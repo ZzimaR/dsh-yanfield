@@ -1,6 +1,6 @@
 {
   "name": "dsh-yanfield",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "在 DeepSeek Harness 里写长篇小说。砚田写作台：正文、大纲、资料与可审阅的 AI 改稿。",
   "type": "module",
   "main": "./dist/host.js",

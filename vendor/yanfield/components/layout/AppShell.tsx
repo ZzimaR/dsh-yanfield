@@ -8,6 +8,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { novelBackTarget } from "@/lib/app-nav";
+import { GITHUB_URL } from "@/components/landing/constants";
 import {
   ChevronLeft,
   CodeXml,
@@ -132,7 +133,7 @@ export function AppShell({
           </Tooltip>
           <Tooltip label="GitHub" side="right">
             <a
-              href="https://github.com/ZzimaR/Yanfield"
+              href={GITHUB_URL}
               target="_blank"
               rel="noreferrer noopener"
               aria-label="GitHub"

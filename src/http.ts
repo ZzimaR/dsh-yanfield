@@ -20,6 +20,7 @@ interface NodeResponse {
   write: (chunk: Uint8Array) => boolean
   end: (chunk?: Uint8Array | string) => void
   on: (event: string, listener: () => void) => void
+  once?: (event: string, listener: () => void) => void
   off?: (event: string, listener: () => void) => void
   headersSent?: boolean
   destroyed?: boolean
@@ -126,7 +127,10 @@ async function writeWebResponse(res: NodeResponse, response: Response): Promise<
       if (res.destroyed) return
       const chunk = Buffer.from(value)
       if (!res.write(chunk)) {
-        await new Promise<void>((resolve) => res.on("drain" as "close", resolve as () => void))
+        await new Promise<void>((resolve) => {
+          if (typeof res.once === "function") res.once("drain", resolve)
+          else res.on("drain", resolve)
+        })
       }
     }
   } finally {

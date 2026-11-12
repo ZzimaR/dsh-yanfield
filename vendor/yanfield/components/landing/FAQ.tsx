@@ -13,7 +13,7 @@ const FAQS = [
   },
   {
     q: "我的书稿数据在哪？怎么备份？",
-    a: "保存在运行砚田的设备上：默认在系统用户数据目录（Windows 为 %APPDATA%\\Yanfield），「设置 → 数据」可以查看实际位置并打开所在文件夹。可停服后备份整个文件夹，或使用 SQLite 在线备份；单本书也可以导出为 Markdown / TXT。",
+    a: "保存在本机的 SQLite 文件里，默认是 $DSH_HOME/yanfield/yanfield.db。「设置 → 数据」可以查看实际位置并打开所在文件夹。单本书也可以导出为 Markdown / TXT。",
   },
   {
     q: "能导入已有的 TXT 小说吗？",

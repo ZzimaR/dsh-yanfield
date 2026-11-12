@@ -6,35 +6,35 @@ import { SectionHeading } from "./SectionHeading";
 const STEPS = [
   {
     no: "01",
-    title: "安装依赖",
-    description: "克隆仓库并安装依赖。需要 Node.js ≥ 22.13 与 pnpm。",
-    note: "没有 pnpm？先执行 npm i -g pnpm。",
+    title: "安装插件",
+    description: "用 DSH 的插件命令装进 web 或 desktop profile。",
+    note: "仓库已带构建产物，安装不会执行脚本。",
   },
   {
     no: "02",
-    title: "启动本地服务",
-    description: "一条命令启动。首次运行会自动建库并写入内置提示词，不碰外部数据库。",
-    note: "SQLite 零配置，不需要 Docker。",
+    title: "重启 Harness",
+    description: "装完后重启，侧栏才会出现砚田。",
+    note: "桌面版使用 desktop profile。",
   },
   {
     no: "03",
     title: "开始写作",
-    description: "打开本地地址，在「设置 → 模型服务」填入你的 API Key，或先创建示例作品离线体验。",
-    note: "Key 保存在自己的部署环境，调用时发送给所选服务商鉴权。",
+    description: "打开砚田。模型用 Harness 里已经配好的服务，也可以先用离线演示。",
+    note: "改动先给你看，确认后才写入。",
   },
 ] as const;
 
 /** 三步把砚田装到自己的电脑上。 */
 export function HowItWorks({ compact = false }: { compact?: boolean }) {
-  const clone = `git clone https://github.com/ZzimaR/Yanfield.git\ncd Yanfield\npnpm install`;
+  const clone = `dsh plugin --profile web add github:ZzimaR/dsh-yanfield`;
 
   return (
     <section id="how" className={compact ? "py-2" : "mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:py-24"}>
       <SectionHeading
         align={compact ? "left" : "center"}
         eyebrow="安装"
-        title="三步，放到自己的电脑上"
-        description="不需要注册，也不需要数据库。能跑 Node.js 的地方就能写。"
+        title="三步，放进 Harness"
+        description="不需要另外开一个网站。装进当前 profile 就能写。"
       />
 
       <ol className={compact ? "mt-6 grid gap-3" : "mt-10 grid gap-4 sm:mt-12 lg:grid-cols-3"}>
@@ -54,9 +54,9 @@ export function HowItWorks({ compact = false }: { compact?: boolean }) {
               {index === 0 ? (
                 <CodeBlock label="terminal" code={clone} />
               ) : index === 1 ? (
-                <CodeBlock label="terminal" code="pnpm dev" />
+                <CodeBlock label="terminal" code="重启 Harness" />
               ) : (
-                <CodeBlock label="browser" code="http://127.0.0.1:3000" />
+                <CodeBlock label="app" code="侧栏 → 砚田" />
               )}
             </div>
             <p className="mt-auto pt-3 text-[11px] leading-5 text-ink-3">{step.note}</p>

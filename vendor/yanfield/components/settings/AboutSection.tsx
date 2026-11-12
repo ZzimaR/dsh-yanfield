@@ -6,10 +6,10 @@ import { InkstoneMark } from "@/components/brand/InkstoneMark";
 import { Badge, Card } from "@/components/ui/kit";
 import { GITHUB_URL, DOCS_URL, ISSUES_URL, VERSION } from "@/components/landing/constants";
 
-const STACK = ["Next.js 15", "React 19", "TypeScript", "Tailwind CSS v4", "TipTap", "SQLite (node:sqlite)", "lucide-react"];
+const STACK = ["DeepSeek Harness", "React", "TypeScript", "Tailwind CSS v4", "TipTap", "SQLite", "lucide-react"];
 
 const CREDITS = [
-  { name: "Next.js / React", note: "应用框架与 UI 运行时" },
+  { name: "React", note: "写作台界面" },
   { name: "TipTap", note: "沉浸式块级编辑器" },
   { name: "Tailwind CSS", note: "设计 token 与排版系统" },
   { name: "lucide-react", note: "图标" },
@@ -22,7 +22,7 @@ export function AboutSection() {
     <div className="space-y-4">
       <div>
         <h2 className="font-serif text-lg text-ink">关于</h2>
-        <p className="mt-1 text-[12px] leading-6 text-ink-3">砚田是一个本地优先的 AI 小说创作工作台，源码公开、可自托管。</p>
+        <p className="mt-1 text-[12px] leading-6 text-ink-3">砚田是 DeepSeek Harness 里的写作台。书稿留在本机，模型用当前 profile 里已经配好的服务。</p>
       </div>
 
       <Card className="p-4">
@@ -54,7 +54,7 @@ export function AboutSection() {
             <dt className="text-ink-3">文档</dt>
             <dd>
               <a href={DOCS_URL} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-accent link-underline">
-                使用与架构文档
+                使用说明
                 <ExternalLink className="size-3" aria-hidden />
               </a>
             </dd>

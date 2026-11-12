@@ -7,12 +7,13 @@ import { YanfieldApp } from "./app"
 
 export const inject = ["slots"]
 
+/** 侧栏只给 16px。用线条画田字格，跟宿主其他入口一样吃 currentColor。 */
 function PanelIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg data-dsh-panel-entry="yanfield" viewBox="0 0 16 16" width={size} height={size} aria-hidden="true">
-      <rect x="1.2" y="1.2" width="13.6" height="13.6" rx="3.2" fill="none" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M8 1.6v12.8M1.6 8h12.8" stroke="currentColor" strokeWidth="0.8" strokeDasharray="1.4 1.2" fill="none" opacity="0.75" />
-      <path d="M5.2 4.2c.5-.4 1.4-.2 2.3.5 1.4.9 2.6 2.2 2.8 3.6.2 1.2-.6 2.2-1.8 2.2-1.1 0-1.8-.8-1.7-1.8.1-.9-.3-1.9-1.1-3.1-.3-.5-.6-.9-.5-1.4Z" fill="currentColor" />
+    <svg data-dsh-panel-entry="yanfield" viewBox="0 0 16 16" width={size} height={size} fill="none"
+      stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="1.7" y="1.7" width="12.6" height="12.6" rx="3" />
+      <path d="M8 1.7v12.6M1.7 8h12.6" strokeDasharray="1.5 1.2" />
     </svg>
   )
 }

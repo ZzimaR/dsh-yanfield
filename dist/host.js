@@ -45471,7 +45471,7 @@ __export(route_exports43, {
 import path3 from "node:path";
 
 // vendor/yanfield/package.json
-var version2 = "0.1.0";
+var version2 = "0.1.1";
 
 // vendor/yanfield/app/api/_lib/open-folder.ts
 import { spawn } from "node:child_process";
@@ -45817,7 +45817,10 @@ async function writeWebResponse(res, response) {
       if (res.destroyed) return;
       const chunk = Buffer.from(value);
       if (!res.write(chunk)) {
-        await new Promise((resolve) => res.on("drain", resolve));
+        await new Promise((resolve) => {
+          if (typeof res.once === "function") res.once("drain", resolve);
+          else res.on("drain", resolve);
+        });
       }
     }
   } finally {
