@@ -21,7 +21,9 @@ Your book stays local, the model is the DeepSeek you already configured, and eve
 > [!NOTE]
 > Yanfield is still being polished; UI and behavior will keep changing. Bugs and ideas are welcome in [Issues](https://github.com/ZzimaR/dsh-yanfield/issues) — the Bug report / Feature request forms (with environment and steps) get fixed faster. Pull requests are welcome too.
 
-![Yanfield workspace: outline and notes on the left, prose in the middle, AI assistant on the right](docs/screenshots/workspace.png)
+[![Yanfield inside DeepSeek Harness: open the bookshelf from the host sidebar, switch between outline and notes, preview AI context, and review a prose edit](docs/screenshots/yanfield-in-dsh.gif)](docs/screenshots/yanfield-in-dsh.gif)
+
+24-second walkthrough of a sample novel in DSH. The review uses a prepared example edit. The interface and captions are in Chinese.
 
 <p align="center"><sub>Three-column writing desk · sample manuscript · click for full size</sub></p>
 
