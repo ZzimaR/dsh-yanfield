@@ -23,38 +23,33 @@ import type { AppSettings, Novel, ProviderConfig, Volume } from "./types";
 import { DEFAULT_APP_SETTINGS } from "./types";
 
 let ready = false;
+let initializing: Promise<void> | undefined;
 
 export function isReady(): boolean {
   return ready;
 }
 
-export function ensureReady(): void {
+export async function ensureReady(): Promise<void> {
   if (ready) return;
-  ready = true;
-  try {
-    repo.ensureBuiltinPresets(BUILTIN_PRESETS);
-    ensureDefaultSettings();
-    ensureDemoProvider();
-    ensureEnvProviders();
-    ensureHarnessProvider();
-    if (repo.listNovels().length === 0) seedDemo();
-  } catch (err) {
-    ready = false;
-    throw err;
-  }
+  initializing ??= initialize().catch((error) => {
+    initializing = undefined;
+    throw error;
+  });
+  await initializing;
 }
 
-/** 旧版上下文预算档位（照别的模型定的，对 1M 窗口太保守）：启动时一次性迁移为「不限」。 */
-const LEGACY_CONTEXT_BUDGETS = new Set([4000, 8000, 12000, 24000, 48000]);
+async function initialize(): Promise<void> {
+  repo.ensureBuiltinPresets(BUILTIN_PRESETS);
+  ensureDefaultSettings();
+  ensureDemoProvider();
+  ensureEnvProviders();
+  await ensureHarnessProvider();
+  if (repo.listNovels().length === 0) seedDemo();
+  ready = true;
+}
 
 export function ensureDefaultSettings(): AppSettings {
   const current = repo.getSettings();
-  const budget = current.defaultContext?.contextBudget;
-  if (typeof budget === "number" && LEGACY_CONTEXT_BUDGETS.has(budget)) {
-    return repo.saveSettings({
-      defaultContext: { ...current.defaultContext, contextBudget: 0 },
-    });
-  }
   if (JSON.stringify(current) !== JSON.stringify(DEFAULT_APP_SETTINGS)) {
     return repo.saveSettings({});
   }
@@ -148,22 +143,15 @@ export function ensureEnvProviders(): ProviderConfig[] {
 }
 
 /** DSH 插件里优先使用 Harness 已经配好的模型。已有官方 Key 服务时不抢默认值。 */
-export function ensureHarnessProvider(): ProviderConfig | undefined {
+export async function ensureHarnessProvider(): Promise<ProviderConfig | undefined> {
   if (process.env.YANFIELD_IN_DSH !== "1") return undefined;
   const bridge = getHarnessBridge();
-  const route = bridge?.providerRoute() || "deepseek";
   const model = bridge?.defaultModel() || "deepseek-flash";
-  const models = [{ id: model, label: `${model}（Harness 当前模型）`, contextWindow: 1_000_000 }];
   let provider = repo.listProviders().find((item) => item.kind === "harness");
-  // 旧版本把 harness 服务固定成 ``harness:deepseek-official``（要 API Key）；DSH 是账号登录时
-  // 那条路由必然报 MISSING_CREDENTIAL，启动时静默迁到账号路由，用户就不用改配置。
-  if (provider && provider.baseUrl === "harness:deepseek-official") {
-    const accountRoute = bridge?.listProviders().find((item) => item.id === "deepseek-account");
-    if (accountRoute) {
-      provider = repo.updateProvider(provider.id, { baseUrl: `harness:${accountRoute.id}` });
-    }
-  }
   if (!provider) {
+    const route = await bridge?.preferredProviderRoute?.() ?? bridge?.providerRoute() ?? "deepseek";
+    const discovered = await bridge?.discoverModels(route).catch(() => []) ?? [];
+    const models = discovered.length ? discovered : [{ id: model, label: model }];
     provider = repo.createProvider({
       name: "DeepSeek Harness",
       kind: "harness",
@@ -178,10 +166,11 @@ export function ensureHarnessProvider(): ProviderConfig | undefined {
     ? repo.listProviders().find((item) => item.id === settings.models.chat.providerId)
     : undefined;
   if (!current || current.kind === "demo" || !settings.models.chat.model) {
+    const defaultModel = provider.models.find((item) => item.id === model)?.id ?? provider.models[0]?.id ?? model;
     repo.saveSettings({
       models: {
-        chat: { providerId: provider.id, model: provider.models[0]?.id || model },
-        prose: { providerId: provider.id, model: provider.models[0]?.id || model },
+        chat: { providerId: provider.id, model: defaultModel },
+        prose: { providerId: provider.id, model: defaultModel },
       },
     });
   }

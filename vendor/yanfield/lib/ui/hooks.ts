@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isInsideComposedPath } from "./composed";
+import { yanfieldPanelBounds, yanfieldPanelElement, type PanelBounds } from "./portal";
 
 /** 防抖值 */
 export function useDebouncedValue<T>(value: T, delay = 300): T {
@@ -57,6 +58,27 @@ export function useMediaQuery(query: string): boolean {
     return () => media.removeEventListener("change", listener);
   }, [query]);
   return matches;
+}
+
+/** 插件面板可能比浏览器窗口窄，且可由宿主动态调整。 */
+export function useYanfieldPanelBounds(enabled = true): PanelBounds | null {
+  const [bounds, setBounds] = useState<PanelBounds | null>(null);
+  useLayoutEffect(() => {
+    if (!enabled) return;
+    const update = () => setBounds(yanfieldPanelBounds() ?? {
+      left: 0, top: 0, width: window.innerWidth, height: window.innerHeight,
+    });
+    update();
+    const panel = yanfieldPanelElement();
+    const observer = panel ? new ResizeObserver(update) : null;
+    if (panel) observer?.observe(panel);
+    window.addEventListener("resize", update);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [enabled]);
+  return bounds;
 }
 
 /** 点击外部关闭 */

@@ -23,13 +23,18 @@ export interface PanelBounds {
  * 用面板矩形当浮层的边界，弹窗才会在面板内居中、遮罩也不会盖住宿主侧栏。
  */
 export function yanfieldPanelBounds(): PanelBounds | null {
+  const host = yanfieldPanelElement()
+  if (!host) return null
+  const rect = host.getBoundingClientRect()
+  if (rect.width < 80 || rect.height < 80) return null
+  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+}
+
+export function yanfieldPanelElement(): HTMLElement | null {
   if (typeof window === "undefined") return null
   const node = yanfieldPortal()
   const root = node.getRootNode()
   const host =
     root instanceof ShadowRoot && root.host instanceof HTMLElement ? root.host : node === document.body ? null : node
-  if (!host || !host.isConnected) return null
-  const rect = host.getBoundingClientRect()
-  if (rect.width < 80 || rect.height < 80) return null
-  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+  return host?.isConnected ? host : null
 }

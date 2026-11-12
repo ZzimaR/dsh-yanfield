@@ -533,7 +533,6 @@ export function AiPanel({
     void sendAgent(text);
   },[task,sendAgent,chat.streaming]);
   const handleSend=React.useCallback(()=>sendAgent(draft.trim()),[sendAgent,draft]);
-  const handleQuickAsk=React.useCallback((prompt:string)=>{void sendAgent(prompt);},[sendAgent]);
   const sendAgentRef=React.useRef(sendAgent);
   sendAgentRef.current=sendAgent;
   const handleRetry=React.useCallback((message:UIMessage)=>{
@@ -850,7 +849,6 @@ export function AiPanel({
             model={target}
             presets={presets?.items ?? null}
             onPickSkill={handlePickSkill}
-            onSendExample={handleQuickAsk}
             disabled={chat.streaming}
           />
         ) : (

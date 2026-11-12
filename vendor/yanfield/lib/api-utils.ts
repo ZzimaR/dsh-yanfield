@@ -49,7 +49,7 @@ export function handle<P extends Record<string, string> = Record<string, string>
   // 否则 next 生成的类型校验（.next/types）会报 ParamCheck 错误。
   return async (req: Request, ctx: { params: Promise<Record<string, string>> }): Promise<Response> => {
     try {
-      ensureReady();
+      await ensureReady();
       const params = (ctx && ctx.params ? await ctx.params : ({} as Record<string, string>)) as P;
       return await fn(req, { params });
     } catch (err) {

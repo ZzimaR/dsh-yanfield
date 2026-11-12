@@ -390,14 +390,16 @@ export interface SwitchProps {
   label?: React.ReactNode;
   hint?: React.ReactNode;
   disabled?: boolean;
+  "aria-label"?: string;
 }
 
-export function Switch({ checked, onChange, label, hint, disabled }: SwitchProps) {
+export function Switch({ checked, onChange, label, hint, disabled, "aria-label": ariaLabel }: SwitchProps) {
   return (
     <label className={cn("flex cursor-pointer items-start gap-3", disabled && "cursor-not-allowed opacity-60")}>
       <button
         type="button"
         role="switch"
+        aria-label={ariaLabel}
         aria-checked={checked}
         disabled={disabled}
         onClick={() => onChange(!checked)}

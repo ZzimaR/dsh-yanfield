@@ -159,9 +159,15 @@ export async function handleHttp(
   }
   const found = pathname.match(match.regex)
   const params: Record<string, string> = {}
-  match.keys.forEach((key, index) => {
-    params[key] = decodeURIComponent(found?.[index + 1] || "")
-  })
+  try {
+    match.keys.forEach((key, index) => {
+      params[key] = decodeURIComponent(found?.[index + 1] || "")
+    })
+  } catch (error) {
+    if (!(error instanceof URIError)) throw error
+    json(res, 400, { error: "URL 路径编码无效" })
+    return
+  }
   const handlers = match.handlers as Record<string, (request: Request, context: { params: Promise<Record<string, string>> }) => Promise<Response> | Response>
   const handler = handlers[method]
   if (typeof handler !== "function") {

@@ -5,10 +5,10 @@
 - Node.js ≥ 22.19（构建、自检用；运行时不依赖它，Harness 自带运行时）。
 - 一个可用的 DeepSeek Harness 安装（`>=0.2.1-rc.5 <0.3.0`），最好有两个 profile：
   - 一个正式用的（如 `desktop`），装稳定版本；
-  - 一个开发用的（如 `yanfield-dev`），用 `link:` 指向本仓库，改完即可生效。
+  - 一个开发用的（如 `yanfield-dev`），用 DSH CLI 链接本仓库，修改后重新构建。
 
 ```bash
-npm install
+npm ci
 ```
 
 只装构建依赖（esbuild、Tailwind CLI、React 类型等）。插件发布时自带 `dist/`，安装端不会执行任何安装脚本。
@@ -21,15 +21,8 @@ npm install
 | `npm run check` | 清单自检：包名、`cordis.patch.yml`、导出、README 安装命令、产物是否存在 |
 | `npm run smoke` | 冒烟测试：在临时目录起 HTTP 处理器，验证关键接口 |
 | `npm run test` | 以上三者串起来 |
-| `npm run reinstall` | 构建 + 自检 + 整目录替换到 `~/.dsh/profiles/<profile>/node_modules/dsh-yanfield` |
-
-`reinstall` 默认装到 `desktop`，也可以指定 profile：
-
-```bash
-npm run reinstall -- yanfield-dev
-```
-
-> 桌面 profile 里是**真实拷贝**（不是 symlink），所以每次改宿主代码都要 reinstall + 重启；开发 profile 用 `link:` 时，改完只需重启。
+| `npm pack --dry-run` | 查看安装包文件清单，检查两个 `dist/` 入口和 `cordis.patch.yml` |
+| `npm run reinstall -- <profile>` | 调试已有的拷贝安装，直接替换其插件目录。首次安装使用 DSH CLI |
 
 ## 三、构建链
 
@@ -54,11 +47,15 @@ npm run reinstall -- yanfield-dev
 
 推荐做法：单独起一个实例，别碰正在用的那个。
 
-1. 建一个开发 profile（`~/.dsh/profiles/yanfield-dev`），把插件依赖指向本仓库：
+1. 在仓库根目录构建，用 Web 模板创建开发 profile，再通过 DSH CLI 链接仓库：
 
-   ```json
-   { "dependencies": { "dsh-yanfield": "link:D:/dsh-yanfield" } }
+   ```bash
+   npm test
+   dsh --profile yanfield-dev --from-default-profile web --dump-config
+   dsh plugin --profile yanfield-dev add .
    ```
+
+   `--from-default-profile` 会重建同名 profile，只在首次创建时运行。已有开发 profile 可以跳过这一行。
 
 2. 给这个 profile 配一份隔离数据库（避免写你的真实书稿），在 `~/.dsh/profiles/yanfield-dev/cordis.patch.yml` 追加：
 
@@ -73,13 +70,12 @@ npm run reinstall -- yanfield-dev
 3. 起实例：
 
    ```bash
-   "<install>/DeepSeek Harness.exe" --expose-internals "<install>/resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/cli.js" \
-     --profile yanfield-dev --port 4761 --no-open
+   dsh --profile yanfield-dev --port 4761 --no-open
    ```
 
    日志里会打印带 token 的地址，用无头浏览器附上 token 打开即可自动化验证。
 
-4. 改完客户端代码：重新 `build` 后刷新页面（资源带内容哈希）；改完宿主代码：重启实例。
+4. 后续修改运行代码时执行 `npm run build`，再重启开发实例。链接会继续使用同一份仓库，无需再次安装。
 
 ## 六、界面验证（可选）
 
@@ -96,11 +92,12 @@ chrome --headless=new --no-sandbox --disable-gpu --disable-crash-reporter \
 ## 七、发布检查清单
 
 1. `npm run test` 全绿；
-2. `npm run build` 后 `dist/` 有更新，且 `client/styles.generated.css` 已重新生成；
+2. 检查版本号与「关于」页一致。发版标签用 `v<package.json 版本>`，例如 `v0.1.1`。
 3. `README.md` 的安装命令与 `package.json` 的 `name`、`dsh` 字段一致；
-4. 版本号（`package.json`）与「关于」页显示一致；
-5. 装到干净 profile 试一次：安装 → 重启 → 新建作品 → 发一条消息 → 审阅并应用；
-6. 提交时把 `dist/` 一起提交（安装端不跑构建）。
+4. 用 `npm pack` 生成安装包，用 `dsh plugin --profile <测试 profile> add <安装包路径>` 验证实际安装，再验证新建作品和 AI 审阅流程。
+5. 推送发版标签后，[发布工作流](../.github/workflows/release.yml) 会重新构建、自检和打包，然后把 `dsh-yanfield.tgz` 附到对应的 GitHub Release。带预发布后缀的版本会标为预发布。稳定版保留同一个附件名，供 `releases/latest/download/dsh-yanfield.tgz` 使用。
+
+`dist/` 由本地构建或 CI 生成，随 Release 安装包交付。普通用户从 README 的 Release 链接安装，开发者使用本地链接。市场条目的 `tarball` 可以指向同一个稳定版附件。参见 [DSH 打包与安装文档](https://deepseek-harness.github.io/deepseek-harness/develop/basic/publish)。
 
 ## 八、目录速览
 

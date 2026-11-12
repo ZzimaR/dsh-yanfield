@@ -36,14 +36,14 @@
 
 ## 安装
 
-前置：DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`。
+需要 DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`。按你启动的 profile 选择下面一条命令，安装 [GitHub Releases](https://github.com/ZzimaR/dsh-yanfield/releases) 提供的预构建包。
 
 ```bash
 # Web 版
-dsh plugin --profile web add github:ZzimaR/dsh-yanfield
+dsh plugin --profile web add https://github.com/ZzimaR/dsh-yanfield/releases/latest/download/dsh-yanfield.tgz
 
 # 桌面版
-dsh plugin --profile desktop add github:ZzimaR/dsh-yanfield
+dsh plugin --profile desktop add https://github.com/ZzimaR/dsh-yanfield/releases/latest/download/dsh-yanfield.tgz
 ```
 
 安装完成后**完全退出 Harness 再重新打开**（只刷新页面不够：插件含宿主侧代码，需要重启进程）。
@@ -51,9 +51,9 @@ dsh plugin --profile desktop add github:ZzimaR/dsh-yanfield
 确认装好：
 
 1. 左侧导航出现「砚田」；
-2. 打开 `砚田 → 设置 → 关于`，「构建」一行是刚才那次安装的时间。
+2. 打开 `砚田 → 设置 → 关于`，核对版本和构建时间。构建时间是产物生成时间。
 
-更新到新版本：重复上面的安装命令，再重启 Harness。
+更新或回退时，从 Releases 复制目标版本的 `dsh-yanfield.tgz` 链接（形如 `releases/download/v0.1.1/dsh-yanfield.tgz`），用同一个 profile 执行 `dsh plugin --profile <profile> add <链接>`，然后重启 Harness。之前用仓库地址安装的用户也可以用这个方法切换到 Release 包。
 
 ## 第一次使用
 
@@ -121,7 +121,7 @@ dsh plugin --profile desktop add github:ZzimaR/dsh-yanfield
 ## 数据与备份
 
 - 书稿默认在 `$DSH_HOME/yanfield/yanfield.db`（含 `-wal` / `-shm` 附属文件）。`设置 → 数据` 会显示实际路径并能一键打开所在文件夹。
-- 也可以用环境变量 `YANFIELD_DB_PATH` 指定数据库文件，或在 profile 的 `cordis.patch.yml` 里给插件加 `dataDir` 配置。
+- 用环境变量 `YANFIELD_DB_PATH` 可指定数据库文件。若 profile 的 `cordis.patch.yml` 配置了插件的 `dataDir`，优先使用该目录里的 `yanfield.db`。
 - 备份：先退出 Harness，再复制整个目录（运行中直接复制 SQLite 可能拿到不一致的快照）。
 - 卸载插件不会删除书稿；数据库仍在上面那个路径里。
 
@@ -172,11 +172,8 @@ dsh plugin --profile desktop remove dsh-yanfield
 需要 Node.js ≥ 22.19（构建与自检用；运行时由 Harness 提供）。
 
 ```bash
-npm install          # 仅开发依赖（esbuild、tailwind、react 类型）
-npm run build        # 生成 API 路由表 + 编译样式 + 打包 dist/host.js 与 dist/client.js
-npm run check        # 类型/接口自检
-npm run smoke        # 冒烟测试
-npm run reinstall    # 构建并装进 ~/.dsh/profiles/<profile>/node_modules/dsh-yanfield
+npm ci      # 按 package-lock.json 安装构建依赖
+npm test    # 构建 dist/，再运行清单检查与冒烟测试
 ```
 
 ```bash
@@ -187,7 +184,7 @@ scripts/    构建、自检、冒烟、重装
 docs/       功能、AI 与费用、架构、开发、常见问题
 ```
 
-更细的构建链、目录职责与本地联调方式见 [开发说明](docs/development.md)；架构与数据模型见 [架构说明](docs/architecture.md)；完整功能清单见 [功能说明](docs/features.md)；AI 接入与费用细节见 [AI 与费用](docs/ai-and-cost.md)；排障见 [常见问题](docs/faq.md)。
+从本地源码安装到隔离 profile 的步骤见 [本地联调](docs/development.md#五本地联调)。架构与数据模型见 [架构说明](docs/architecture.md)，功能清单见 [功能说明](docs/features.md)，AI 接入和费用见 [AI 与费用](docs/ai-and-cost.md)，排障见 [常见问题](docs/faq.md)。
 
 English docs: [README.en.md](README.en.md) · [docs/en/](docs/en/features.md)
 

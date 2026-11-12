@@ -5,7 +5,7 @@
  * - 保留当前智能体头像 / 角色 / 问候语；
  * - 说明 AI 在这本书里能做什么、改动可审阅可撤销；
  * - 4 个真实技能（对应内置预设：爆款仿写 / 承接续写 / 去 AI 味 / 章节体检），点击填入输入框；
- * - 3 个示例问题，点击直接发送；
+ * - 简短的提问入口，点击填入输入框；
  * - 离线演示模式下说明「无需 Key」与接入真实模型的入口。
  */
 import Link from "next/link";
@@ -18,9 +18,9 @@ import type { ModelTargetInfo } from "./model-info";
 import { SKILL_CARDS } from "./skills";
 
 const EXAMPLES = [
-  "看看第一章，说说节奏上的问题",
-  "把最新一章的错别字改掉",
-  "为下一章写一个章纲",
+  { label: "检查节奏", prompt: "看看第一章，说说节奏上的问题" },
+  { label: "校对错别字", prompt: "把最新一章的错别字改掉" },
+  { label: "起草章纲", prompt: "为下一章写一个章纲" },
 ];
 
 export interface WelcomePanelProps {
@@ -28,10 +28,8 @@ export interface WelcomePanelProps {
   model: ModelTargetInfo | null;
   /** 内置预设（/api/presets）：用于确认技能可用并展示预设名 */
   presets?: PromptPreset[] | null;
-  /** 点击技能：把示例 prompt 填入输入框（不直接发送） */
+  /** 把技能或示例指令填入输入框。 */
   onPickSkill: (prompt: string, label: string) => void;
-  /** 点击示例：直接发送 */
-  onSendExample: (text: string) => void;
   disabled?: boolean;
   className?: string;
 }
@@ -41,7 +39,6 @@ export function WelcomePanel({
   model,
   presets,
   onPickSkill,
-  onSendExample,
   disabled = false,
   className,
 }: WelcomePanelProps) {
@@ -149,28 +146,20 @@ export function WelcomePanel({
       </div>
 
       {/* 示例问题 */}
-      <div>
-        <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-ink-4">试试这样问</p>
-        <div className="flex flex-col gap-1.5">
-          {EXAMPLES.map((example) => (
-            <button
-              key={example}
-              type="button"
-              disabled={disabled}
-              onClick={() => onSendExample(example)}
-              className="group flex w-full items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 py-1.5 text-left text-[11.5px] text-ink-2 transition-colors duration-150 hover:border-accent/30 hover:bg-accent-soft hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <span className="min-w-0 flex-1 truncate">{example}</span>
-              <ArrowRight className="size-3 shrink-0 text-ink-4 transition-colors group-hover:text-accent" />
-            </button>
-          ))}
-        </div>
+      <div role="group" aria-label="示例提问" className="flex flex-wrap items-center gap-1.5">
+        {EXAMPLES.map(({ label, prompt }) => (
+          <button
+            key={label}
+            type="button"
+            disabled={disabled}
+            title={prompt}
+            onClick={() => onPickSkill(prompt, label)}
+            className="rounded-full bg-surface-2 px-2.5 py-1 text-[11px] text-ink-2 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {label}
+          </button>
+        ))}
       </div>
-
-      <p className="text-center text-[10px] leading-relaxed text-ink-4">
-        也可以直接在下方输入框描述需求，<kbd className="rounded border border-line px-1">@</kbd> 引用章节 / 角色 / 设定，
-        <kbd className="ml-0.5 rounded border border-line px-1">/</kbd> 选技能
-      </p>
     </div>
   );
 }

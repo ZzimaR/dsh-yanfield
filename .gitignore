@@ -5,3 +5,5 @@ node_modules/
 client/styles.generated.css
 src/generated/
 .tmp-test/
+/dist/
+/*.tgz

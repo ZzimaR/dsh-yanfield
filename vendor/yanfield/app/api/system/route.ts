@@ -2,7 +2,7 @@ import path from "node:path";
 import { version } from "@/package.json";
 import type { SystemInfo } from "@/lib/types";
 import { ApiError, handle, ok } from "@/lib/api-utils";
-import { getDbPath, SCHEMA_VERSION } from "@/lib/db";
+import { getDbPath, hasCustomDbPath, SCHEMA_VERSION } from "@/lib/db";
 import { openFolder } from "@/app/api/_lib/open-folder";
 
 export const runtime = "nodejs";
@@ -15,7 +15,7 @@ function systemInfo(): SystemInfo {
     schemaVersion: SCHEMA_VERSION,
     dbPath,
     dataDir: path.dirname(dbPath),
-    customDbPath: Boolean(process.env.YANFIELD_DB_PATH?.trim()),
+    customDbPath: hasCustomDbPath(),
   };
 }
 

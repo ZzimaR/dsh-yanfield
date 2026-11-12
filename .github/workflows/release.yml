@@ -1,0 +1,63 @@
+name: 发布安装包
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 核对标签与包版本
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag must match package.json version (expected v$version)"
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm test
+      - name: 打包并检查安装入口
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          npm pack --quiet --pack-destination "$RUNNER_TEMP"
+          archive="$RUNNER_TEMP/dsh-yanfield.tgz"
+          mv "$RUNNER_TEMP/dsh-yanfield-$version.tgz" "$archive"
+          for entry in package.json cordis.patch.yml dist/host.js dist/client.js icon.svg; do
+            tar -xOzf - "package/$entry" < "$archive" > /dev/null
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dsh-yanfield-package
+          path: ${{ runner.temp }}/dsh-yanfield.tgz
+          if-no-files-found: error
+
+  release:
+    needs: pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dsh-yanfield-package
+      - name: 发布 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=(--repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes)
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" dsh-yanfield.tgz "${args[@]}"

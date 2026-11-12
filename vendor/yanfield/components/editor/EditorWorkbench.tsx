@@ -21,7 +21,7 @@ import { useChapterDraft } from "@/lib/editor/useChapterDraft";
 import { useEditorBridgeValue } from "@/lib/editor/useEditorBridgeValue";
 import { useNovelTree } from "@/lib/editor/useNovelTree";
 import { cn } from "@/lib/ui/cn";
-import { useHotkeys, useLocalStorageState, useMediaQuery, useResizePanel } from "@/lib/ui/hooks";
+import { useHotkeys, useLocalStorageState, useResizePanel, useYanfieldPanelBounds } from "@/lib/ui/hooks";
 import { applySurfaceDataset, applyTheme, readSurfaceTheme } from "@/lib/ui/theme";
 import type { AppSettings, Chapter } from "@/lib/types";
 import { CommandPalette } from "./CommandPalette";
@@ -78,8 +78,9 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
    * ≥768：左栏内联（可拖宽/折叠）；<768：左栏改为 header 按钮唤起的抽屉
    * ≥1024：AI 面板内联；<1024：AI 面板改为抽屉，不挤压正文
    */
-  const isDesktop = useMediaQuery("(min-width: 768px)");
-  const isWide = useMediaQuery("(min-width: 1024px)");
+  const panelWidth = useYanfieldPanelBounds()?.width ?? 0;
+  const isDesktop = panelWidth >= 768;
+  const isWide = panelWidth >= 1024;
   const [drawerLeftOpen, setDrawerLeftOpen] = React.useState(false);
   const [drawerRightOpen, setDrawerRightOpen] = React.useState(false);
   /** ⌘K 命令面板 */
@@ -640,7 +641,6 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
             novel={tree?.novel ?? null}
             volumeTitle={volume?.title ?? null}
             title={title}
-            wordCount={wordCount}
             saveState={activeRecovery ? "dirty" : saveState}
             lastSavedAt={lastSavedAt}
             immersive={immersive}
@@ -665,13 +665,13 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
           />
         )}
 
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
           {/* 左栏：目录 / 章纲 / 设定 / 档案（仅 ≥768 内联）。
               桌面下始终挂载，折叠 / 沉浸只切显隐：各面板不卸载，页签、草稿与已拉取的数据都保留 */}
           {isDesktop ? (
             <>
               <aside
-                style={{ width: leftPanel.width }}
+                style={{ width: Math.min(leftPanel.width, panelWidth * 0.28) }}
                 className={cn("min-h-0 shrink-0 overflow-hidden", leftInlineVisible ? "flex" : "hidden")}
                 aria-label="目录、章纲、设定与档案"
                 aria-hidden={leftInlineVisible ? undefined : true}
@@ -694,7 +694,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
                   aria-orientation="vertical"
                   aria-label="拖拽调整左栏宽度"
                   onPointerDown={leftPanel.onPointerDown}
-                  className="hidden w-1 shrink-0 cursor-col-resize border-r border-line bg-surface-2/40 transition-colors duration-150 hover:bg-accent-soft md:block"
+                  className="w-1 shrink-0 cursor-col-resize border-r border-line bg-surface-2/40 transition-colors duration-150 hover:bg-accent-soft"
                 />
               ) : null}
             </>
@@ -807,12 +807,12 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
           </main>
 
           {/* 右栏：AI 协作（仅 ≥1024 内联，窄屏走抽屉） */}
-          {showRightInline ? <div role="separator" aria-orientation="vertical" aria-label="拖拽调整右栏宽度" onPointerDown={rightPanel.onPointerDown} className="hidden w-1 shrink-0 cursor-col-resize border-l border-line bg-surface-2/40 hover:bg-accent-soft lg:block" /> : null}
-          {!isWide && drawerRightOpen ? <button type="button" aria-label="关闭助手遮罩" className="fixed inset-0 z-40 bg-black/30" onClick={()=>setDrawerRightOpen(false)} /> : null}
+          {showRightInline ? <div role="separator" aria-orientation="vertical" aria-label="拖拽调整右栏宽度" onPointerDown={rightPanel.onPointerDown} className="w-1 shrink-0 cursor-col-resize border-l border-line bg-surface-2/40 hover:bg-accent-soft" /> : null}
+          {!isWide && drawerRightOpen ? <button type="button" aria-label="关闭助手遮罩" className="absolute inset-0 z-40 bg-black/30" onClick={()=>setDrawerRightOpen(false)} /> : null}
           {/* Keep one panel mounted across collapse, immersion and responsive layouts. */}
           <aside
-            style={{width:isWide?rightPanel.width:440,maxWidth:"100vw"}}
-            className={cn("min-h-0 min-w-0 shrink-0 overflow-hidden bg-surface",isWide?(showRightInline?"flex":"hidden"):(drawerRightOpen?"fixed inset-y-0 right-0 z-50 flex shadow-float":"hidden"))}
+            style={{ width: isWide ? Math.min(rightPanel.width, panelWidth * 0.38) : 440, maxWidth: "100%" }}
+            className={cn("min-h-0 min-w-0 shrink-0 overflow-hidden bg-surface", isWide ? (showRightInline ? "flex" : "hidden") : (drawerRightOpen ? "absolute inset-y-0 right-0 z-50 flex shadow-float" : "hidden"))}
             aria-label="AI 协作面板"
             role={!isWide&&drawerRightOpen?"dialog":undefined}
             aria-modal={!isWide&&drawerRightOpen?true:undefined}

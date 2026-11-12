@@ -53,13 +53,11 @@
   },
   "files": [
     "dist",
-    "client",
-    "src",
-    "vendor/yanfield",
     "icon.svg",
     "cordis.patch.yml",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "README.en.md"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",

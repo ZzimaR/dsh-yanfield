@@ -5,10 +5,10 @@
 - Node.js ≥ 22.19 (for building and checks; the runtime comes from Harness).
 - A working DeepSeek Harness install (`>=0.2.1-rc.5 <0.3.0`), ideally with two profiles:
   - a production one (e.g. `desktop`) with a released build;
-  - a development one (e.g. `yanfield-dev`) whose plugin dependency is `link:`-ed to this repo.
+  - a development one (e.g. `yanfield-dev`) linked to this checkout through the DSH CLI.
 
 ```bash
-npm install
+npm ci
 ```
 
 Build dependencies only (esbuild, Tailwind CLI, React types). Published packages ship `dist/`, and installing never runs lifecycle scripts.
@@ -21,15 +21,8 @@ Build dependencies only (esbuild, Tailwind CLI, React types). Published packages
 | `npm run check` | manifest checks: name, `cordis.patch.yml`, exports, README install command, artefacts |
 | `npm run smoke` | smoke test: boots the HTTP handler in a temp dir and exercises key endpoints |
 | `npm run test` | build + check + smoke |
-| `npm run reinstall` | build + check + replace `~/.dsh/profiles/<profile>/node_modules/dsh-yanfield` wholesale |
-
-`reinstall` defaults to `desktop`; pass a profile name for another one:
-
-```bash
-npm run reinstall -- yanfield-dev
-```
-
-> A desktop profile holds a **real copy** (not a symlink), so every host-side change needs reinstall + restart. A dev profile using `link:` only needs a restart.
+| `npm pack --dry-run` | check that the package contains both `dist/` entry points and `cordis.patch.yml` |
+| `npm run reinstall -- <profile>` | replace an existing copied install for debugging. Use the DSH CLI for the first install |
 
 ## 3. Build chain
 
@@ -54,11 +47,15 @@ When patching sources with Python, use `io.open(path, "w", encoding="utf-8", new
 
 Run a separate instance so you never touch the profile you actually use.
 
-1. Create `~/.dsh/profiles/yanfield-dev` and link the plugin:
+1. Build from the repository root, create a profile from the Web template and link the checkout:
 
-   ```json
-   { "dependencies": { "dsh-yanfield": "link:D:/dsh-yanfield" } }
+   ```bash
+   npm test
+   dsh --profile yanfield-dev --from-default-profile web --dump-config
+   dsh plugin --profile yanfield-dev add .
    ```
+
+   `--from-default-profile` recreates the named profile. Run that line only when creating it.
 
 2. Give that profile an isolated database in `~/.dsh/profiles/yanfield-dev/cordis.patch.yml`:
 
@@ -73,13 +70,12 @@ Run a separate instance so you never touch the profile you actually use.
 3. Start it:
 
    ```bash
-   "<install>/DeepSeek Harness.exe" --expose-internals "<install>/resources/app.asar/dsh/node_modules/@deepseek-ai/dsh-desktop-host/lib/cli.js" \
-     --profile yanfield-dev --port 4761 --no-open
+   dsh --profile yanfield-dev --port 4761 --no-open
    ```
 
    The log prints a URL with a token; open it in a headless browser for automation.
 
-4. Client changes: rebuild and refresh (assets carry a content hash). Host changes: restart the instance.
+4. Run `npm run build` and restart the dev instance after changing runtime code. The profile remains linked to the checkout.
 
 ## 6. Visual verification (optional)
 
@@ -95,12 +91,13 @@ For interaction (clicks, waiting on streaming output) drive CDP directly: connec
 
 ## 7. Release checklist
 
-1. `npm run test` is green;
-2. `npm run build` refreshed `dist/` and `client/styles.generated.css`;
-3. the install command in `README.md` matches `package.json` (`name`, `dsh` fields);
-4. the version in `package.json` matches Settings → About;
-5. install into a clean profile once: install → restart → new novel → send a message → review and apply;
-6. commit `dist/` together with sources (installs never build).
+1. Run `npm test`.
+2. Check that the version matches Settings → About. Use the tag `v<package.json version>`, for example `v0.1.1`.
+3. Check that the README install command matches the package manifest.
+4. Run `npm pack`, install the archive with `dsh plugin --profile <test-profile> add <archive-path>`, then test creating a novel and reviewing an AI edit.
+5. Push the release tag. The [release workflow](../../.github/workflows/release.yml) builds and tests the package, then attaches `dsh-yanfield.tgz` to the GitHub Release for that tag. Versions with a prerelease suffix are marked as prereleases. The stable asset name supports `releases/latest/download/dsh-yanfield.tgz`.
+
+Local builds and CI generate `dist/` and ship it in the Release archive. Users install from the Release link in the README, and developers link the checkout. A market entry can point its `tarball` field at the same stable asset. See [DSH packaging and installation](https://deepseek-harness.github.io/deepseek-harness/en/develop/basic/publish).
 
 ## 8. Layout
 

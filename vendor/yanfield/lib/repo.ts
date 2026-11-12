@@ -19,7 +19,7 @@ import { builtinAiPricing } from "./ai/deepseek-pricing";
 import { unifyModelSettings } from "./model-settings";
 import { normalizeProviderKind } from "./ai/provider-kind";
 import { countWords } from "./ui/cn";
-import { DEFAULT_APP_SETTINGS } from "./types";
+import { DEFAULT_APP_SETTINGS, MAX_CONTEXT_BUDGET, MAX_OUTPUT_TOKENS } from "./types";
 import type {
   AiFeature,
   AiLog,
@@ -1150,6 +1150,8 @@ export function getSettings(): AppSettings {
     models: unifyModelSettings(stored.models ?? DEFAULT_APP_SETTINGS.models),
     aiPricing: { ...DEFAULT_APP_SETTINGS.aiPricing, ...(stored.aiPricing ?? {}) },
   };
+  merged.defaultContext.contextBudget = Math.min(merged.defaultContext.contextBudget, MAX_CONTEXT_BUDGET);
+  merged.defaultContext.maxTokens = Math.min(merged.defaultContext.maxTokens, MAX_OUTPUT_TOKENS);
   return merged;
 }
 

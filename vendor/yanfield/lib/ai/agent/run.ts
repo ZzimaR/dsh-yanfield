@@ -7,7 +7,7 @@ import { parseAgentDecision, supportsDecisionJson, usesDecisionTool, DECISION_TO
 import { protocolDiagnostic } from "./diagnostics";
 import * as repo from "@/lib/repo";
 import { resolveTarget, mergeContextConfig } from "@/lib/ai/engine";
-import { isOutputLimitError, streamCompletion, type AiMessage } from "@/lib/ai/provider";
+import { isOutputLimitError, streamCompletion, type AiMessage, type ProviderChunk } from "@/lib/ai/provider";
 import { historyLimitsFor, trimChatHistory } from "@/lib/ai/history";
 import { agentPreamble, extractJson } from "@/lib/ai/prompts";
 import { countWords, estimateTokens, stripHtml, uid } from "@/lib/ui/cn";
@@ -114,49 +114,64 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
   // 一旦真的被截断，就放宽本轮上限重试一次，并在本次任务后续决策轮保持放宽。
   let decisionCapRelaxed=false;
   async function* complete(input:AiMessage[],decisionOutput=false,materialOutput=false,shortWrite=false):AsyncGenerator<string> {
-    let raw="",prompt=0,output=0;
-    if(decisionOutput)lastDecisionReasoning="";
-    let cachedInputTokens:number|undefined;
-    let reported=false,cost:{amount:number;currency:"USD"|"CNY"}|undefined;
-    try {
-      // 决策轮与资料整理都是结构化输出：关掉思考能省下大部分输出 token。
-      // 短篇润色/小改动的写作也降到 low，长篇创作仍按作者设置。
-      const thinkingOptions = thinkingProfile(target.provider,target.model).options;
-      const canOff = thinkingOptions.some(option=>option.value==="off");
-      const canLow = thinkingOptions.some(option=>option.value==="low");
-      const decideThinking = (decisionOutput||materialOutput) && canOff ? "off" as const : shortWrite && canLow ? "low" as const : target.thinkingLevel;
-      const baseMaxTokens = config.maxTokens>0?config.maxTokens:undefined;
-      let retried=false;
-      for(;;) {
-        raw="";
-        const capped = decisionOutput && !retried && !decisionCapRelaxed;
-        const callMaxTokens = capped ? 1400 : baseMaxTokens;
-        try {
-          for await(const chunk of streamCompletion({provider:target.provider,model:target.model,messages:input,maxTokens:callMaxTokens,temperature:0.4,signal,disableThinking:true,thinkingLevel:decideThinking,...(decisionOutput ? usesDecisionTool(target.provider,target.model)?{decisionTools:DECISION_TOOLS}:supportsDecisionJson(target.provider,target.model)?{outputFormat:"json" as const}:{} : materialOutput&&supportsDecisionJson(target.provider,target.model)?{outputFormat:"json" as const}:{})})) {
-            if(signal?.aborted) throw new DOMException("已停止","AbortError");
-            if(chunk.type==="reasoning"&&decisionOutput&&deepThinking)lastDecisionReasoning+=chunk.text;
-            if(chunk.type==="delta") {raw+=chunk.text;yield chunk.text;}
-            if(chunk.type==="usage") {prompt=chunk.promptTokens;output=chunk.completionTokens;reported=true;cachedInputTokens=chunk.cachedInputTokens;if(chunk.cost)cost=chunk.cost;}
+    const thinkingOptions = thinkingProfile(target.provider, target.model).options;
+    const canOff = thinkingOptions.some((option) => option.value === "off");
+    const canLow = thinkingOptions.some((option) => option.value === "low");
+    const thinkingLevel = (decisionOutput || materialOutput) && canOff ? "off"
+      : shortWrite && canLow ? "low" : target.thinkingLevel;
+    const baseMaxTokens = config.maxTokens || undefined;
+    const decisionTools = decisionOutput && usesDecisionTool(target.provider, target.model) ? DECISION_TOOLS : undefined;
+    const outputFormat = !decisionTools && (decisionOutput || materialOutput) &&
+      supportsDecisionJson(target.provider, target.model) ? "json" : undefined;
+    for (;;) {
+      let raw = "";
+      let reasoning = "";
+      let usage: Extract<ProviderChunk, { type: "usage" }> | undefined;
+      const capped = decisionOutput && !decisionCapRelaxed && (baseMaxTokens === undefined || baseMaxTokens > 1400);
+      const maxTokens = capped ? 1400 : baseMaxTokens;
+      let limited = false;
+      try {
+        for await (const chunk of streamCompletion({
+          provider: target.provider, model: target.model, messages: input, maxTokens,
+          temperature: 0.4, signal, disableThinking: true, thinkingLevel, decisionTools, outputFormat,
+        })) {
+          if (chunk.type === "usage") usage = chunk;
+          if (signal?.aborted) throw new DOMException("已停止", "AbortError");
+          if (chunk.type === "reasoning") reasoning += chunk.text;
+          if (chunk.type === "delta") {
+            raw += chunk.text;
+            yield chunk.text;
           }
-          break;
-        } catch(error) {
-          if(capped && isOutputLimitError(error) && !signal?.aborted) {decisionCapRelaxed=true;retried=true;continue;}
-          throw error;
         }
+      } catch (error) {
+        limited = isOutputLimitError(error);
+        if (!capped || !limited || signal?.aborted) throw error;
+        decisionCapRelaxed = true;
+        continue;
+      } finally {
+        completionCalls++;
+        const cost = usage?.cost;
+        if (cost && (!run.usage.reportedCost || run.usage.reportedCost.currency === cost.currency)) {
+          pricedCalls++;
+          run.usage.reportedCost = { ...cost, amount: (run.usage.reportedCost?.amount ?? 0) + cost.amount, complete: false };
+        }
+        if (run.usage.reportedCost) run.usage.reportedCost.complete = pricedCalls === completionCalls;
+        run.usage.estimatedTokens = Boolean(run.usage.estimatedTokens || !usage);
+        run.usage.promptTokens += usage?.promptTokens ?? (
+          input.reduce((sum, message) => sum + estimateTokens(message.content + (message.reasoning_content || "")), 0) +
+          (decisionOutput ? decisionOverhead : 0)
+        );
+        run.usage.completionTokens += usage?.completionTokens ?? (limited && maxTokens ? maxTokens : estimateTokens(raw + reasoning));
+        if (usage?.cachedInputTokens !== undefined) {
+          run.usage.cachedInputTokens = (run.usage.cachedInputTokens ?? 0) + usage.cachedInputTokens;
+          run.usage.cacheReportedInputTokens = (run.usage.cacheReportedInputTokens ?? 0) + usage.promptTokens;
+        }
+        checkpoint();
       }
-    } finally {
-      completionCalls++;
-      if(cost&&(!run.usage.reportedCost||run.usage.reportedCost.currency===cost.currency)) {
-        pricedCalls++;run.usage.reportedCost={...cost,amount:(run.usage.reportedCost?.amount??0)+cost.amount,complete:false};
-      }
-      if(run.usage.reportedCost)run.usage.reportedCost.complete=pricedCalls===completionCalls;
-      run.usage.estimatedTokens=Boolean(run.usage.estimatedTokens||!reported);
-      run.usage.promptTokens+=reported?prompt:input.reduce((n,m)=>n+estimateTokens(m.content+(m.reasoning_content||"")),0)+(decisionOutput?decisionOverhead:0);
-      run.usage.completionTokens+=reported?output:estimateTokens(raw);
-      if(reported&&cachedInputTokens!==undefined){run.usage.cachedInputTokens=(run.usage.cachedInputTokens??0)+cachedInputTokens;run.usage.cacheReportedInputTokens=(run.usage.cacheReportedInputTokens??0)+prompt;}
-      checkpoint();
+      if (decisionOutput) lastDecisionReasoning = deepThinking ? reasoning : "";
+      if (!raw.trim() && !decisionOutput) throw new Error("模型未返回内容");
+      return;
     }
-    if(!raw.trim() && !decisionOutput) throw new Error("模型未返回内容");
   }
   const reference=(kind:EntityKind,id:string,row:Fields)=>{
     if(!run.references.some(r=>r.kind===kind&&r.id===id)) run.references.push({kind,id,title:String(row.title||row.name||ENTITY_LABEL[kind])});

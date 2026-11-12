@@ -691,10 +691,10 @@ export async function listProviderModels(
   if (provider.kind === "harness") {
     const bridge = getHarnessBridge();
     const route = harnessRoute(provider);
-    const models = bridge ? await bridge.discoverModels(route) : provider.models;
+    const discovered = await bridge?.discoverModels(route);
     return {
       endpoint: `harness:${route}`,
-      models: models.map((item) => ({ id: item.id, label: item.label, contextWindow: 1_000_000 })),
+      models: discovered?.length ? discovered : provider.models,
     };
   }
   const key = provider.apiKey?.trim() ?? "";

@@ -218,7 +218,7 @@ export function DataSection() {
         </h3>
         <p className="mt-1.5 text-[12px] leading-6 text-ink-2">
           全部书稿、设置和 API Key 都保存在下面这个数据库文件里
-          {systemApi.data?.customDbPath ? "（位置由 YANFIELD_DB_PATH 指定）" : ""}：
+          {systemApi.data?.customDbPath ? "（自定义位置）" : ""}：
         </p>
         <p className="mt-1.5 break-all rounded-sm bg-surface-2 px-2 py-1.5 font-mono text-[11px] text-ink" data-testid="db-path">
           {systemApi.data?.dbPath ?? (systemApi.error ? "无法读取数据库位置" : "读取中…")}

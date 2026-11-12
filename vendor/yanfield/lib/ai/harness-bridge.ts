@@ -47,6 +47,7 @@ export interface HarnessRouteOption {
 
 export interface HarnessBridge {
   providerRoute(): string
+  preferredProviderRoute?(): Promise<string>
   defaultModel(): string
   listProviders(): { id: string; name: string }[]
   discoverModels(route: string): Promise<HarnessModel[]>

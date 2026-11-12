@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Dropdown, IconButton, Tooltip, type DropdownItem } from "@/components/ui/kit";
 import { openSettingsDialog } from "@/components/settings/open";
-import { cn, formatWords } from "@/lib/ui/cn";
+import { cn } from "@/lib/ui/cn";
 import type { Novel } from "@/lib/types";
 import type { SaveState } from "@/lib/editor/types";
 import { SaveIndicator } from "./SaveIndicator";
@@ -32,7 +32,6 @@ interface EditorHeaderProps {
   volumeTitle: string | null;
   /** 实时草稿标题（未保存也即时反映） */
   title: string;
-  wordCount: number;
   saveState: SaveState;
   lastSavedAt: string | null;
   immersive: boolean;
@@ -60,13 +59,12 @@ interface EditorHeaderProps {
   onNextChapter?: () => void;
 }
 
-/** 编辑器顶栏：返回上一级、作品名、面包屑、保存状态、字数、主题、沉浸、AI */
+/** 编辑器顶栏：返回上一级、作品名、面包屑、保存状态、主题、沉浸、AI */
 export function EditorHeader({
   novelId,
   novel,
   volumeTitle,
   title,
-  wordCount,
   saveState,
   lastSavedAt,
   immersive,
@@ -96,7 +94,7 @@ export function EditorHeader({
   ];
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-surface/85 px-2 backdrop-blur">
+    <header className="@container/editor-header flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-surface/85 px-2 backdrop-blur">
       <Tooltip label={backLabel}>
         <IconButton label={backLabel} onClick={onBack}>
           <ArrowLeft className="size-4" />
@@ -125,8 +123,8 @@ export function EditorHeader({
         </Link>
         {volumeTitle ? (
           <>
-            <ChevronRight className="hidden size-3 shrink-0 text-ink-4 sm:block" aria-hidden />
-            <span className="hidden max-w-[110px] truncate text-ink-3 sm:block" title={volumeTitle}>
+            <ChevronRight className="hidden size-3 shrink-0 text-ink-4 @min-[640px]/editor-header:block" aria-hidden />
+            <span className="hidden max-w-[110px] truncate text-ink-3 @min-[640px]/editor-header:block" title={volumeTitle}>
               {volumeTitle}
             </span>
           </>
@@ -139,7 +137,7 @@ export function EditorHeader({
 
       {/* 上下章导航：顺序未知（如新建/移出）时不展示 */}
       {chapterPosition != null && chapterTotal > 0 ? (
-        <div className="hidden shrink-0 items-center gap-0.5 sm:flex">
+        <div className="hidden shrink-0 items-center gap-0.5 @min-[640px]/editor-header:flex">
           <Tooltip label={prevChapterTitle ? `上一章：${prevChapterTitle}` : "上一章"}>
             <IconButton
               label="上一章"
@@ -170,15 +168,10 @@ export function EditorHeader({
       ) : null}
 
       <div className="ml-auto flex shrink-0 items-center gap-1">
-        <SaveIndicator state={saveState} lastSavedAt={lastSavedAt} className="mr-1 hidden sm:inline-flex" />
+        <SaveIndicator state={saveState} lastSavedAt={lastSavedAt} className="mr-1 hidden @min-[640px]/editor-header:inline-flex" />
         <SaveButton onSave={onSave} saving={saveState === "saving"} disabled={!canSave} />
-        <span className="mr-1 hidden text-[11.5px] tabular-nums text-ink-3 md:inline">
-          {formatWords(wordCount)} 字
-        </span>
 
-        {/* 更多菜单：移动端收起（header 精简），平板及以上保留 */}
         <Tooltip label="更多">
-          <span className="hidden sm:inline-flex">
             <Dropdown
               align="end"
               width={180}
@@ -189,10 +182,9 @@ export function EditorHeader({
                 </IconButton>
               }
             />
-          </span>
         </Tooltip>
         <Tooltip label={immersive ? "退出沉浸模式 (Esc)" : "沉浸模式"}>
-          <span className="hidden sm:inline-flex">
+          <span className="hidden @min-[640px]/editor-header:inline-flex">
             <IconButton label="沉浸模式" active={immersive} onClick={onToggleImmersive}>
               {immersive ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
             </IconButton>

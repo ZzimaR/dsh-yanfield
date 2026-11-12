@@ -873,6 +873,9 @@ export function applyAgentOverride(agent: AgentDef, override?: AgentPersonaOverr
   };
 }
 
+export const MAX_CONTEXT_BUDGET = 2_000_000;
+export const MAX_OUTPUT_TOKENS = 64_000;
+
 export const DEFAULT_CONTEXT_CONFIG: ContextConfig = {
   includeNovelOutline: true,
   includeVolumeOutline: true,

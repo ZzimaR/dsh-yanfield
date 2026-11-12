@@ -19,7 +19,11 @@ function toModelOptions(models: { id: string; label: string; contextWindow?: num
 
 function sameModels(left: ModelOption[], right: ModelOption[]): boolean {
   if (left.length !== right.length) return false;
-  return left.every((model, index) => model.id === right[index]?.id && model.label === right[index]?.label);
+  return left.every((model, index) =>
+    model.id === right[index]?.id &&
+    model.label === right[index]?.label &&
+    model.contextWindow === right[index]?.contextWindow,
+  );
 }
 
 /**

@@ -3,6 +3,7 @@
  * repo.saveSettings 是浅合并，这里先按现有设置做深合并，避免子对象丢字段。
  */
 import { ApiError } from "@/lib/api-utils";
+import { MAX_CONTEXT_BUDGET, MAX_OUTPUT_TOKENS } from "@/lib/types";
 import { unifyModelSettings } from "@/lib/model-settings";
 import type { AgentId, AgentPersonaOverride, AiPricing, AppSettings, ContextConfig } from "@/lib/types";
 import { AGENT_IDS, isObject, pickEnum, pickFields, type FieldSpec, type Json } from "./http";
@@ -74,6 +75,8 @@ function mergeContext(current: ContextConfig, raw: unknown): ContextConfig {
     if (value === undefined) continue;
     const num = Number(value);
     if (!Number.isFinite(num) || num < 0) throw new ApiError(`defaultContext.${key} 必须是非负数字`, 400);
+    if (key === "contextBudget" && num > MAX_CONTEXT_BUDGET) throw new ApiError(`上下文预算最多 ${MAX_CONTEXT_BUDGET} tokens`, 400);
+    if (key === "maxTokens" && num > MAX_OUTPUT_TOKENS) throw new ApiError(`单次输出上限最多 ${MAX_OUTPUT_TOKENS} tokens`, 400);
     next[key] = Math.floor(num);
   }
   if (raw.customInstruction !== undefined) {

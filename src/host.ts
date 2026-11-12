@@ -4,6 +4,7 @@ import os from "node:os"
 import path from "node:path"
 import { setHarnessBridge, type HarnessAccountBalance, type HarnessBridge, type HarnessModel, type HarnessRouteOption, type HarnessStreamInput } from "../vendor/yanfield/lib/ai/harness-bridge"
 import { handleHttp } from "./http"
+import { setPluginDbPath } from "../vendor/yanfield/lib/db"
 
 export const name = "dsh-yanfield"
 const PREFIX = "/yanfield"
@@ -44,10 +45,12 @@ function adoptLegacyDatabase(target: string): void {
 
 function prepareDatabase(config: PluginConfig): void {
   const custom = typeof config.dataDir === "string" ? config.dataDir.trim() : ""
-  const dir = custom ? path.resolve(custom) : path.join(dshHome(), "yanfield")
-  const file = path.join(dir, "yanfield.db")
-  adoptLegacyDatabase(file)
-  process.env.YANFIELD_DB_PATH = file
+  const envPath = process.env.YANFIELD_DB_PATH?.trim()
+  const file = custom
+    ? path.resolve(custom, "yanfield.db")
+    : envPath ? path.resolve(envPath) : path.join(dshHome(), "yanfield", "yanfield.db")
+  if (!custom && !envPath) adoptLegacyDatabase(file)
+  setPluginDbPath(file, Boolean(custom || envPath))
   process.env.YANFIELD_IN_DSH = "1"
 }
 
@@ -135,7 +138,11 @@ function createBridge(ctx: { llm?: LlmLike; get?: (name: string) => unknown; dee
   const configuredProvider = typeof config.provider === "string" ? config.provider.trim() : ""
   const configuredModel = typeof config.model === "string" && config.model.trim() ? config.model.trim() : "deepseek-flash"
   const llmOf = (): LlmLike | null => {
-    if (ctx.llm && typeof ctx.llm.stream === "function") return ctx.llm
+    try {
+      if (ctx.llm && typeof ctx.llm.stream === "function") return ctx.llm
+    } catch {
+      /* llm 还未注入 */
+    }
     try {
       const found = ctx.get?.("llm") as LlmLike | undefined
       if (found && typeof found.stream === "function") return found
@@ -212,7 +219,7 @@ function createBridge(ctx: { llm?: LlmLike; get?: (name: string) => unknown; dee
     }
     if (route === ACCOUNT_PROVIDER_ROUTE) {
       const account = accountOf()
-      if (!account?.getState) return { available: true }
+      if (!account?.getState) return { available: false, unavailableReason: "账号服务暂时无法确认登录状态" }
       try {
         const state = await account.getState()
         if (state?.status === "credential-stored") return { available: true }
@@ -233,6 +240,15 @@ function createBridge(ctx: { llm?: LlmLike; get?: (name: string) => unknown; dee
       if (listed.some((item) => item.id === ACCOUNT_PROVIDER_ROUTE)) return ACCOUNT_PROVIDER_ROUTE
       return listed[0]?.id || "deepseek"
     },
+    async preferredProviderRoute() {
+      if (configuredProvider) return configuredProvider
+      const listed = this.listProviders().map((item) => item.id)
+      const preferred = [ACCOUNT_PROVIDER_ROUTE, OFFICIAL_PROVIDER_ROUTE, ...listed]
+      for (const route of new Set(preferred)) {
+        if (listed.includes(route) && (await routeAvailability(route)).available) return route
+      }
+      return this.providerRoute()
+    },
     defaultModel() {
       return configuredModel
     },
@@ -242,13 +258,7 @@ function createBridge(ctx: { llm?: LlmLike; get?: (name: string) => unknown; dee
       return llm.listProviders().map((item) => ({ id: String(item.id), name: String(item.name || item.id) }))
     },
     async discoverModels(route: string) {
-      const fallback = [{ id: configuredModel, label: `${configuredModel}（Harness）` }]
-      try {
-        const found = await catalogOf(route)
-        return found.length > 0 ? found : fallback
-      } catch {
-        return fallback
-      }
+      return catalogOf(route)
     },
     async listRoutes() {
       const llm = llmOf()
@@ -265,9 +275,7 @@ function createBridge(ctx: { llm?: LlmLike; get?: (name: string) => unknown; dee
         const status = await routeAvailability(id)
         routes.push({ id, name: routeDisplayName(id, item.name), ...status, models })
       }
-      // 当前在用的路由排第一位：设置页据此把它标成「使用中」。
-      const current = this.providerRoute()
-      return [...routes].sort((left, right) => (left.id === current ? -1 : right.id === current ? 1 : 0))
+      return routes
     },
     async accountBalance() {
       const account = accountOf()
@@ -294,8 +302,7 @@ function createBridge(ctx: { llm?: LlmLike; get?: (name: string) => unknown; dee
       // 旧版本把 harness 服务固定到 ``deepseek-official``（需要 API Key）。用户是账号登录时
       // 那条路由会抛 MISSING_CREDENTIAL，这里自动改用账号路由重试，免得旧数据报错。
       const routes = [input.provider]
-      const accountRoute = availableAccountRoute(llm)
-      if (accountRoute && accountRoute !== input.provider) routes.push(accountRoute)
+      if (input.provider === OFFICIAL_PROVIDER_ROUTE && availableAccountRoute(llm)) routes.push(ACCOUNT_PROVIDER_ROUTE)
       let lastError: unknown = null
       for (const route of routes) {
         let delivered = false
@@ -310,6 +317,7 @@ function createBridge(ctx: { llm?: LlmLike; get?: (name: string) => unknown; dee
         } catch (error) {
           // 已经吐出内容就不能重试，否则会重复输出。
           if (delivered || !isMissingCredential(error)) throw error
+          if (route === OFFICIAL_PROVIDER_ROUTE && !(await routeAvailability(ACCOUNT_PROVIDER_ROUTE)).available) throw error
           lastError = error
         }
       }
@@ -405,7 +413,10 @@ export function apply(ctx: { effect?: (fn: () => void, label?: string) => void; 
   setHarnessBridge(createBridge(ctx, resolved))
   if (typeof ctx.inject === "function") {
     ctx.inject(["llm"], (scoped) => {
-      setHarnessBridge(createBridge({ ...ctx, llm: scoped.llm, get: scoped.get ?? ctx.get }, resolved))
+      setHarnessBridge(createBridge({
+        llm: scoped.llm,
+        get: (name) => scoped.get?.(name) ?? ctx.get?.(name),
+      }, resolved))
     })
   }
   const handler = createHttpHandler(ctx)

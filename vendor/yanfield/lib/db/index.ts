@@ -332,13 +332,23 @@ function migrate(db: DB, dbPath: string): void {
 }
 
 /** 当前进程实际使用的数据库文件绝对路径 */
+let pluginDbPath: { file: string; custom: boolean } | undefined;
+
+export function setPluginDbPath(file: string, custom: boolean): void {
+  pluginDbPath = { file, custom };
+}
+
+export function hasCustomDbPath(): boolean {
+  return pluginDbPath?.custom ?? Boolean(process.env.YANFIELD_DB_PATH?.trim());
+}
+
 export function getDbPath(): string {
-  return resolveDbPath();
+  return pluginDbPath?.file ?? resolveDbPath();
 }
 
 export function getDb(): DB {
   if (dbInstance) return dbInstance;
-  const dbPath = resolveDbPath();
+  const dbPath = getDbPath();
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   try {

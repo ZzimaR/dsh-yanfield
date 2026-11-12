@@ -12,6 +12,7 @@
 import * as React from "react";
 import { CircleAlert, Layers, RefreshCw } from "lucide-react";
 import type { ContextConfig } from "@/lib/types";
+import { MAX_CONTEXT_BUDGET, MAX_OUTPUT_TOKENS } from "@/lib/types";
 import { Badge, Button, Sheet, Skeleton, Switch } from "@/components/ui/kit";
 import { cn, formatNumber, truncate } from "@/lib/ui/cn";
 import type { ContextPreview, ContextSection } from "./types";
@@ -87,7 +88,7 @@ export function ContextDrawer({
   const budgetOptions = React.useMemo(() => {
     const recommended = recommendedContextBudget(modelContextWindow, modelMaxOutputTokens);
     const options = [...BUDGET_OPTIONS];
-    if (recommended && !options.some((option) => option.value === recommended)) {
+    if (recommended && recommended <= MAX_CONTEXT_BUDGET && !options.some((option) => option.value === recommended)) {
       options.push({ value: recommended, label: `建议 ${budgetLabel(recommended)}` });
     }
     if (options.some((option) => option.value === activeBudget)) return options;
@@ -129,10 +130,7 @@ export function ContextDrawer({
       title="上下文预览"
       width={420}
       footer={
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[10.5px] leading-tight text-ink-4 dark:text-ink-3">
-            支持预算与分节开关，排序后续开放
-          </span>
+        <div className="flex justify-end">
           <Button
             variant="secondary"
             size="sm"
@@ -156,28 +154,24 @@ export function ContextDrawer({
             {activeBudget > 0 ? (
               <span className={cn("shrink-0 tabular-nums", toneText)}>{percent}%</span>
             ) : (
-              <span className="shrink-0 text-ink-4 dark:text-ink-3">不限制</span>
+              <span className="shrink-0 text-ink-4 dark:text-ink-3">由模型决定</span>
             )}
           </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-3">
-            <div
-              className={cn("h-full rounded-full transition-all duration-300", toneBg)}
-              style={{ width: `${percent}%` }}
-            />
-          </div>
+          {activeBudget > 0 ? (
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-3">
+              <div className={cn("h-full rounded-full transition-all duration-300", toneBg)} style={{ width: `${percent}%` }} />
+            </div>
+          ) : null}
           <p className="mt-1.5 text-[10px] leading-relaxed text-ink-4 dark:text-ink-3">
-            统计作品资料及分节标题；不含系统提示、聊天历史或提示模板额外加入的材料。
+            仅估算作品资料，不含系统提示和聊天记录。
           </p>
 
           <label className="mt-3 flex items-center justify-between gap-2 text-[11px] text-ink-2">
-            单次输出上限（tokens）
-            <input type="number" min={0} max={64000} step={1000} value={config.maxTokens}
-              onChange={event=>{const value=Number(event.target.value);if(Number.isFinite(value))onConfigChange({...config,maxTokens:Math.min(64000,Math.max(0,Math.round(value)))});}}
+            单次输出上限（0 为自动）
+            <input type="number" min={0} max={MAX_OUTPUT_TOKENS} step={1} value={config.maxTokens}
+              onChange={event=>{const value=Number(event.target.value);if(Number.isFinite(value))onConfigChange({...config,maxTokens:Math.min(MAX_OUTPUT_TOKENS,Math.max(0,Math.round(value)))});}}
               className="w-24 rounded-sm border border-line bg-surface px-1.5 py-1" />
           </label>
-          <p className="mt-1 text-[10.5px] leading-relaxed text-ink-3">
-            0 自动选择：使用 DeepSeek 接口的默认输出上限，并非无限。主编、写手、资料整理每次调用均使用此值；长篇可尝试 16000–32000，须在模型支持范围内。tokens 不等于字数，实际生成越多，等待和费用通常越高。
-          </p>
           {/* 上下文预算 */}
           <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2">
             <label
@@ -203,15 +197,12 @@ export function ContextDrawer({
             >
               {budgetOptions.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {option.value === 0 ? "由模型决定" : option.label}
                 </option>
               ))}
             </select>
           </div>
 
-          <p className="mt-1.5 text-[10.5px] leading-relaxed text-ink-4 dark:text-ink-3">
-            这是资料用量估算。AI 会按需读取资料，分节开关控制可读取范围；选区关闭时，选中文本不会发送。
-          </p>
           {modelContextWindow ? (
             <p className={cn(
               "mt-1 text-[10.5px] leading-relaxed",
@@ -252,7 +243,7 @@ export function ContextDrawer({
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-1.5">
+          <div className="overflow-hidden rounded-md border border-line bg-surface">
             {rows.map((section) => {
               const summary = isChapterSummarySection(section);
               const spec = summary ? CHAPTER_SUMMARY_TOGGLE : resolveContextToggle(section.id, section.label);
@@ -261,8 +252,8 @@ export function ContextDrawer({
                 <div
                   key={section.id}
                   className={cn(
-                    "rounded-md border bg-surface px-2.5 py-2 transition-colors duration-150",
-                    section.fallback ? "border-dashed border-line bg-surface-2/40" : "border-line",
+                    "border-b border-line px-2.5 py-2 last:border-b-0",
+                    section.fallback && "bg-surface-2/40",
                   )}
                 >
                   <div className="flex items-start gap-2">
@@ -272,6 +263,7 @@ export function ContextDrawer({
                         {section.mode ? <Badge tone="default">{section.mode}</Badge> : null}
                         {section.fallback ? <Badge tone="default">{enabled ? "暂无可用内容" : "未启用"}</Badge> : null}
                         {section.truncated ? <Badge tone="gold">已截断</Badge> : null}
+                        {!spec && section.included ? <Badge tone="default">自动包含</Badge> : null}
                         <span className="ml-auto shrink-0 text-[11px] tabular-nums text-ink-3 dark:text-ink-2">
                           {section.tokens > 0 ? `${formatNumber(section.tokens)} tokens` : "—"}
                         </span>
@@ -313,32 +305,25 @@ export function ContextDrawer({
                         </label>
                       ) : null}
 
-                      {!spec ? (
-                        <p className="mt-1 text-[10.5px] leading-relaxed text-ink-4 dark:text-ink-3">
-                          由服务端自动装配，暂不支持单独关闭
-                        </p>
-                      ) : spec.hint ? (
+                      {spec?.hint ? (
                         <p className="mt-1 text-[10.5px] leading-relaxed text-ink-4 dark:text-ink-3">{spec.hint}</p>
                       ) : null}
                     </div>
 
-                    <div className="shrink-0 pt-0.5">
+                    {spec ? <div className="shrink-0 pt-0.5">
                       <Switch
+                        aria-label={section.label || section.id}
                         checked={enabled}
-                        disabled={!spec}
-                        onChange={(next) => {
-                          if (!spec) return;
-                          onConfigChange({ ...config, ...spec.set(config, next) });
-                        }}
+                        onChange={(next) => onConfigChange({ ...config, ...spec.set(config, next) })}
                       />
-                    </div>
+                    </div> : null}
                   </div>
                 </div>
               );
             })}
 
             {data?.dropped && data.dropped.length > 0 ? (
-              <p className="px-1 text-[10.5px] leading-relaxed text-ink-4 dark:text-ink-3">
+              <p className="px-2.5 py-2 text-[10.5px] leading-relaxed text-ink-4 dark:text-ink-3">
                 预算不足已省略：{data.dropped.join("、")}（可调高上下文预算或关闭部分分节）
               </p>
             ) : null}

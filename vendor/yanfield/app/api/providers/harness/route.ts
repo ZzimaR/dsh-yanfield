@@ -5,6 +5,7 @@
  */
 import { handle, ok } from "@/lib/api-utils";
 import { getHarnessBridge } from "@/lib/ai/harness-bridge";
+import { getProvider, getSettings } from "@/lib/repo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,9 +16,11 @@ export const GET = handle(async () => {
     return ok({ routes: [], current: null, defaultModel: null });
   }
   const routes = typeof bridge.listRoutes === "function" ? await bridge.listRoutes() : [];
+  const { providerId } = getSettings().models.chat;
+  const provider = providerId ? getProvider(providerId) : undefined;
   return ok({
     routes,
-    current: `harness:${bridge.providerRoute()}`,
+    current: provider?.kind === "harness" && provider.enabled ? provider.baseUrl : null,
     defaultModel: bridge.defaultModel(),
   });
 });

@@ -33,6 +33,7 @@ export function useSettingsEditor(server: AppSettings | undefined, setServer: (v
   const [lastSavedAt, setLastSavedAt] = React.useState<number | null>(null);
   const pending = React.useRef<Partial<AppSettings>>({});
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inFlight = React.useRef(false);
   const mounted = React.useRef(true);
   const { toast } = useToast();
 
@@ -53,26 +54,35 @@ export function useSettingsEditor(server: AppSettings | undefined, setServer: (v
       clearTimeout(timer.current);
       timer.current = null;
     }
-    const patch = pending.current;
-    if (Object.keys(patch).length === 0) return;
-    pending.current = {};
+    if (inFlight.current || Object.keys(pending.current).length === 0) return;
+    inFlight.current = true;
     setSaving(true);
     setSaveError(null);
     try {
-      const updated = await apiPatch<AppSettings>("/api/settings", patch);
-      if (!mounted.current) return;
-      setLocal(updated);
-      setServer(updated);
-      setDirty(false);
-      setLastSavedAt(Date.now());
-      notifyDataChanged("settings");
-    } catch (cause) {
-      if (!mounted.current) return;
-      const message = cause instanceof Error ? cause.message : "保存设置失败";
-      setSaveError(message);
-      setDirty(true);
-      toast({ title: "设置保存失败", description: message, tone: "error" });
+      do {
+        const patch = pending.current;
+        pending.current = {};
+        try {
+          const updated = await apiPatch<AppSettings>("/api/settings", patch);
+          if (!mounted.current) return;
+          const queued = pending.current;
+          setLocal(mergeSettings(updated, queued));
+          setServer(updated);
+          setDirty(Object.keys(queued).length > 0);
+          setLastSavedAt(Date.now());
+          notifyDataChanged("settings");
+        } catch (cause) {
+          pending.current = mergePatches(patch, pending.current);
+          if (!mounted.current) return;
+          const message = cause instanceof Error ? cause.message : "保存设置失败";
+          setSaveError(message);
+          setDirty(true);
+          toast({ title: "设置保存失败", description: message, tone: "error" });
+          return;
+        }
+      } while (!timer.current && Object.keys(pending.current).length > 0);
     } finally {
+      inFlight.current = false;
       if (mounted.current) setSaving(false);
     }
   }, [setServer, toast]);

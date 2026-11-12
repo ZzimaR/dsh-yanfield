@@ -36,11 +36,14 @@ Yanfield is a **DeepSeek Harness plugin**, not a standalone app. After installat
 
 ## Install
 
-Requires DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`.
+Requires DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`. Choose the command for your profile to install the prebuilt package from [GitHub Releases](https://github.com/ZzimaR/dsh-yanfield/releases).
 
 ```bash
-# Use the profile you actually run: web or desktop
-dsh plugin --profile desktop add github:ZzimaR/dsh-yanfield
+# Web
+dsh plugin --profile web add https://github.com/ZzimaR/dsh-yanfield/releases/latest/download/dsh-yanfield.tgz
+
+# Desktop
+dsh plugin --profile desktop add https://github.com/ZzimaR/dsh-yanfield/releases/latest/download/dsh-yanfield.tgz
 ```
 
 Then **quit Harness completely and start it again** — a page refresh is not enough, because the plugin ships host-side code.
@@ -48,9 +51,9 @@ Then **quit Harness completely and start it again** — a page refresh is not en
 How to confirm it worked:
 
 1. a 「砚田」 entry appears in the left sidebar;
-2. `砚田 → Settings → About` shows the build time of the version you just installed.
+2. Check the version and build time in `砚田 → Settings → About`. The build time comes from the bundle.
 
-To update, run the same command and restart Harness.
+To update or roll back, copy the version-specific `dsh-yanfield.tgz` link from Releases (for example, `releases/download/v0.1.1/dsh-yanfield.tgz`). Run `dsh plugin --profile <profile> add <link>` in the same profile and restart Harness. This also replaces an earlier install from the repository URL.
 
 ## First run
 
@@ -118,7 +121,7 @@ More: [model services](docs/screenshots/settings-models.png) · [screenshot note
 ## Data and backup
 
 - Manuscripts live in `$DSH_HOME/yanfield/yanfield.db` (plus `-wal` / `-shm`). `Settings → Data` shows the real path and can open the folder.
-- You can point elsewhere with the `YANFIELD_DB_PATH` environment variable, or with a `dataDir` entry for the plugin in the profile's `cordis.patch.yml`.
+- Set `YANFIELD_DB_PATH` to select a database file. If the profile's `cordis.patch.yml` sets the plugin's `dataDir`, its `yanfield.db` takes precedence.
 - Backup: quit Harness first, then copy the whole directory (copying SQLite while it runs can give an inconsistent snapshot).
 - Removing the plugin does not delete your manuscript; the database stays where it is.
 
@@ -169,11 +172,8 @@ Then restart Harness. Your manuscript is not deleted.
 Requires Node.js ≥ 22.19 (build and checks only; the runtime comes from Harness).
 
 ```bash
-npm install          # dev dependencies (esbuild, tailwind, react types)
-npm run build        # generate API routes + compile CSS + bundle dist/host.js and dist/client.js
-npm run check        # static checks
-npm run smoke        # smoke tests
-npm run reinstall    # build and install into ~/.dsh/profiles/<profile>/node_modules/dsh-yanfield
+npm ci      # install build dependencies from package-lock.json
+npm test    # build dist/, check the manifest and run smoke tests
 ```
 
 ```bash

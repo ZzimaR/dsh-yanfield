@@ -14,7 +14,7 @@ Switch them in `Settings → Model services`; an unavailable route explains itse
 - account route not ready: "还没有登录 DeepSeek 账号：在 DSH 里登录后即可直接用"
 - key route not ready: "还没有保存 DeepSeek API Key：在 DSH 的模型服务页填写，或设置 DEEPSEEK_API_KEY 环境变量"
 
-The account route is preferred. If an older configuration points at the key route while the key is missing, requests fall back to the account route automatically.
+On first setup, Yanfield prefers a signed-in account route, then an official key route with credentials. Restarting preserves the selected route. If the official route reports a missing credential, the request can fall back to a signed-in account route.
 
 ## 2. Model catalogue
 
@@ -64,7 +64,7 @@ Built-in DeepSeek price table (CNY per million tokens):
 
 ## 6. Context budget (unlimited by default)
 
-Unlimited by default: DeepSeek's window is 1,048,576 tokens, so Yanfield carries as much outline, material and previous prose as fits. To cap cost, pick 96k / 128k / 256k / 512k (or a custom value) under Settings → AI & context.
+Unlimited by default: DeepSeek's window is 1,048,576 tokens, so Yanfield carries as much outline, material and previous prose as fits. To cap cost, pick 96k / 128k / 256k / 512k or choose Custom and enter up to 2,000,000 tokens under Settings → AI & context.
 
 `0 = unlimited` still has a guard: each request reserves roughly 10% of the model window plus the output allowance (`max output`, 8k when set to auto) and trims the oldest observations first. If a request still exceeds the window it fails with an explicit "needs X tokens, window is Y" message instead of being silently truncated.
 

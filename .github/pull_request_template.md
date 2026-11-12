@@ -28,7 +28,7 @@ Closes #
 - [ ] `node scripts/build.mjs` 通过
 - [ ] `node scripts/check.mjs` 通过
 - [ ] `node scripts/smoke.mjs` 通过
-- [ ] `node scripts/reinstall.mjs` 装进 profile 并**退出重开 DSH** 手动验过相关页面
+- [ ] 用 DSH CLI 装进测试 profile，启动后手动验过相关页面
 - [ ] 改的是宿主端（`src/host.ts`、`vendor/yanfield/lib`、API 路由）→ 确认已重启而非只刷新
 - [ ] AI 相关改动在**隔离库**（`yanfield-dev` + `config.dataDir`）里跑过，没有写用户真实书库
 
@@ -40,7 +40,7 @@ Closes #
 
 ## 检查清单
 
-- [ ] 没有提交 `dist/`、`.tmp-test/`、`data/`、`client/styles.generated.css`、`src/generated/`（构建产物由 CI/本地生成）
+- [ ] 没有提交 `dist/`、安装包、`.tmp-test/`、`data/`、`client/styles.generated.css` 或 `src/generated/`
 - [ ] 没有把 Node 专用模块（`node:sqlite` / `node:fs` / `@/lib/db` 等）带进客户端 bundle
 - [ ] 新文案与现有中文风格一致；README / docs 相关说明已同步（含 `docs/en/`）
 - [ ] 没有隐私信息（API Key、书稿正文、个人路径）
