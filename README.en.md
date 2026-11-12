@@ -50,6 +50,8 @@ dsh plugin --profile desktop add https://github.com/ZzimaR/dsh-yanfield/releases
 
 Then **quit Harness completely and start it again** — a page refresh is not enough, because the plugin ships host-side code.
 
+If the CLI download times out, download `dsh-yanfield.tgz` from the [latest release](https://github.com/ZzimaR/dsh-yanfield/releases/latest) and run `dsh plugin --profile <profile> add "<local archive path>"`.
+
 How to confirm it worked:
 
 1. a 「砚田」 entry appears in the left sidebar;

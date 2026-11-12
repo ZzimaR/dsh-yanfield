@@ -50,6 +50,8 @@ dsh plugin --profile desktop add https://github.com/ZzimaR/dsh-yanfield/releases
 
 安装完成后**完全退出 Harness 再重新打开**（只刷新页面不够：插件含宿主侧代码，需要重启进程）。
 
+如果命令行下载超时，可以先从 [发布页](https://github.com/ZzimaR/dsh-yanfield/releases/latest) 下载 `dsh-yanfield.tgz`，再运行 `dsh plugin --profile <profile> add "<本地安装包路径>"`。
+
 确认装好：
 
 1. 左侧导航出现「砚田」；
