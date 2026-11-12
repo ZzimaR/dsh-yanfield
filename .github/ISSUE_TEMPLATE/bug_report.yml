@@ -94,7 +94,7 @@ body:
     attributes:
       label: 砚田版本 / 构建时间
       description: 砚田 → 设置 → 关于 → 「构建」那一行的时间；或 `package.json` 里的 version。
-      placeholder: 2026-11-12T11:59:00Z
+      placeholder: "2026-11-12T11:59:00Z"
     validations:
       required: true
 
