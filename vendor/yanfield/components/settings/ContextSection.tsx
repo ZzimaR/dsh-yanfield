@@ -42,13 +42,11 @@ const CUSTOM_INSTRUCTION_LIMIT = 600;
 
 /** 上下文预算常用档位（token）。0 = 不限制。 */
 const BUDGET_PRESETS: { value: number; label: string }[] = [
-  { value: 4000, label: "4k" },
-  { value: 8000, label: "8k" },
-  { value: 12000, label: "12k" },
-  { value: 24000, label: "24k" },
-  { value: 48000, label: "48k" },
-  { value: 96000, label: "96k" },
   { value: 0, label: "不限" },
+  { value: 96000, label: "96k" },
+  { value: 128000, label: "128k" },
+  { value: 256000, label: "256k" },
+  { value: 512000, label: "512k" },
 ];
 
 function budgetLabel(value: number): string {

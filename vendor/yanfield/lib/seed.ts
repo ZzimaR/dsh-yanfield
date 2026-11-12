@@ -44,8 +44,17 @@ export function ensureReady(): void {
   }
 }
 
+/** 旧版上下文预算档位（照别的模型定的，对 1M 窗口太保守）：启动时一次性迁移为「不限」。 */
+const LEGACY_CONTEXT_BUDGETS = new Set([4000, 8000, 12000, 24000, 48000]);
+
 export function ensureDefaultSettings(): AppSettings {
   const current = repo.getSettings();
+  const budget = current.defaultContext?.contextBudget;
+  if (typeof budget === "number" && LEGACY_CONTEXT_BUDGETS.has(budget)) {
+    return repo.saveSettings({
+      defaultContext: { ...current.defaultContext, contextBudget: 0 },
+    });
+  }
   if (JSON.stringify(current) !== JSON.stringify(DEFAULT_APP_SETTINGS)) {
     return repo.saveSettings({});
   }

@@ -18774,7 +18774,9 @@ var DEFAULT_CONTEXT_CONFIG = {
   includeStyleGuide: true,
   includeSelection: true,
   customInstruction: "",
-  contextBudget: 12e3,
+  // 0 = 不限制：DeepSeek 的窗口有 1M，旧版 12k 的默认值是照着别的模型定的，
+  // 会把长篇必备的大纲/资料/前文挤掉。真正的护栏在宿主按模型窗口计算（见 agent/run.ts）。
+  contextBudget: 0,
   maxTokens: 0
 };
 var DEFAULT_APP_SETTINGS = {
@@ -20030,8 +20032,15 @@ function ensureReady() {
     throw err;
   }
 }
+var LEGACY_CONTEXT_BUDGETS = /* @__PURE__ */ new Set([4e3, 8e3, 12e3, 24e3, 48e3]);
 function ensureDefaultSettings() {
   const current = getSettings();
+  const budget = current.defaultContext?.contextBudget;
+  if (typeof budget === "number" && LEGACY_CONTEXT_BUDGETS.has(budget)) {
+    return saveSettings({
+      defaultContext: { ...current.defaultContext, contextBudget: 0 }
+    });
+  }
   if (JSON.stringify(current) !== JSON.stringify(DEFAULT_APP_SETTINGS)) {
     return saveSettings({});
   }
@@ -40975,6 +40984,13 @@ function protocolDiagnostic(raw, json3, issues, round, attempt) {
 // vendor/yanfield/lib/ai/history.ts
 var DEFAULT_HISTORY_MESSAGES = 10;
 var DEFAULT_HISTORY_CHARS = 24e3;
+function historyLimitsFor(contextBudget) {
+  if (contextBudget <= 0) return { maxMessages: 30, maxChars: 2e5 };
+  return {
+    maxMessages: Math.min(40, Math.max(10, Math.round(contextBudget / 4e3))),
+    maxChars: Math.min(24e4, Math.max(24e3, contextBudget * 2))
+  };
+}
 function trimChatHistory(messages, options = {}) {
   const maxMessages = Math.max(1, Math.floor(options.maxMessages ?? DEFAULT_HISTORY_MESSAGES));
   const maxChars = Math.max(1, Math.floor(options.maxChars ?? DEFAULT_HISTORY_CHARS));
@@ -42283,8 +42299,9 @@ function proseAction(feature, text3, selection) {
   }
 }
 function historyMessages(sessionId) {
-  const page = listChatHistoryPage(sessionId, 10);
-  const { kept, trimmed } = trimChatHistory(page.items);
+  const limits = historyLimitsFor(getSettings().defaultContext.contextBudget);
+  const page = listChatHistoryPage(sessionId, limits.maxMessages);
+  const { kept, trimmed } = trimChatHistory(page.items, limits);
   return { messages: kept, trimmed: page.hasMore || trimmed };
 }
 function toAiMessages(history, system, userContent, historyTrimmed = false) {
@@ -43092,12 +43109,15 @@ async function* runAgent(request, signal) {
   const deepThinking = thinkingProfile(target.provider, target.model).adapter === "deepseek" && !!target.thinkingLevel && target.thinkingLevel !== "off";
   let lastDecisionReasoning = "";
   const decisionOverhead = usesDecisionTool(target.provider, target.model) ? estimateTokens(JSON.stringify(DECISION_TOOLS)) : 0;
+  const modelWindow = target.provider.models.find((item) => item.id === target.model)?.contextWindow ?? 0;
+  const outputReserve = config2.maxTokens > 0 ? config2.maxTokens : 8e3;
+  const effectiveBudget = config2.contextBudget > 0 ? config2.contextBudget : modelWindow > 0 ? Math.max(8e3, Math.floor(modelWindow * 0.9) - outputReserve - decisionOverhead) : 0;
   const started = Date.now();
   const run2 = { id: uid("agent"), novelId: novel.id, chapterId: request.chapterId || null, request: request.message, status: "running", summary: "\u6B63\u5728\u7406\u89E3\u4EFB\u52A1", error: "", steps: [], changes: [], references: [], usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, latencyMs: 0 }, model: target.model, provider: target.provider.name, preview: "", createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
   const observed = /* @__PURE__ */ new Map();
   const material = /* @__PURE__ */ new Map();
   const appendBases = /* @__PURE__ */ new Map();
-  const history = trimChatHistory(request.history ?? [], { maxChars: 12e3, maxMessages: 10 });
+  const history = trimChatHistory(request.history ?? [], historyLimitsFor(effectiveBudget));
   const messages = [{ role: "system", content: (usesDecisionTool(target.provider, target.model) ? nativeDecisionSystem(SYSTEM) : SYSTEM) + "\n" + agentPreamble(request.agentId, getSettings()) + `
 \u4F5C\u54C1id=${novel.id}\u3002\u4F5C\u8005\u6587\u98CE\u4E0E\u7EA6\u675F\uFF1A${config2.includeStyleGuide ? novel.styleGuide : ""}
 ${config2.customInstruction || ""}
@@ -43233,7 +43253,7 @@ ${config2.customInstruction || ""}
     let stopReason = null;
     for (let round = 0; round < 12; round++) {
       if (signal?.aborted) throw new DOMException("\u5DF2\u505C\u6B62", "AbortError");
-      const budget = config2.contextBudget;
+      const budget = effectiveBudget;
       if (budget > 0) {
         while (messages.length > baseMessages + 2 && messages.reduce((n2, m) => n2 + estimateTokens(m.content + (m.reasoning_content || "")), 0) + decisionOverhead > budget) messages.splice(baseMessages, 1);
         if (messages.reduce((n2, m) => n2 + estimateTokens(m.content + (m.reasoning_content || "")), 0) + decisionOverhead > budget) throw new Error("\u4EFB\u52A1\u6750\u6599\u8D85\u8FC7\u4E0A\u4E0B\u6587\u9884\u7B97\uFF0C\u8BF7\u63D0\u9AD8\u9884\u7B97\u6216\u7F29\u5C0F\u4EFB\u52A1\u8303\u56F4");
@@ -43524,7 +43544,7 @@ ${config2.customInstruction || ""}
           else existing.push({ kind: c.kind, id: c.targetId, fields: { ...c.before, ...c.after } });
         }
         const input2 = [{ role: "system", content: MATERIAL_PROMPT }, { role: "user", content: JSON.stringify({ sources, existing, allowedKinds: [...config2.includeCharacters ? ["character"] : [], ...config2.includeWorld ? ["world"] : [], ...config2.includeForeshadows ? ["foreshadow"] : []] }) }];
-        const budget = config2.contextBudget;
+        const budget = effectiveBudget;
         if (budget > 0 && input2.reduce((n2, m) => n2 + estimateTokens(m.content + (m.reasoning_content || "")), 0) > budget) throw new Error("\u8D44\u6599\u6574\u7406\u6750\u6599\u8D85\u8FC7\u9884\u7B97\uFF0C\u672C\u8F6E\u6B63\u6587\u5DF2\u4FDD\u7559\uFF0C\u53EF\u5F15\u7528\u5355\u7AE0\u7EE7\u7EED\u6574\u7406");
         let parsed;
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -43611,7 +43631,7 @@ var POST2 = handle(async (request) => {
     mentions: external_exports.array(external_exports.object({ type: external_exports.string(), id: external_exports.string(), label: external_exports.string() })).max(30).optional(),
     selection: external_exports.string().max(3e4).optional(),
     context: external_exports.object({
-      contextBudget: external_exports.number().int().min(0).max(2e5),
+      contextBudget: external_exports.number().int().min(0).max(2e6),
       maxTokens: external_exports.number().int().min(0).max(64e3),
       includeNovelOutline: external_exports.boolean(),
       includeVolumeOutline: external_exports.boolean(),

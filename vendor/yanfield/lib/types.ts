@@ -888,7 +888,9 @@ export const DEFAULT_CONTEXT_CONFIG: ContextConfig = {
   includeStyleGuide: true,
   includeSelection: true,
   customInstruction: "",
-  contextBudget: 12000,
+  // 0 = 不限制：DeepSeek 的窗口有 1M，旧版 12k 的默认值是照着别的模型定的，
+  // 会把长篇必备的大纲/资料/前文挤掉。真正的护栏在宿主按模型窗口计算（见 agent/run.ts）。
+  contextBudget: 0,
   maxTokens: 0,
 };
 

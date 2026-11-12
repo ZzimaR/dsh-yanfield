@@ -23,7 +23,7 @@ import type {
   ProviderConfig,
   StoryArchive,
 } from "@/lib/types";
-import { trimChatHistory } from "@/lib/ai/history";
+import { historyLimitsFor, trimChatHistory } from "@/lib/ai/history";
 import {
   addAiLog,
   addMessage,
@@ -204,8 +204,9 @@ export interface ChatRunParams extends AiChatRequest {
 }
 
 function historyMessages(sessionId: string): { messages: ChatMessage[]; trimmed: boolean } {
-  const page = listChatHistoryPage(sessionId, 10);
-  const { kept, trimmed } = trimChatHistory(page.items);
+  const limits = historyLimitsFor(getSettings().defaultContext.contextBudget);
+  const page = listChatHistoryPage(sessionId, limits.maxMessages);
+  const { kept, trimmed } = trimChatHistory(page.items, limits);
   return { messages: kept, trimmed: page.hasMore || trimmed };
 }
 

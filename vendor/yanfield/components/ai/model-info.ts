@@ -17,15 +17,13 @@ export interface BudgetOption {
   label: string;
 }
 
-/** 上下文预算分段：4k / 8k / 12k / 24k / 48k / 96k / 不限（0） */
+/** 上下文预算分段：不限（0）/ 96k / 128k / 256k / 512k */
 export const BUDGET_OPTIONS: BudgetOption[] = [
-  { value: 4000, label: "4k" },
-  { value: 8000, label: "8k" },
-  { value: 12000, label: "12k" },
-  { value: 24000, label: "24k" },
-  { value: 48000, label: "48k" },
-  { value: 96000, label: "96k" },
   { value: 0, label: "不限" },
+  { value: 96000, label: "96k" },
+  { value: 128000, label: "128k" },
+  { value: 256000, label: "256k" },
+  { value: 512000, label: "512k" },
 ];
 
 /** 预算 → 可读文案（0 显示「不限」；命中预设时用预设短名） */

@@ -62,7 +62,13 @@ Built-in DeepSeek price table (CNY per million tokens):
 - If the API reports real billing, that value is shown; otherwise "estimated"; with neither, "cost unknown".
 - Balance and cost are independent: balance is the real account balance, cost is a local estimate.
 
-## 6. Built-in thrift
+## 6. Context budget (unlimited by default)
+
+Unlimited by default: DeepSeek's window is 1,048,576 tokens, so Yanfield carries as much outline, material and previous prose as fits. To cap cost, pick 96k / 128k / 256k / 512k (or a custom value) under Settings → AI & context.
+
+`0 = unlimited` still has a guard: each request reserves roughly 10% of the model window plus the output allowance (`max output`, 8k when set to auto) and trims the oldest observations first. If a request still exceeds the window it fails with an explicit "needs X tokens, window is Y" message instead of being silently truncated.
+
+## 7. Built-in thrift
 
 | Behaviour | Why |
 | --- | --- |
@@ -75,7 +81,7 @@ Built-in DeepSeek price table (CNY per million tokens):
 
 Reference magnitudes (peak price, real calls): one-paragraph polish ≈ ¥0.03; a chapter blueprint ≈ ¥0.03–0.17 depending on existing notes; pure chat ≈ ¥0.004.
 
-## 7. FAQ
+## 8. FAQ
 
 **Why does a task show hundreds of thousands of tokens?**
 That is the conversation's cumulative input (context is re-sent each round), not one request. Most of it hits the cache, billed at 1/50 of the input price.

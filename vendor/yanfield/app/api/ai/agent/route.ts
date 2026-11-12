@@ -19,7 +19,7 @@ export const POST=handle(async request=>{
     retryRunId:z.string().optional(),previousRunId:z.string().optional(),mentions:z.array(z.object({type:z.string(),id:z.string(),label:z.string()})).max(30).optional(),
     selection:z.string().max(30000).optional(),
     context:z.object({
-      contextBudget:z.number().int().min(0).max(200000),maxTokens:z.number().int().min(0).max(64000),
+      contextBudget:z.number().int().min(0).max(2000000),maxTokens:z.number().int().min(0).max(64000),
       includeNovelOutline:z.boolean(),includeVolumeOutline:z.boolean(),includeChapterBlueprint:z.boolean(),
       includeChapterSummaries:z.number().int().min(0).max(100),chapterSummaryMode:z.enum(["summary","tail"]),
       includeArchives:z.boolean(),archiveDepth:z.number().int().min(0).max(100),

@@ -20,6 +20,15 @@ export const DEFAULT_HISTORY_MESSAGES = 10;
 /** 历史消息总字符上限（约 12k tokens）；超过就从最早的消息开始丢。 */
 export const DEFAULT_HISTORY_CHARS = 24000;
 
+/** 按上下文预算换算聊天历史的上限：预算越大带越多；0（不限）给一个宽松但有限的上限。 */
+export function historyLimitsFor(contextBudget: number): { maxMessages: number; maxChars: number } {
+  if (contextBudget <= 0) return { maxMessages: 30, maxChars: 200000 };
+  return {
+    maxMessages: Math.min(40, Math.max(10, Math.round(contextBudget / 4000))),
+    maxChars: Math.min(240000, Math.max(24000, contextBudget * 2)),
+  };
+}
+
 export interface TrimmedHistory<T extends ChatHistoryEntry> {
   kept: T[];
   /** 是否有消息被丢掉（调用方据此在 system prompt 里加提示）。 */

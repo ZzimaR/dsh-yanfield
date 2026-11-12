@@ -39,6 +39,12 @@ The footer is **today's cumulative** tokens and cost, not one task. Open it for 
 **Estimate differs from the bill.**
 Estimates combine local unit prices with reported usage; cache hits, official price changes and missing usage reports all cause differences. The DeepSeek bill wins.
 
+**Q: What is the default context budget? Can a long novel overflow it?**
+Unlimited by default — DeepSeek's window is 1,048,576 tokens, enough for the outline, notes and plenty of previous prose. To cap cost, choose 96k / 128k / 256k / 512k under Settings → AI & context. During a task, if context approaches the window, the oldest observations are dropped first; if it still overflows, you get an explicit "needs X tokens, window is Y" message instead of silent truncation.
+
+**Q: Is there automatic compaction near the 1M limit?**
+Not semantic/summary-based compaction today. Over budget we keep the most recent chat turns up to a character cap, drop the rest and tell the model "earlier conversation omitted"; task observations are trimmed oldest-first. Hitting the window raises an explicit error instead of losing content quietly. Summary compaction could be added (it costs one extra model call per compaction), but it is off by default.
+
 ## Writing and notes
 
 **The AI cannot see a note.**

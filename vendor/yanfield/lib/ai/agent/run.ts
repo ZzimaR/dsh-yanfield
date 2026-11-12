@@ -8,7 +8,7 @@ import { protocolDiagnostic } from "./diagnostics";
 import * as repo from "@/lib/repo";
 import { resolveTarget, mergeContextConfig } from "@/lib/ai/engine";
 import { isOutputLimitError, streamCompletion, type AiMessage } from "@/lib/ai/provider";
-import { trimChatHistory } from "@/lib/ai/history";
+import { historyLimitsFor, trimChatHistory } from "@/lib/ai/history";
 import { agentPreamble, extractJson } from "@/lib/ai/prompts";
 import { countWords, estimateTokens, stripHtml, uid } from "@/lib/ui/cn";
 import { ApiError } from "@/lib/api-utils";
@@ -69,12 +69,20 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
   const deepThinking=thinkingProfile(target.provider,target.model).adapter==="deepseek" && !!target.thinkingLevel&&target.thinkingLevel!=="off";
   let lastDecisionReasoning="";
   const decisionOverhead=usesDecisionTool(target.provider,target.model)?estimateTokens(JSON.stringify(DECISION_TOOLS)):0;
+  // 上下文预算：0 = 不限，但仍受模型窗口保护——按窗口留出输出与工具定义开销后自动裁剪。
+  const modelWindow=target.provider.models.find(item=>item.id===target.model)?.contextWindow??0;
+  const outputReserve=config.maxTokens>0?config.maxTokens:8000;
+  const effectiveBudget=config.contextBudget>0
+    ? config.contextBudget
+    : modelWindow>0
+      ? Math.max(8000,Math.floor(modelWindow*0.9)-outputReserve-decisionOverhead)
+      : 0;
   const started=Date.now();
   const run:AgentRun={id:uid("agent"),novelId:novel.id,chapterId:request.chapterId||null,request:request.message,status:"running",summary:"正在理解任务",error:"",steps:[],changes:[],references:[],usage:{promptTokens:0,completionTokens:0,totalTokens:0,latencyMs:0},model:target.model,provider:target.provider.name,preview:"",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
   const observed=new Map<string,Fields|null>();
   const material=new Map<string,unknown>();
   const appendBases=new Map<string,string>();
-  const history=trimChatHistory(request.history??[],{maxChars:12000,maxMessages:10});
+  const history=trimChatHistory(request.history??[],historyLimitsFor(effectiveBudget));
   const messages:AiMessage[]=[{role:"system",content:(usesDecisionTool(target.provider,target.model)?nativeDecisionSystem(SYSTEM):SYSTEM)+"\n"+agentPreamble(request.agentId,repo.getSettings())+`\n作品id=${novel.id}。作者文风与约束：${config.includeStyleGuide?novel.styleGuide:""}\n${config.customInstruction||""}\n禁用词：${novel.forbiddenWords.join("、")}\n尚未揭示的资料默认不可读取；只有作者本轮明确引用的卡片可例外读取，且不得提前写入正文。`} ,...history.kept.map(m=>m.role==="assistant"?{...m,content:JSON.stringify({message:m.content,calls:[],done:true}),...(deepThinking?{reasoning_content:""}:{})}:m),{role:"user",content:JSON.stringify({request:request.message,currentChapterId:request.chapterId||null,mentions:request.mentions,selection,snapshot:request.snapshot,historyOmitted:history.trimmed})}];
   let previous:AgentRun|undefined;
   if(request.previousRunId) {
@@ -184,7 +192,7 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
     for(let round=0;round<12;round++) {
       if(signal?.aborted) throw new DOMException("已停止","AbortError");
       // Pin the instruction and latest task state; evict old observations, never tool-result pairs from native protocols.
-      const budget=config.contextBudget;
+      const budget=effectiveBudget;
       if (budget > 0) {
         while(messages.length>baseMessages+2 && messages.reduce((n,m)=>n+estimateTokens(m.content+(m.reasoning_content||"")),0)+decisionOverhead>budget) messages.splice(baseMessages,1);
         if(messages.reduce((n,m)=>n+estimateTokens(m.content+(m.reasoning_content||"")),0)+decisionOverhead>budget) throw new Error("任务材料超过上下文预算，请提高预算或缩小任务范围");
@@ -448,7 +456,7 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
           else existing.push({kind:c.kind as ExistingMaterial["kind"],id:c.targetId,fields:{...c.before,...c.after}});
         }
         const input:AiMessage[]=[{role:"system",content:MATERIAL_PROMPT},{role:"user",content:JSON.stringify({sources,existing,allowedKinds:[...(config.includeCharacters?["character"]:[]),...(config.includeWorld?["world"]:[]),...(config.includeForeshadows?["foreshadow"]:[])]})}];
-        const budget=config.contextBudget;
+        const budget=effectiveBudget;
         if(budget>0&&input.reduce((n,m)=>n+estimateTokens(m.content+(m.reasoning_content||"")),0)>budget)throw new Error("资料整理材料超过预算，本轮正文已保留，可引用单章继续整理");
         let parsed:z.infer<typeof materialResultSchema>|undefined;
         for(let attempt=0;attempt<2;attempt++) {

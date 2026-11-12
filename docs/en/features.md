@@ -63,7 +63,7 @@ Capabilities:
 
 - Continue, expand, polish, remove AI flavour, diagnose a chapter, draft blueprints, create character / world cards, extract story archives.
 - Edit prose (paragraph-by-paragraph review), edit notes (field-level comparison), create notes, tidy blueprints, record foreshadowing.
-- `@` reference chapters, characters, settings, foreshadowing, archives; context budget (4k–96k or unlimited) with per-section preview.
+- `@` reference chapters, characters, settings, foreshadowing, archives; context budget (unlimited by default; 96k / 128k / 256k / 512k presets) with per-section preview.
 - Prompt presets: 20 built in; create, edit, disable, restore defaults.
 - Persona: name, role, description, greeting, extra requirements, restorable.
 
