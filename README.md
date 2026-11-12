@@ -11,7 +11,7 @@
 
 [![DSH 版本](https://img.shields.io/badge/DSH-%E2%89%A5%200.2.1--rc.5%20%3C%200.3.0-4f7864?style=flat-square)](#安装)
 [![构建用 Node](https://img.shields.io/badge/Node-%E2%89%A5%2022.19-4f7864?style=flat-square)](https://nodejs.org)
-[![状态](https://img.shields.io/badge/status-v0.1.1%20%E5%BC%80%E5%8F%91%E4%B8%AD-a97f2b?style=flat-square)](#路线图)
+[![版本](https://img.shields.io/github/v/release/ZzimaR/dsh-yanfield?label=version&style=flat-square)](https://github.com/ZzimaR/dsh-yanfield/releases/latest)
 [![许可](https://img.shields.io/badge/license-PolyForm%20Noncommercial-a97f2b?style=flat-square)](LICENSE)
 
 [安装](#安装) · [第一次使用](#第一次使用) · [功能](#功能) · [AI 与费用](#ai-与费用) · [截图](#截图) · [数据与备份](#数据与备份) · [排障](#排障) · [开发](#开发) · [English](README.en.md)
@@ -38,26 +38,26 @@
 
 ## 安装
 
-需要 DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`。按你启动的 profile 选择下面一条命令，安装 [GitHub Releases](https://github.com/ZzimaR/dsh-yanfield/releases) 提供的预构建包。
+需要 DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`。按你启动的 profile 选择下面一条命令，安装 [npm](https://www.npmjs.com/package/dsh-yanfield) 上的预构建包。
 
 ```bash
 # Web 版
-dsh plugin --profile web add https://github.com/ZzimaR/dsh-yanfield/releases/latest/download/dsh-yanfield.tgz
+dsh plugin --profile web add dsh-yanfield
 
 # 桌面版
-dsh plugin --profile desktop add https://github.com/ZzimaR/dsh-yanfield/releases/latest/download/dsh-yanfield.tgz
+dsh plugin --profile desktop add dsh-yanfield
 ```
 
 安装完成后**完全退出 Harness 再重新打开**（只刷新页面不够：插件含宿主侧代码，需要重启进程）。
 
-如果命令行下载超时，可以先从 [发布页](https://github.com/ZzimaR/dsh-yanfield/releases/latest) 下载 `dsh-yanfield.tgz`，再运行 `dsh plugin --profile <profile> add "<本地安装包路径>"`。
+如果需要离线安装，可以从 [GitHub Releases](https://github.com/ZzimaR/dsh-yanfield/releases/latest) 下载 `dsh-yanfield.tgz`，再运行 `dsh plugin --profile <profile> add "<本地安装包路径>"`。
 
 确认装好：
 
 1. 左侧导航出现「砚田」；
 2. 打开 `砚田 → 设置 → 关于`，核对版本和构建时间。构建时间是产物生成时间。
 
-更新或回退时，从 Releases 复制目标版本的 `dsh-yanfield.tgz` 链接（形如 `releases/download/v0.1.1/dsh-yanfield.tgz`），用同一个 profile 执行 `dsh plugin --profile <profile> add <链接>`，然后重启 Harness。之前用仓库地址安装的用户也可以用这个方法切换到 Release 包。
+更新时用同一个 profile 执行 `dsh plugin --profile <profile> add dsh-yanfield@latest`，然后重启 Harness。回退可把 `@latest` 换成目标版本，例如 `@0.1.1`。之前用 GitHub 地址安装的用户也可以用这个命令切到 npm。
 
 ## 第一次使用
 

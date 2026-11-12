@@ -11,7 +11,7 @@ Your book stays local, the model is the DeepSeek you already configured, and eve
 
 [![DSH version](https://img.shields.io/badge/DSH-%E2%89%A5%200.2.1--rc.5%20%3C%200.3.0-4f7864?style=flat-square)](#install)
 [![Node for builds](https://img.shields.io/badge/Node-%E2%89%A5%2022.19-4f7864?style=flat-square)](https://nodejs.org)
-[![status](https://img.shields.io/badge/status-v0.1.1%20in%20development-a97f2b?style=flat-square)](#roadmap)
+[![Version](https://img.shields.io/github/v/release/ZzimaR/dsh-yanfield?label=version&style=flat-square)](https://github.com/ZzimaR/dsh-yanfield/releases/latest)
 [![license](https://img.shields.io/badge/license-PolyForm%20Noncommercial-a97f2b?style=flat-square)](LICENSE)
 
 [Install](#install) · [First run](#first-run) · [Features](#features) · [AI and cost](#ai-and-cost) · [Screenshots](#screenshots) · [Data and backup](#data-and-backup) · [Troubleshooting](#troubleshooting) · [Development](#development) · [中文](README.md)
@@ -38,26 +38,26 @@ Yanfield is a **DeepSeek Harness plugin**, not a standalone app. After installat
 
 ## Install
 
-Requires DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`. Choose the command for your profile to install the prebuilt package from [GitHub Releases](https://github.com/ZzimaR/dsh-yanfield/releases).
+Requires DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`. Choose the command for your profile to install the prebuilt package from [npm](https://www.npmjs.com/package/dsh-yanfield).
 
 ```bash
 # Web
-dsh plugin --profile web add https://github.com/ZzimaR/dsh-yanfield/releases/latest/download/dsh-yanfield.tgz
+dsh plugin --profile web add dsh-yanfield
 
 # Desktop
-dsh plugin --profile desktop add https://github.com/ZzimaR/dsh-yanfield/releases/latest/download/dsh-yanfield.tgz
+dsh plugin --profile desktop add dsh-yanfield
 ```
 
 Then **quit Harness completely and start it again** — a page refresh is not enough, because the plugin ships host-side code.
 
-If the CLI download times out, download `dsh-yanfield.tgz` from the [latest release](https://github.com/ZzimaR/dsh-yanfield/releases/latest) and run `dsh plugin --profile <profile> add "<local archive path>"`.
+For offline installation, download `dsh-yanfield.tgz` from [GitHub Releases](https://github.com/ZzimaR/dsh-yanfield/releases/latest) and run `dsh plugin --profile <profile> add "<local archive path>"`.
 
 How to confirm it worked:
 
 1. a 「砚田」 entry appears in the left sidebar;
 2. Check the version and build time in `砚田 → Settings → About`. The build time comes from the bundle.
 
-To update or roll back, copy the version-specific `dsh-yanfield.tgz` link from Releases (for example, `releases/download/v0.1.1/dsh-yanfield.tgz`). Run `dsh plugin --profile <profile> add <link>` in the same profile and restart Harness. This also replaces an earlier install from the repository URL.
+To update, run `dsh plugin --profile <profile> add dsh-yanfield@latest` in the same profile and restart Harness. To roll back, replace `@latest` with the desired version, such as `@0.1.1`. This also switches an existing GitHub install to npm.
 
 ## First run
 

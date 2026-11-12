@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { version } from "../package.json"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -114,7 +115,7 @@ interface DeepSeekAccountLike {
 /** 账号接口要求「东经为正」的秒偏移，getTimezoneOffset 正好相反。 */
 function accountClientMetadata() {
   return {
-    version: "dsh-yanfield/0.1.1",
+    version: `dsh-yanfield/${version}`,
     locale: "zh-CN",
     timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60,
   }

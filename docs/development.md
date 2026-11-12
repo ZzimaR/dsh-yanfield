@@ -33,7 +33,7 @@ npm ci
 3. **浏览器包**：esbuild 打包 `client/index.tsx` → `dist/client.js`（CJS、`platform=browser`、React 外置、`.css` 用 text loader、banner 为 `window.__ModuleLoader__.load(...)`）。构建时间通过 `define.__YANFIELD_BUILD__` 打进包里，显示在「设置 → 关于」。
 4. **宿主包**：esbuild 打包 `src/host.ts` → `dist/host.js`（ESM、node22）。
 
-别名 `@/` → `vendor/yanfield/`，所以 vendor 目录里的相对导入不用改。
+别名 `@/` 指向 `vendor/yanfield/`。`@/package.json` 在打包时指向仓库根清单，使安装包、API 与「关于」页共用一个版本号。
 
 ## 四、两个容易踩的坑
 
@@ -91,13 +91,18 @@ chrome --headless=new --no-sandbox --disable-gpu --disable-crash-reporter \
 
 ## 七、发布检查清单
 
-1. `npm run test` 全绿；
-2. 检查版本号与「关于」页一致。发版标签用 `v<package.json 版本>`，例如 `v0.1.1`。
-3. `README.md` 的安装命令与 `package.json` 的 `name`、`dsh` 字段一致；
-4. 用 `npm pack` 生成安装包，用 `dsh plugin --profile <测试 profile> add <安装包路径>` 验证实际安装，再验证新建作品和 AI 审阅流程。
-5. 推送发版标签后，[发布工作流](../.github/workflows/release.yml) 会重新构建、自检和打包，然后把 `dsh-yanfield.tgz` 附到对应的 GitHub Release。带预发布后缀的版本会标为预发布。稳定版保留同一个附件名，供 `releases/latest/download/dsh-yanfield.tgz` 使用。
+日常 push 和 PR 只运行 CI。准备交付一批修复时，先提交代码并通过 `npm test`，然后从干净的 `main` 执行：
 
-`dist/` 由本地构建或 CI 生成，随 Release 安装包交付。普通用户从 README 的 Release 链接安装，开发者使用本地链接。市场条目的 `tarball` 可以指向同一个稳定版附件。参见 [DSH 打包与安装文档](https://deepseek-harness.github.io/deepseek-harness/develop/basic/publish)。
+```bash
+npm version patch
+git push origin main --follow-tags
+```
+
+`npm version patch` 会更新根清单和锁文件并创建版本提交和标签。按需要将 `patch` 换为 `minor` 或 `major`。推送 `v*` 标签后，[发布工作流](../.github/workflows/release.yml) 核对标签与包版本，只构建、测试并打包一次。同一个 `dsh-yanfield.tgz` 随 GitHub Release 交付，也通过 npm Trusted Publishing 发布。稳定版发布到 npm 的 `latest`，预发布版发布到 `next`。
+
+npm 的 Trusted Publisher 绑定 `ZzimaR/dsh-yanfield` 的 `release.yml`，并允许 `npm publish`。工作流使用 OIDC，无需仓库 Token。可在隔离 profile 安装产物验证新建作品、模型连接和 AI 审阅。
+
+`dist/` 由构建生成，随安装包交付。开发者用本地链接调试。市场收录条目可使用 [market-entry.yml](market-entry.yml)，截图由 [screenshots.json](../screenshots.json) 提供，市场通过包清单的 `repository` 关联 npm。
 
 ## 八、目录速览
 

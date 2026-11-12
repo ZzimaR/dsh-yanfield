@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -91,7 +91,10 @@ try {
     return { ...result, data: JSON.parse(result.body) }
   }
 
-  assert.equal((await api("GET", "/system")).data.dbPath, dbPath)
+  const { data: system } = await api("GET", "/system")
+  const manifest = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"))
+  assert.equal(system.dbPath, dbPath)
+  assert.equal(system.version, manifest.version)
   assert.equal((await api("GET", "/novels/%ZZ")).status, 400)
   const providers = await api("GET", "/providers")
   const harness = providers.data.items.find((item) => item.kind === "harness")

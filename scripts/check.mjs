@@ -22,16 +22,22 @@ const patch = await readFile(path.join(root, "cordis.patch.yml"), "utf8")
 if (!patch.includes("name: dsh-yanfield") && !patch.includes('name: "dsh-yanfield"') && !patch.includes("name: 'dsh-yanfield'")) {
   fail("cordis.patch.yml 必须插入 name 等于包名的行")
 }
-const releaseUrl = `https://github.com/ZzimaR/dsh-yanfield/releases/latest/download/${manifest.name}.tgz`
 for (const file of ["README.md", "README.en.md"]) {
   const readme = await readFile(path.join(root, file), "utf8")
   for (const profile of ["web", "desktop"]) {
-    if (!readme.includes(`dsh plugin --profile ${profile} add ${releaseUrl}`)) {
-      fail(`${file} 缺少 ${profile} profile 的 Release 安装命令`)
+    if (!readme.split(/\r?\n/).includes(`dsh plugin --profile ${profile} add ${manifest.name}`)) {
+      fail(`${file} 缺少 ${profile} profile 的 npm 安装命令`)
     }
   }
 }
-for (const file of ["dist/host.js", "dist/client.js", "LICENSE", "icon.svg"]) {
+const screenshots = JSON.parse(await readFile(path.join(root, "screenshots.json"), "utf8"))
+const validScreenshot = (file) => typeof file === "string" && /^docs\/screenshots\/[\w.-]+\.(png|jpe?g|webp)$/i.test(file)
+const screenshotFiles = Array.isArray(screenshots) ? screenshots.filter(validScreenshot) : []
+if (!Array.isArray(screenshots) || screenshotFiles.length < 1 || screenshotFiles.length > 8 ||
+    screenshotFiles.length !== screenshots.length) {
+  fail("screenshots.json 必须包含 1–8 张 docs/screenshots/ 下的图片")
+}
+for (const file of ["dist/host.js", "dist/client.js", "LICENSE", "icon.svg", "docs/screenshots/market-icon.png", ...screenshotFiles]) {
   try {
     const info = await stat(path.join(root, file))
     if (info.size < 32) fail(`${file} 太小`)

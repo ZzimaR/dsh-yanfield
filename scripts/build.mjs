@@ -35,6 +35,7 @@ function atAliasPlugin() {
     name: "yanfield-at",
     setup(build) {
       build.onResolve({ filter: /^@\// }, (args) => {
+        if (args.path === "@/package.json") return { path: path.join(root, "package.json") }
         const base = path.join(vendor, args.path.slice(2))
         const candidates = [
           base,

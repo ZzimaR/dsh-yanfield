@@ -1,0 +1,8 @@
+url: https://github.com/ZzimaR/dsh-yanfield
+name: ZzimaR/dsh-yanfield
+category: ui
+description:
+  en: A novel-writing workspace in DeepSeek Harness with chapter editing, outlines, story notes, and reviewable AI edits.
+  zh: DeepSeek Harness 内的长篇小说写作台，支持正文编辑、章纲、故事资料和可审阅的 AI 改稿。
+icon: https://raw.githubusercontent.com/ZzimaR/dsh-yanfield/main/docs/screenshots/market-icon.png
+tarball: https://github.com/ZzimaR/dsh-yanfield/releases/latest/download/dsh-yanfield.tgz

@@ -91,13 +91,18 @@ For interaction (clicks, waiting on streaming output) drive CDP directly: connec
 
 ## 7. Release checklist
 
-1. Run `npm test`.
-2. Check that the version matches Settings → About. Use the tag `v<package.json version>`, for example `v0.1.1`.
-3. Check that the README install command matches the package manifest.
-4. Run `npm pack`, install the archive with `dsh plugin --profile <test-profile> add <archive-path>`, then test creating a novel and reviewing an AI edit.
-5. Push the release tag. The [release workflow](../../.github/workflows/release.yml) builds and tests the package, then attaches `dsh-yanfield.tgz` to the GitHub Release for that tag. Versions with a prerelease suffix are marked as prereleases. The stable asset name supports `releases/latest/download/dsh-yanfield.tgz`.
+Branch pushes and PRs run CI. Once the changes are committed and `npm test` passes, run from a clean `main`:
 
-Local builds and CI generate `dist/` and ship it in the Release archive. Users install from the Release link in the README, and developers link the checkout. A market entry can point its `tarball` field at the same stable asset. See [DSH packaging and installation](https://deepseek-harness.github.io/deepseek-harness/en/develop/basic/publish).
+```bash
+npm version patch
+git push origin main --follow-tags
+```
+
+`npm version patch` updates the root manifest and lockfile, then creates the version commit and tag. Use `minor` or `major` as appropriate. The [release workflow](../../.github/workflows/release.yml) checks that the tag matches the package version, then builds, tests, and packs once. GitHub Releases and npm receive the same `dsh-yanfield.tgz`. Stable npm versions use `latest`, and prereleases use `next`.
+
+The npm Trusted Publisher binds `release.yml` in `ZzimaR/dsh-yanfield` and permits `npm publish`. The workflow authenticates with OIDC. Test the package in an isolated profile by creating a novel, connecting a model, and reviewing an AI edit.
+
+Builds generate `dist/` and ship it in the archive. Developers link the checkout. The catalog entry uses [market-entry.yml](../market-entry.yml), while [screenshots.json](../../screenshots.json) provides gallery images. The market links npm using the manifest's `repository` field.
 
 ## 8. Layout
 
