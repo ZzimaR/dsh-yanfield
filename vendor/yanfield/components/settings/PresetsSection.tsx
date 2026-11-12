@@ -145,7 +145,9 @@ export function PresetsSection({ novelId }: PresetsSectionProps) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-[12.5px] font-medium text-ink">{preset.name}</span>
-                    <Badge tone="accent">{AI_FEATURE_LABEL[preset.feature]}</Badge>
+                    {AI_FEATURE_LABEL[preset.feature] !== preset.name ? (
+                      <Badge tone="accent">{AI_FEATURE_LABEL[preset.feature]}</Badge>
+                    ) : null}
                     <Badge tone="default">{preset.modelRole === "prose" ? "长文任务" : "通用任务"}</Badge>
                     {preset.isBuiltin ? (
                       <Badge tone="jade">

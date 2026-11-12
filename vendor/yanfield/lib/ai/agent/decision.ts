@@ -44,7 +44,11 @@ export const DECISION_TOOLS=[
 export function nativeDecisionSystem(system:string):string {
   return system.replace(/^每轮最多12个工具调用[^\n]+/m,"通过声明的原生函数推进任务，不在回复里书写JSON或DSML/XML工具标签。每轮最多12个调用。完成、普通讨论或需要作者确认时调用respond；其他工具结果返回后继续执行。");
 }
-/** DeepSeek 原生工具（function calling）在思考模式下同样可用；离线演示走文本回退。 */
+/**
+ * DeepSeek 原生工具（function calling）在思考模式下同样可用；离线演示走文本回退。
+ * harness 走 DSH 的 llm.stream，tools 会被透传到底层适配器（host 侧 streamHarness 解析
+ * tool-call-delta），所以同样能走原生工具，不再退回易碎的 DSML 文本协议。
+ */
 export function usesDecisionTool(provider:{kind:string;baseUrl:string},_model:string):boolean {
-  return provider.kind==="deepseek";
+  return provider.kind==="deepseek"||provider.kind==="harness";
 }

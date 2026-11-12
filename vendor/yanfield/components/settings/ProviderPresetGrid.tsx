@@ -30,7 +30,7 @@ export function ProviderPresetGrid({ existingNames, onPick }: ProviderPresetGrid
             添加 DeepSeek 服务
           </h3>
           <p className="mt-1 text-[11.5px] leading-5 text-ink-3">
-            本构建专精 DeepSeek，其他服务商适配已移除。只需填写 DeepSeek 官方 API Key；选中卡片会预填官方地址，之后可手动拉取账户可用模型，或自行填写模型 ID。
+            本构建专精 DeepSeek，其他服务商适配已移除。填官方 API Key，或直接用 DSH 里已登录的账号；选中卡片会预填地址，之后可手动拉取可用模型，或自行填写模型 ID。
           </p>
         </div>
         <button

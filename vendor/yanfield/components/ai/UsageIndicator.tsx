@@ -5,13 +5,14 @@ import { estimateAiCost, formatCny, type TokenPrice } from "@/lib/ai/cost";
 import { inputBreakdown } from "@/lib/ai/cache-usage";
 import type { AiUsage } from "@/lib/types";
 import { formatTokens } from "./utils";
+import { isInsideComposedPath } from "@/lib/ui/composed";
 
 export function UsageIndicator({promptTokens,completionTokens,price,calls,latencyMs,iconOnly=false,label="本次",reportedCost,estimatedTokens,cachedInputTokens,cacheReportedInputTokens}:{promptTokens:number;completionTokens:number;price:TokenPrice;calls?:number;latencyMs?:number;iconOnly?:boolean;label?:string;reportedCost?:AiUsage["reportedCost"];estimatedTokens?:boolean;cachedInputTokens?:number;cacheReportedInputTokens?:number}) {
   const [open,setOpen]=React.useState(false);
   const ref=React.useRef<HTMLDivElement>(null);
   React.useEffect(()=>{
     if(!open)return;
-    const outside=(e:PointerEvent)=>{if(!ref.current?.contains(e.target as Node))setOpen(false);};
+    const outside=(e:PointerEvent)=>{if(!isInsideComposedPath(e,[ref.current]))setOpen(false);};
     const escape=(e:KeyboardEvent)=>{if(e.key==="Escape")setOpen(false);};
     document.addEventListener("pointerdown",outside);document.addEventListener("keydown",escape);
     return()=>{document.removeEventListener("pointerdown",outside);document.removeEventListener("keydown",escape);};
@@ -23,7 +24,7 @@ export function UsageIndicator({promptTokens,completionTokens,price,calls,latenc
   const costText=actual?`接口 ${reportedLabel(actual)}`:cost===null?"费用未知":`预估 ${formatCny(cost)}`;
   return <div ref={ref} className="relative min-w-0">
     <button type="button" aria-label={`查看${label}用量与费用`} aria-expanded={open} onClick={()=>setOpen(!open)} className="flex h-6 items-center gap-1.5 whitespace-nowrap rounded px-1 text-[10px] tabular-nums text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink">
-      <Database className="size-3" strokeWidth={1.5}/>{iconOnly?null:<><span>{formatTokens(total)} tok</span><span className="mx-1 text-line-strong">·</span><Coins className="size-3" strokeWidth={1.5}/><span>{costText}</span></>}
+      <Database className="size-3" strokeWidth={1.5}/>{iconOnly?null:<>{label==="今日"?<span className="text-ink-4">今日</span>:null}<span>{formatTokens(total)} tok</span><span className="mx-1 text-line-strong">·</span><Coins className="size-3" strokeWidth={1.5}/><span>{costText}</span></>}
     </button>
     {open?<div className="absolute bottom-full left-0 z-50 mb-2 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-line bg-surface p-4 text-[12px] text-ink-2 shadow-float" role="dialog" aria-label={`${label}用量明细`}>
       <p className="mb-3 font-medium text-ink">{label}用量</p>

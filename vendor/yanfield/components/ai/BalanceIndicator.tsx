@@ -12,7 +12,7 @@
 import * as React from "react";
 import { Wallet } from "lucide-react";
 import { apiPost } from "@/lib/client/api";
-import type { ProviderBalance } from "@/lib/ai/balance";
+import { providerShowsBalance, type ProviderBalance } from "@/lib/ai/balance";
 import type { ProviderConfig } from "@/lib/types";
 import { cn } from "@/lib/ui/cn";
 
@@ -44,14 +44,9 @@ function buildTitle(value: ProviderBalance): string {
   ].join("\n");
 }
 
-/** 余额接口只属于 DeepSeek 官方地址；中转或其他来源不显示按钮。 */
-function isOfficialDeepSeek(provider: ProviderConfig): boolean {
-  if (provider.kind !== "deepseek") return false;
-  try {
-    return new URL(provider.baseUrl).hostname === "api.deepseek.com";
-  } catch {
-    return false;
-  }
+/** 官方地址用 API Key 查；harness 通道用 DSH 已登录账号查（见 lib/ai/balance.ts）。 */
+function supportsProviderBalance(provider: ProviderConfig): boolean {
+  return providerShowsBalance(provider);
 }
 
 export interface BalanceIndicatorProps {
@@ -79,7 +74,7 @@ export function BalanceIndicator({ provider, className }: BalanceIndicatorProps)
 
   const providerId = provider?.id ?? null;
   // 指向兼容中转时隐藏按钮，避免点了才报错。
-  const supported = Boolean(provider && isOfficialDeepSeek(provider));
+  const supported = Boolean(provider && supportsProviderBalance(provider));
 
   const query = React.useCallback(async () => {
     if (!providerId || !supported) return;

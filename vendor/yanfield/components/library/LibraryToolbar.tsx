@@ -38,7 +38,7 @@ export function LibraryToolbar({
         />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 sm:ml-auto">
         <div className="w-32 sm:w-36">
           <Select
             aria-label="类型筛选"

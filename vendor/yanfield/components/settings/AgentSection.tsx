@@ -9,7 +9,7 @@
 
 import * as React from "react";
 import { RotateCcw } from "lucide-react";
-import { Badge, Button, Card, Input, Textarea, useToast } from "@/components/ui/kit";
+import { Badge, Button, Card, IconButton, Input, Textarea, useToast } from "@/components/ui/kit";
 import {
   AGENTS,
   CUSTOM_AGENT,
@@ -199,14 +199,14 @@ export function AgentSection({ settings, update }: AgentSectionProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <h2 className="font-serif text-lg text-ink">智能体</h2>
-          <p className="mt-1 text-[12px] leading-6 text-ink-3">
+          <p className="mt-1 max-w-[62ch] text-[12px] leading-6 text-ink-3">
             这里改的是右侧 AI 面板里智能体的名字、职责、人设与额外要求，改动会同时用于对话提示词，并自动保存。留空表示沿用内置默认。
           </p>
         </div>
-        <Button variant="ghost" size="sm" icon={<RotateCcw className="size-3.5" />} onClick={resetAll} disabled={!canReset}>
+        <Button variant="secondary" size="sm" className="shrink-0" icon={<RotateCcw className="size-3.5" />} onClick={resetAll} disabled={!canReset}>
           恢复默认
         </Button>
       </div>
@@ -244,9 +244,10 @@ export function AgentSection({ settings, update }: AgentSectionProps) {
                 </div>
               </div>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="sm"
-                icon={<RotateCcw className="size-3.5" />}
+                className="shrink-0"
+                icon={<RotateCcw className="size-3.5" aria-hidden />}
                 onClick={() => resetAgent(agent)}
                 disabled={resetDisabled}
               >

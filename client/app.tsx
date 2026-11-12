@@ -38,7 +38,7 @@ export function YanfieldApp() {
   return (
     <ToastProvider>
       <EditorSaveGuardProvider>
-        <div className="yf-app">
+        <div className="yf-content">
           <DeskPages />
         </div>
         <SettingsDialogHost />

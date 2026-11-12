@@ -127,14 +127,14 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <h2 className="font-serif text-lg text-ink">编辑器</h2>
-          <p className="mt-1 text-[12px] leading-6 text-ink-3">
+          <p className="mt-1 max-w-[62ch] text-[12px] leading-6 text-ink-3">
             调整写作页的字体、行距与页面留白。所有改动即时生效并自动保存。
           </p>
         </div>
-        <Button variant="secondary" size="sm" icon={<RotateCcw className="size-3.5" aria-hidden />} onClick={resetAll}>
+        <Button variant="secondary" size="sm" className="shrink-0" icon={<RotateCcw className="size-3.5" aria-hidden />} onClick={resetAll}>
           恢复默认
         </Button>
       </div>

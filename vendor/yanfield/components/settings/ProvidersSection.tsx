@@ -9,6 +9,7 @@ import {
   ConfirmDialog,
   EmptyState,
   IconButton,
+  Segmented,
   Skeleton,
   Spinner,
   Switch,
@@ -17,7 +18,8 @@ import {
 import { apiDelete, apiPatch, apiPost, notifyDataChanged, useApi } from "@/lib/client/api";
 import type { ProviderPreset } from "@/lib/defaults";
 import type { AppSettings, ProviderConfig } from "@/lib/types";
-import type {ProviderBalance} from "@/lib/ai/balance";
+import { providerShowsBalance, type ProviderBalance } from "@/lib/ai/balance";
+import { harnessRouteOf, type HarnessRouteOption } from "@/lib/ai/harness-bridge";
 import { cn } from "@/lib/ui/cn";
 import { ProviderDialog } from "./ProviderDialog";
 import { ProviderPresetGrid } from "./ProviderPresetGrid";
@@ -30,6 +32,12 @@ export interface ProvidersSectionProps {
 
 interface ProviderListResponse {
   items: ProviderConfig[];
+}
+
+interface HarnessRoutesResponse {
+  routes: HarnessRouteOption[];
+  current: string;
+  defaultModel: string;
 }
 
 interface TestResult {
@@ -64,6 +72,34 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
     finally{setBalanceLoading(prev=>({...prev,[provider.id]:false}));}
   };
   const items = providersApi.data?.items ?? [];
+  const routesApi = useApi<HarnessRoutesResponse>("/api/providers/harness");
+  const [switchingRouteId, setSwitchingRouteId] = React.useState<string | null>(null);
+
+  /** 切换 harness 服务的底层路由（账号登录 / 官方 API Key），并把默认模型对齐到新路由的目录。 */
+  const switchRoute = async (provider: ProviderConfig, routeId: string) => {
+    if (!routeId || routeId === harnessRouteOf(provider.baseUrl)) return;
+    setSwitchingRouteId(provider.id);
+    try {
+      await apiPatch<ProviderConfig>(`/api/providers/${provider.id}`, { baseUrl: `harness:${routeId}` });
+      const route = routesApi.data?.routes.find((item) => item.id === routeId);
+      const first = route?.models[0];
+      const selection = settings?.models.chat;
+      const missing = selection?.providerId === provider.id && first
+        && !(route?.models ?? []).some((model) => model.id === selection.model);
+      if (missing && first && selection) {
+        const next = { providerId: provider.id, model: first.id };
+        update({ models: { chat: next, prose: next } });
+      }
+      await providersApi.refresh();
+      await routesApi.refresh();
+      notifyDataChanged("providers");
+      toast({ title: "已切换模型路由", description: route?.name ?? routeId, tone: "success" });
+    } catch (cause) {
+      toast({ title: "切换失败", description: cause instanceof Error ? cause.message : "请稍后再试", tone: "error" });
+    } finally {
+      setSwitchingRouteId(null);
+    }
+  };
 
   const openCreate = (nextPreset: ProviderPreset | null = null) => {
     setEditing(null);
@@ -178,14 +214,14 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <h2 className="font-serif text-lg text-ink">模型服务</h2>
-          <p className="mt-1 text-[12px] leading-6 text-ink-3">
-            本构建只接 DeepSeek 官方接口：模型配置与密钥只保存在本机。写作与对话共用一个默认模型，可随时切换。
+          <p className="mt-1 max-w-[62ch] text-[12px] leading-6 text-ink-3">
+            本构建只接 DeepSeek：可以填官方 API Key，也可以直接用 DSH 里已登录的账号。配置只保存在本机，写作与对话共用一个默认模型，可随时切换。
           </p>
         </div>
-        <Button variant="primary" size="sm" icon={<Plus className="size-3.5" />} onClick={() => openCreate()}>
+        <Button variant="primary" size="sm" className="shrink-0" icon={<Plus className="size-3.5" />} onClick={() => openCreate()}>
           添加 DeepSeek
         </Button>
       </div>
@@ -216,7 +252,7 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
           }
         />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {items.map((provider) => {
             const result = testResults[provider.id];
             return (
@@ -228,7 +264,9 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="truncate text-[13px] font-medium text-ink">{provider.name}</span>
-                      <Badge tone="default">{provider.kind === "demo" ? "离线演示模式" : providerKindLabel(provider.kind)}</Badge>
+                      {provider.name !== (provider.kind === "demo" ? "离线演示模式" : providerKindLabel(provider.kind)) ? (
+                        <Badge tone="default">{provider.kind === "demo" ? "离线演示模式" : providerKindLabel(provider.kind)}</Badge>
+                      ) : null}
                       <Badge tone="jade">{provider.models.length} 个模型</Badge>
                       {result ? (
                         <Badge tone={result.ok ? "success" : "danger"}>
@@ -236,9 +274,48 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
                         </Badge>
                       ) : null}
                     </div>
-                    <p className="mt-1 truncate font-mono text-[10.5px] text-ink-3">
-                      {provider.baseUrl || "本地演示 · 无需网络"}
-                    </p>
+                    {provider.kind === "harness" ? (() => {
+                      const currentRoute = harnessRouteOf(provider.baseUrl) ?? "";
+                      const routes = routesApi.data?.routes ?? [];
+                      const active = routes.find((route) => route.id === currentRoute);
+                      const options = routes.map((route) => ({
+                        value: route.id,
+                        label: (
+                          <span className="flex items-center gap-1.5">
+                            {route.name}
+                            {route.available ? null : <span className="text-ink-4">· 未就绪</span>}
+                          </span>
+                        ),
+                      }));
+                      return (
+                        <div className="mt-2 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[11px] text-ink-3">模型路由</span>
+                            {options.length > 0 ? (
+                              <Segmented
+                                size="sm"
+                                value={currentRoute}
+                                options={options}
+                                onChange={(value) => { if (!switchingRouteId) void switchRoute(provider, value); }}
+                              />
+                            ) : (
+                              <span className="font-mono text-[10.5px] text-ink-4">{provider.baseUrl}</span>
+                            )}
+                          </div>
+                          <p className={cn("text-[11px]", active && !active.available ? "text-warning" : "text-ink-3")}>
+                            {active
+                              ? active.available
+                                ? `${active.models.length} 个模型 · ${routeKindHint(active.id)}`
+                                : active.unavailableReason ?? "这条路由暂时不可用"
+                              : "正在读取宿主路由…"}
+                          </p>
+                        </div>
+                      );
+                    })() : (
+                      <p className="mt-1 truncate font-mono text-[10.5px] text-ink-3">
+                        {provider.baseUrl || "本地演示 · 无需网络"}
+                      </p>
+                    )}
                     {provider.models.length > 0 ? (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {provider.models.slice(0, 5).map((model) => (
@@ -251,11 +328,15 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
                         ) : null}
                       </div>
                     ) : null}
-                    {(()=>{let supported=false;try{supported=new URL(provider.baseUrl).hostname==="api.deepseek.com";}catch{}
-                      const value=balances[provider.id];return supported?<div className="mt-2 space-y-1 text-[11px]">
-                        <Button size="sm" variant="ghost" loading={balanceLoading[provider.id]} onClick={()=>void queryBalance(provider)}>{value?"刷新余额":"查询余额"}</Button>
+                    {(()=>{const supported=providerShowsBalance(provider);
+                      const value=balances[provider.id];return supported?<div className="mt-2.5 space-y-1.5 text-[11px]">
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                          <Button size="sm" variant="secondary" loading={balanceLoading[provider.id]} onClick={()=>void queryBalance(provider)}>{value?"刷新余额":"查询余额"}</Button>
+                          {value?<span className="text-ink-2">
+                            {value.isAvailable?"账户可用":"余额不足"} · {value.balances.map(b=>`${b.currency} ${b.total}`).join(" / ")}
+                          </span>:<span className="text-ink-3">读取 DSH 里已登录的 DeepSeek 账号</span>}
+                        </div>
                         {value?<>
-                          <p className="text-ink-2">{value.isAvailable?"账户可用":"余额不足"} · {value.balances.map(b=>`${b.currency} ${b.total}`).join(" / ")}</p>
                           <p className="text-ink-3">{value.balances.map(b=>`${b.currency} 充值 ${b.toppedUp} · 赠送 ${b.granted}`).join("；")}</p>
                           <p className="text-ink-4">查询于 {new Date(value.fetchedAt).toLocaleString()} · 账户余额，不是本次调用费用{balanceErrors[provider.id]?"（刷新失败，显示上次结果）":""}</p>
                         </>:null}
@@ -365,4 +446,11 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
       />
     </div>
   );
+}
+
+/** 路由名后面的一句用途提示，避免只有名字看不出区别。 */
+function routeKindHint(routeId: string): string {
+  if (routeId === "deepseek-account") return "用 DSH 里已登录的账号，不需要填 Key";
+  if (routeId === "deepseek-official") return "用 DeepSeek 官方 API Key，按调用计费";
+  return "宿主里的模型路由";
 }

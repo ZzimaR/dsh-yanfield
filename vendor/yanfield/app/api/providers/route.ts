@@ -1,4 +1,5 @@
 import { bad, handle, ok } from "@/lib/api-utils";
+import { syncAllHarnessModels } from "@/lib/ai/model-sync";
 import * as repo from "@/lib/repo";
 import type { ProviderConfig } from "@/lib/types";
 import { isObject, pickEnum, pickFields, readBody, requireString, type FieldSpec } from "@/app/api/_lib/http";
@@ -21,7 +22,9 @@ function invalidModels(value: unknown): boolean {
 }
 
 export const GET = handle(async () => {
-  return ok({ items: repo.listProviders().map(maskProvider) });
+  // harness 服务的模型列表跟着宿主目录走：DSH 新增模型时这里自动补上。
+  const providers = await syncAllHarnessModels(repo.listProviders());
+  return ok({ items: providers.map(maskProvider) });
 });
 
 export const POST = handle(async (request) => {

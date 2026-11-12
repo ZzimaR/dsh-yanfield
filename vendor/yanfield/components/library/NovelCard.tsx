@@ -60,7 +60,7 @@ export function NovelCard({ novel, onDelete, onEdit }: NovelCardProps) {
         </div>
       </Link>
 
-      <div className="absolute right-3.5 top-3.5 z-10">
+      <div className="absolute right-6 top-6 z-10">
         <Dropdown
           width={188}
           trigger={

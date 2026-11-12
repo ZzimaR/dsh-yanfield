@@ -91,6 +91,8 @@ function run(command, args) {
   })
 }
 
+const buildStamp = new Date().toISOString().replace(/\.\d{3}Z$/, "Z")
+
 await generateRoutes()
 await run("npx", ["@tailwindcss/cli", "-i", "client/app.css", "-o", "client/styles.generated.css", "--minify"])
 const statusBarCss = await readFile(path.join(vendor, "components", "editor", "EditorStatusBar.module.css"), "utf8")
@@ -111,6 +113,7 @@ await build({
   },
   plugins: [atAliasPlugin(), cssModulePlugin()],
   loader: { ".css": "text" },
+  define: { __YANFIELD_BUILD__: JSON.stringify(buildStamp) },
   minify: true,
   legalComments: "none",
   logLevel: "info",

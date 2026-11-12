@@ -396,7 +396,7 @@ export function ChapterTree({
             {chapter.title || "未命名章节"}
           </span>
         </button>
-        <span className="shrink-0 pl-0.5 text-[10.5px] tabular-nums text-ink-4">
+        <span className="shrink-0 pl-0.5 pr-1 text-[10.5px] tabular-nums text-ink-4">
           {chapter.wordCount > 0 ? formatWords(chapter.wordCount) : ""}
         </span>
         {/* 「⋯」菜单常显：避免 hover 才出现导致点不中/被布局变化顶走 */}

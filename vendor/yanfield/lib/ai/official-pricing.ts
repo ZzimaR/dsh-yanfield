@@ -1,5 +1,6 @@
 import type {ProviderConfig} from "@/lib/types";
-export const DEEPSEEK_PRICE_URL="https://api-docs.deepseek.com/zh-cn/quick_start/pricing/";
+import {DEEPSEEK_PRICE_SOURCE_URL,deepseekPricingRates} from "@/lib/ai/deepseek-pricing";
+export const DEEPSEEK_PRICE_URL=DEEPSEEK_PRICE_SOURCE_URL;
 export interface OfficialPricing {providerId:string;model:string;source:string;fetchedAt:string;rates:{period:string;inputPerMillion:number;outputPerMillion:number;cachedInputPerMillion:number}[];}
 function text(html:string):string{return html.replace(/<sup\b[^>]*>[\s\S]*?<\/sup>/gi,"").replace(/<[^>]+>/g,"").replace(/&nbsp;|&#160;/g," ").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).trim();}
 /** Expand merged table cells so model columns and rate labels cannot shift silently. */
@@ -29,9 +30,12 @@ export function parseDeepseekPricing(html:string,model:string):OfficialPricing["
   return ["空闲时段","高峰时段"].map(period=>({period,inputPerMillion:price(/输入.*缓存未命中/,period),cachedInputPerMillion:price(/输入.*（缓存命中）/,period),outputPerMillion:price(/百万tokens输出/,period)}));
 }
 export async function fetchOfficialPricing(provider:ProviderConfig,model:string):Promise<OfficialPricing>{
+  // 首选内置价目表：离线可用、不依赖官网页面结构，官方调价时改 lib/ai/deepseek-pricing.ts。
+  const builtin=deepseekPricingRates(model);
+  if(builtin)return {providerId:provider.id,model,source:DEEPSEEK_PRICE_SOURCE_URL,fetchedAt:new Date().toISOString(),rates:builtin.map(r=>({period:r.period,inputPerMillion:r.rate.inputPerMillion,cachedInputPerMillion:r.rate.cachedInputPerMillion,outputPerMillion:r.rate.outputPerMillion}))};
+  // 价目表里没有的模型（官方新增模型）再退回抓官方页面解析。
   let host="";try{host=new URL(provider.baseUrl||"https://api.deepseek.com").hostname;}catch{}
   if(host!=="api.deepseek.com")throw new Error("当前仅支持 DeepSeek 官方服务自动获取人民币单价；中转服务请使用其自己的报价，已有单价保持不变");
-  if(!["deepseek-flash","deepseek-v4-pro","deepseek-v4-flash","deepseek-v4-flash-vision-exp"].includes(model))throw new Error("此模型尚无可验证的官方价格映射，请手动填写");
   const response=await fetch(DEEPSEEK_PRICE_URL,{cache:"no-store",redirect:"error",signal:AbortSignal.timeout(15000)});
   if(!response.ok)throw new Error(`官方价格页面暂不可用（HTTP ${response.status}），已有单价保持不变`);
   const html=await response.text();if(html.length>2000000)throw new Error("官方价格页面异常，未修改单价");

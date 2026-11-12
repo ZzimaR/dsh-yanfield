@@ -9,8 +9,9 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/ui/cn";
-import { yanfieldPortal } from "@/lib/ui/portal";
+import { yanfieldPanelBounds, yanfieldPortal } from "@/lib/ui/portal";
 import { useOnClickOutside } from "@/lib/ui/hooks";
+import { isInsideComposedPath } from "@/lib/ui/composed";
 
 /* ============================== Button ============================== */
 
@@ -228,7 +229,10 @@ export function Select({
     const spaceBelow = window.innerHeight - rect.bottom - 12;
     const spaceAbove = rect.top - 12;
     const openUp = spaceBelow < Math.min(menuHeight, 180) && spaceAbove > spaceBelow;
-    const maxHeight = Math.max(140, Math.min(280, openUp ? spaceAbove : spaceBelow));
+    // 菜单行高 32px、内边距 8px：把可用高度取整到整行，避免最后一项只露出半行。
+    const space = (openUp ? spaceAbove : spaceBelow) - 8;
+    const rows = Math.max(4, Math.min(9, Math.floor(space / 32)));
+    const maxHeight = rows * 32 + 8;
     const top = openUp ? Math.max(8, rect.top - Math.min(menuHeight, maxHeight) - 6) : rect.bottom + 6;
     const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8));
     setBox({ top, left, width, maxHeight });
@@ -241,9 +245,8 @@ export function Select({
     place();
     const frame = window.requestAnimationFrame(place);
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (!target) return;
-      if (menuRef.current?.contains(target) || anchorRef.current?.contains(target)) return;
+      // shadow DOM 下 event.target 会被重定向到 host，必须用 composedPath 判断
+      if (isInsideComposedPath(event, [menuRef.current, anchorRef.current])) return;
       setOpen(false);
     };
     window.addEventListener("resize", place);
@@ -699,8 +702,16 @@ function Overlay({ children, onClose, className, align = "center" }: { children:
     };
   }, [onClose]);
 
+  const bounds = React.useMemo(() => yanfieldPanelBounds(), []);
+  const boundsStyle: React.CSSProperties | undefined = bounds
+    ? { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, right: "auto", bottom: "auto" }
+    : undefined;
   return createPortal(
-    <div className={cn("fixed inset-0 z-50 flex bg-black/35 backdrop-blur-[2px] fade-in", align === "center" ? "items-start justify-center overflow-y-auto p-4 pt-[10vh]" : "justify-end")} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className={cn("fixed z-50 flex bg-black/35 backdrop-blur-[2px] fade-in", align === "center" ? "items-center justify-center overflow-y-auto p-4" : "justify-end")}
+      style={boundsStyle}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
       {children}
     </div>,
     yanfieldPortal(),
@@ -846,9 +857,8 @@ export function Dropdown({
     place();
     const frame = window.requestAnimationFrame(place);
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (!target) return;
-      if (menuRef.current?.contains(target) || anchorRef.current?.contains(target)) return;
+      // shadow DOM 下 event.target 会被重定向到 host，必须用 composedPath 判断
+      if (isInsideComposedPath(event, [menuRef.current, anchorRef.current])) return;
       setOpen(false);
     };
     window.addEventListener("resize", place);

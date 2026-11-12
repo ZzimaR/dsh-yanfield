@@ -5,8 +5,16 @@ import { ExternalLink, Info, ShieldCheck, Sparkles } from "lucide-react";
 import { InkstoneMark } from "@/components/brand/InkstoneMark";
 import { Badge, Card } from "@/components/ui/kit";
 import { GITHUB_URL, DOCS_URL, ISSUES_URL, VERSION } from "@/components/landing/constants";
+import { BUILD_STAMP } from "@/lib/build-info";
 
 const STACK = ["DeepSeek Harness", "React", "TypeScript", "Tailwind CSS v4", "TipTap", "SQLite", "lucide-react"];
+
+/** build 脚本写的是 UTC 时间，展示成本地时间更好核对。 */
+function buildStampLabel(stamp: string): string {
+  const parsed = Date.parse(stamp);
+  if (Number.isNaN(parsed)) return stamp;
+  return new Date(parsed).toLocaleString("zh-CN", { hour12: false });
+}
 
 const CREDITS = [
   { name: "React", note: "写作台界面" },
@@ -67,6 +75,10 @@ export function AboutSection() {
                 <ExternalLink className="size-3" aria-hidden />
               </a>
             </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-ink-3">构建</dt>
+            <dd className="font-mono text-[11px] text-ink-2">{buildStampLabel(BUILD_STAMP)}</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
             <dt className="text-ink-3">许可证</dt>

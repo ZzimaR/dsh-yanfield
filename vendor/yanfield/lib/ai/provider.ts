@@ -503,7 +503,9 @@ function randomId(): string {
 }
 
 function harnessEffort(level: ThinkingLevel | undefined): string | undefined {
-  if (!level || level === "default" || level === "off") return undefined;
+  // 明确「关闭思考」时要真的发 off：否则宿主会按默认 high 思考，多花一大截输出费用。
+  if (level === "off") return "off";
+  if (!level || level === "default") return undefined;
   if (level === "xhigh" || level === "ultra") return "max";
   return level;
 }

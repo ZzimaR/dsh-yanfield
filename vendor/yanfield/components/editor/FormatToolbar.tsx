@@ -67,7 +67,7 @@ function ToolbarButton({ label, active, disabled, onClick, className, children }
         active={active}
         disabled={disabled}
         onClick={onClick}
-        className={cn(DISABLED_CLASS, className)}
+        className={cn(DISABLED_CLASS, "shrink-0 whitespace-nowrap", className)}
       >
         {children}
       </IconButton>
@@ -93,7 +93,7 @@ export function FormatToolbar({ editor, className, children }: FormatToolbarProp
   const isParagraph = editor.isActive("paragraph");
 
   return (
-    <div role="toolbar" aria-label="格式工具栏" className={cn("flex flex-wrap items-center gap-0.5", className)}>
+    <div role="toolbar" aria-label="格式工具栏" className={cn("scroll-thin flex flex-nowrap items-center gap-0.5 overflow-x-auto", className)}>
       <ToolbarButton label="撤销" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
         <Undo2 className="size-3.5" />
       </ToolbarButton>

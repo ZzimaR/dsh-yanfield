@@ -378,8 +378,22 @@ export function AiPanel({
     const element=scrollRef.current;
     if(element)element.scrollTop=element.scrollHeight;
   },[]);
-  React.useEffect(()=>{followLatest();},[activeKey,followLatest]);
   React.useEffect(()=>{
+    // 空对话（欢迎态）不该自动滚到底：内容比可视区高一点时会把主编卡和开场白切掉。
+    const element=scrollRef.current;
+    if(chat.activeTab.messages.length===0){
+      followingRef.current=true;setHasNewProgress(false);
+      if(element)element.scrollTop=0;
+      return;
+    }
+    followLatest();
+  },[activeKey,chat.activeTab.messages.length,followLatest]);
+  React.useEffect(()=>{
+    if(chat.activeTab.messages.length===0){
+      followingRef.current=true;setHasNewProgress(false);
+      const element=scrollRef.current;if(element)element.scrollTop=0;
+      return;
+    }
     const frame=requestAnimationFrame(()=>{
       if(followingRef.current)followLatest();
       else setHasNewProgress(true);
@@ -388,7 +402,7 @@ export function AiPanel({
   },[chat.activeTab.messages,followLatest]);
   React.useEffect(()=>{
     const content=scrollRef.current?.firstElementChild;
-    if(!content || typeof ResizeObserver==="undefined")return;
+    if(!content || chat.activeTab.messages.length===0 || typeof ResizeObserver==="undefined")return;
     const observer=new ResizeObserver(()=>{
       if(followingRef.current)followLatest();
       else setHasNewProgress(true);

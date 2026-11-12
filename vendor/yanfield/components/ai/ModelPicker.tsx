@@ -28,6 +28,7 @@ import { cn } from "@/lib/ui/cn";
 import { formatTokens } from "./utils";
 import type { ModelTargetInfo } from "./model-info";
 import { humanizeAiError } from "./errors";
+import { isInsideComposedPath } from "@/lib/ui/composed";
 
 const MENU_WIDTH = 320;
 const OPEN_SETTINGS_EVENT = "yanfield:open-settings";
@@ -84,11 +85,19 @@ export function ModelPicker({
   const currentProseProviderId = settings?.models.prose.providerId ?? null;
   const currentProseModel = settings?.models.prose.model ?? "";
 
-  const label = !target || !target.ready
+  // 面板只有 384px 宽，底部这一行放不下「DeepSeek Harness / deepseek-flash」，
+  // 之前会被截成「DeepSeek …」。这里压成「DeepSeek · flash」，完整信息放 title 里。
+  const shortModel = (value: string) => value.replace(/^deepseek[-_\s]*/i, "");
+  const fullLabel = !target || !target.ready
     ? "未配置模型"
     : target.providerKind === "demo"
       ? `离线演示模式 · ${target.model}`
       : `${target.providerName} / ${target.model}`;
+  const label = !target || !target.ready
+    ? "未配置模型"
+    : target.providerKind === "demo"
+      ? `离线演示 · ${target.model}`
+      : `DeepSeek · ${shortModel(target.model)}`;
 
   /** 当前模型是否仍存在于已启用 Provider 列表中 */
   const currentInList = React.useMemo(() => {
@@ -152,9 +161,8 @@ export function ModelPicker({
     place();
     const frame = window.requestAnimationFrame(place);
     const onPointerDown = (event: PointerEvent) => {
-      const node = event.target as Node | null;
-      if (!node) return;
-      if (menuRef.current?.contains(node) || anchorRef.current?.contains(node)) return;
+      // shadow DOM 下 event.target 会被重定向到 host，必须用 composedPath 判断
+      if (isInsideComposedPath(event, [menuRef.current, anchorRef.current])) return;
       setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
@@ -271,7 +279,7 @@ export function ModelPicker({
           )}
           aria-hidden
         />
-        <span className="truncate">{label}</span>
+        <span className="truncate" title={fullLabel}>{label}</span>
         {thinkingSupported?<span className="shrink-0 text-[9px] text-ink-4">思考·{THINKING_OPTIONS.find(o=>o.value===(thinking||"default"))?.label}</span>:null}
         <ChevronDown className="size-2.5 shrink-0 opacity-70" />
       </button>

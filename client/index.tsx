@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import css from "./styles.generated.css"
-import { setThemeRoots } from "@/lib/ui/theme"
+import { setThemeRoots, syncSurfaceTheme } from "@/lib/ui/theme"
 import { setYanfieldPortal } from "@/lib/ui/portal"
 import { YanfieldApp } from "./app"
 
@@ -15,34 +15,6 @@ function PanelIcon({ size = 16 }: { size?: number }) {
       <rect x="1.7" y="1.7" width="12.6" height="12.6" rx="3" />
       <path d="M8 1.7v12.6M1.7 8h12.6" strokeDasharray="1.5 1.2" />
     </svg>
-  )
-}
-
-function HeaderOpen({ open }: { open?: () => void }) {
-  return (
-    <button
-      type="button"
-      title="打开砚田"
-      aria-label="打开砚田"
-      onClick={() => open?.()}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        height: 28,
-        padding: "0 8px",
-        border: 0,
-        borderRadius: 8,
-        background: "transparent",
-        color: "inherit",
-        cursor: "pointer",
-        font: "inherit",
-        fontSize: 12,
-      }}
-    >
-      <PanelIcon size={14} />
-      <span>砚田</span>
-    </button>
   )
 }
 
@@ -90,11 +62,30 @@ function openPanel(ctx: { get?: (name: string) => unknown }) {
   return false
 }
 
+/** Tailwind v4 把边框/阴影/环等工具类的初始值放在 `@property` 的 initial-value 里，
+ *  而 Chrome 不会注册 shadow root 内声明的 `@property`（实测 Chrome 157），导致
+ *  `border-style: var(--tw-border-style)` 无效、所有边框都不画。
+ *  文档级注册的 property 对 shadow tree 生效，所以把 css 里的 @property 规则
+ *  提升一份到 document.head（同名重复注册会被忽略，可安全重复执行）。 */
+const AT_PROPERTY_RE = /@property\s+--[\w-]+\s*\{[^}]*\}/g
+
+function registerAtProperties(cssText: string) {
+  if (typeof document === "undefined") return
+  if (document.querySelector("style[data-yanfield-at-properties]")) return
+  const rules = cssText.match(AT_PROPERTY_RE)
+  if (!rules || rules.length === 0) return
+  const style = document.createElement("style")
+  style.dataset.yanfieldAtProperties = ""
+  style.textContent = rules.join("\n") + "\n"
+  document.head.appendChild(style)
+}
+
 function Desk() {
   const hostRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const host = hostRef.current
     if (!host) return undefined
+    registerAtProperties(css)
     host.style.height = "100%"
     host.style.minHeight = "100%"
     const shadow = host.attachShadow({ mode: "open" })
@@ -109,6 +100,21 @@ function Desk() {
     shadow.append(style, mount, portal)
     setThemeRoots([host, mount, portal])
     setYanfieldPortal(portal)
+    // 跟随宿主主题：Harness 在 document.body 上标 data-ds-dark-theme，
+    // 用户切换 Harness 的浅色/深色时插件要立刻跟着变。
+    const syncTheme = () => syncSurfaceTheme()
+    syncTheme()
+    const themeObserver = new MutationObserver(syncTheme)
+    try {
+      themeObserver.observe(document.body, {
+        attributes: true,
+        attributeFilter: ["data-ds-dark-theme", "data-ds-light-theme", "data-theme", "data-mode", "class"],
+      })
+    } catch {
+      /* ignore */
+    }
+    const media = window.matchMedia("(prefers-color-scheme: dark)")
+    media.addEventListener("change", syncTheme)
     let root: Root | null = null
     try {
       root = createRoot(mount)
@@ -117,6 +123,8 @@ function Desk() {
       mount.textContent = error instanceof Error ? error.message : "砚田界面没有挂上"
     }
     return () => {
+      themeObserver.disconnect()
+      media.removeEventListener("change", syncTheme)
       root?.unmount()
       setYanfieldPortal(null)
       setThemeRoots([])
@@ -153,13 +161,7 @@ export function apply(ctx: {
     order: 8,
     label: () => "砚田",
   }, PanelIcon))
-  injectSlot("conversation.session.header.utilities", () => slots.register({
-    name: "conversation.session.header.utilities",
-    id: "dsh-yanfield:open",
-    order: 14,
-    label: () => "砚田",
-    inject: () => ({ open: () => openPanel(ctx) }),
-  }, HeaderOpen))
+  // 聊天页头不再放入口：砚田只保留左侧导航栏（sidebar.panellist）一个入口。
   try {
     if (typeof ctx.inject === "function") {
       const seat = ctx.inject(["sidebarRightTabs", "sidebarRight"], (injected) => {

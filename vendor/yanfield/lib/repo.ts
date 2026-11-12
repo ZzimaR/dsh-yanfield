@@ -15,6 +15,7 @@ import {
   type Row,
 } from "./db";
 import { chatTitleFromMessage, isDefaultChatTitle } from "./chat-title";
+import { builtinAiPricing } from "./ai/deepseek-pricing";
 import { unifyModelSettings } from "./model-settings";
 import { normalizeProviderKind } from "./ai/provider-kind";
 import { countWords } from "./ui/cn";
@@ -1152,6 +1153,20 @@ export function getSettings(): AppSettings {
   return merged;
 }
 
+/** 实际生效的 AI 单价：用户填过就用用户的；全 0 时按内置 DeepSeek 官方价目表
+ * 取当前时段（高峰/空闲）的价格，用于底栏「预估 ¥x」。缺用户值时不再返回 0。 */
+export function getEffectiveAiPricing(settings: AppSettings = getSettings()): AppSettings["aiPricing"] {
+  const stored = settings.aiPricing;
+  const filled = stored.inputPerMillion > 0 || stored.outputPerMillion > 0 || (stored.cachedInputPerMillion ?? 0) > 0;
+  if (filled) return stored;
+  const target = settings.models.chat;
+  const provider = target.providerId ? getProvider(target.providerId) : undefined;
+  // 只有 DeepSeek 官方服务与 harness 通道按 DeepSeek 官方价目计费。
+  if (!provider || (provider.kind !== "deepseek" && provider.kind !== "harness")) return stored;
+  const model = target.model || provider.models[0]?.id || "";
+  return builtinAiPricing(model) ?? stored;
+}
+
 export function saveSettings(patchIn: Partial<AppSettings>): AppSettings {
   const next = { ...getSettings(), ...patchIn };
   next.models = unifyModelSettings(next.models);
@@ -1291,7 +1306,7 @@ export function getStats(): DashboardStats {
     todayPromptTokens: todayAi.promptTokens,
     todayCachedInputTokens:todayAi.cachedInputTokens,todayCacheReportedInputTokens:todayAi.cacheReportedInputTokens,
     todayCompletionTokens: todayAi.completionTokens,
-    aiPricing: getSettings().aiPricing,
+    aiPricing: getEffectiveAiPricing(),
     streakDays,
     daily,
     recentNovels: listNovels().slice(0, 4).map((nv) => ({

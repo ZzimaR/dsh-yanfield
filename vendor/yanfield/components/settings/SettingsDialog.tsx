@@ -14,7 +14,7 @@ import { useApi } from "@/lib/client/api";
 import type { AppSettings } from "@/lib/types";
 import { applySurfaceDataset } from "@/lib/ui/theme";
 import { cn } from "@/lib/ui/cn";
-import { yanfieldPortal } from "@/lib/ui/portal";
+import { yanfieldPanelBounds, yanfieldPortal } from "@/lib/ui/portal";
 import {
   SETTINGS_SECTIONS,
   SettingsSaveStatus,
@@ -67,9 +67,15 @@ export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) 
   const status = <SettingsSaveStatus editor={editor} />;
   const activeMeta = SETTINGS_SECTIONS.find((item) => item.key === active) ?? SETTINGS_SECTIONS[0];
 
+  const bounds = yanfieldPanelBounds();
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 backdrop-blur-[2px] fade-in sm:items-center sm:p-6"
+      className="fixed z-50 flex items-end justify-center bg-black/35 backdrop-blur-[2px] fade-in sm:items-center sm:p-6"
+      style={
+        bounds
+          ? { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, right: "auto", bottom: "auto" }
+          : undefined
+      }
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

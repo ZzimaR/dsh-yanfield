@@ -65,7 +65,8 @@
     "build": "node scripts/build.mjs",
     "check": "node scripts/check.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "test": "node scripts/build.mjs && node scripts/check.mjs && node scripts/smoke.mjs"
+    "test": "node scripts/build.mjs && node scripts/check.mjs && node scripts/smoke.mjs",
+    "reinstall": "node scripts/reinstall.mjs"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.16",

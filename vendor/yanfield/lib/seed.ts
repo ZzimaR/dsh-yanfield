@@ -146,6 +146,14 @@ export function ensureHarnessProvider(): ProviderConfig | undefined {
   const model = bridge?.defaultModel() || "deepseek-flash";
   const models = [{ id: model, label: `${model}（Harness 当前模型）`, contextWindow: 1_000_000 }];
   let provider = repo.listProviders().find((item) => item.kind === "harness");
+  // 旧版本把 harness 服务固定成 ``harness:deepseek-official``（要 API Key）；DSH 是账号登录时
+  // 那条路由必然报 MISSING_CREDENTIAL，启动时静默迁到账号路由，用户就不用改配置。
+  if (provider && provider.baseUrl === "harness:deepseek-official") {
+    const accountRoute = bridge?.listProviders().find((item) => item.id === "deepseek-account");
+    if (accountRoute) {
+      provider = repo.updateProvider(provider.id, { baseUrl: `harness:${accountRoute.id}` });
+    }
+  }
   if (!provider) {
     provider = repo.createProvider({
       name: "DeepSeek Harness",

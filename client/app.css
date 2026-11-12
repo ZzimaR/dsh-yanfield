@@ -22,6 +22,17 @@
   color: var(--ink);
 }
 
+/* 注意：不要在这里再套一层 .yf-app —— vendor 的 globals.css 用 `.yf-app` 作为浅色
+   token 的作用域，嵌套的 .yf-app 会把暗色变量重新写成浅色，导致宿主深色下插件仍是浅色。 */
+.yf-content {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  background: var(--paper);
+  color: var(--ink);
+}
+
 .yf-app .h-dvh {
   height: 100% !important;
   max-height: 100%;
@@ -29,6 +40,25 @@
 
 .yf-app .min-h-dvh {
   min-height: 100% !important;
+}
+
+/* AppShell 根容器（非 flush 页面）只有 min-h-dvh，内嵌时高度仍是"内容高度"；
+   这样里面 h-dvh 的左侧导航栏 height:100% 会解析成 auto，只显示图标那一截。
+   给根容器一个确定高度，导航栏和页面背景才会铺满整个面板。 */
+.yf-content > .min-h-dvh {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 非 flush 页面：滚动交给正文列（main），左侧 rail 的 sticky 才有位移空间。
+   否则整页在 .yf-content 里滚动，rail 会跟着滚走、在中途露出半截背景。 */
+.yf-content > .min-h-dvh > div.flex-1 {
+  min-height: 0;
+}
+
+.yf-content > .min-h-dvh > div.flex-1 > main {
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .yf-portal {
@@ -40,4 +70,10 @@
 
 .yf-portal > * {
   pointer-events: auto;
+}
+
+/* 上游用 --ink-4 作 placeholder 色，在浅色主题下对比度约 2:1（偏"看不清"），
+   统一提到 --ink-3；暗色主题本来也是 dark:placeholder:text-ink-3，视觉不变。 */
+.yf-app ::placeholder {
+  color: var(--ink-3);
 }

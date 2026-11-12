@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isInsideComposedPath } from "./composed";
 
 /** 防抖值 */
 export function useDebouncedValue<T>(value: T, delay = 300): T {
@@ -63,7 +64,7 @@ export function useOnClickOutside<T extends HTMLElement>(ref: React.RefObject<T 
   useEffect(() => {
     const listener = (event: MouseEvent | TouchEvent) => {
       const el = ref.current;
-      if (!el || el.contains(event.target as Node)) return;
+      if (!el || isInsideComposedPath(event, [el])) return;
       handler();
     };
     document.addEventListener("mousedown", listener);

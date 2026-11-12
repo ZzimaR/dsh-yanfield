@@ -4,6 +4,7 @@ import * as React from "react";
 import { RotateCcw, SlidersHorizontal } from "lucide-react";
 import { Button, Card, Input, Segmented, Slider, Switch, Textarea, useToast } from "@/components/ui/kit";
 import type {OfficialPricing} from "@/lib/ai/official-pricing";
+import { canonicalPricingModel, currentPricePeriod, pricePeriodLabel } from "@/lib/ai/deepseek-pricing";
 import { apiGet, useApi } from "@/lib/client/api";
 import { DEFAULT_CONTEXT_CONFIG, type AppSettings, type ContextConfig, type DashboardStats } from "@/lib/types";
 import { cn } from "@/lib/ui/cn";
@@ -63,6 +64,10 @@ export function ContextSection({ settings, update }: ContextSectionProps) {
   if (!settings) return null;
   const context = settings.defaultContext;
   const pricing = settings.aiPricing;
+  // 内置价目表：DeepSeek 官方模型（以及走 DeepSeek 的 harness 通道）没填单价时，
+  // 服务端会直接返回按当前时段算出的官方价，这里只负责把规则讲清楚。
+  const builtinModel = canonicalPricingModel(settings.models.chat.model);
+  const builtinPeriod = pricePeriodLabel(currentPricePeriod());
   const stats = statsApi.data;
 
   const patchContext = (patch: Partial<ContextConfig>) => {
@@ -76,14 +81,14 @@ export function ContextSection({ settings, update }: ContextSectionProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <h2 className="font-serif text-lg text-ink">AI 与上下文</h2>
-          <p className="mt-1 text-[12px] leading-6 text-ink-3">
+          <p className="mt-1 max-w-[62ch] text-[12px] leading-6 text-ink-3">
             每次 AI 请求会按这里的开关装配上下文。素材可见、预算可控，写长篇才不会越写越跑偏。
           </p>
         </div>
-        <Button variant="ghost" size="sm" icon={<RotateCcw className="size-3.5" />} onClick={reset}>
+        <Button variant="secondary" size="sm" className="shrink-0" icon={<RotateCcw className="size-3.5" />} onClick={reset}>
           恢复默认
         </Button>
       </div>
@@ -219,6 +224,11 @@ export function ContextSection({ settings, update }: ContextSectionProps) {
           <p className="mt-1 text-[12px] leading-relaxed text-ink-3">
             优先采用接口返回的用量；缓存命中与普通输入分别估算，未报告缓存的部分按普通输入单价估算。实际账单以服务商为准。
           </p>
+          {builtinModel ? (
+            <p className="mt-1 text-[11px] leading-relaxed text-ink-3">
+              {builtinModel} 的价格已内置 DeepSeek 官方价目表，目前按{builtinPeriod}计算：空闲时段是高峰时段的一半，高峰为北京时间工作日 9:00–12:00、14:00–18:00（法定节假日全天按空闲）。官方调价时同步更新插件版本即可。
+            </p>
+          ) : null}
         </div>
         <Button size="sm" variant="secondary" loading={fetchingPrice} onClick={async()=>{
           setFetchingPrice(true);setPriceError("");setOfficial(null);
