@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="砚田 Yanfield">
+  <title>砚田 Yanfield</title>
+  <!-- 砚田标识：宣纸方块上的朱红田字格，落下一笔墨点。浅色、深色背景通用。 -->
+  <rect x="2.5" y="2.5" width="59" height="59" rx="15" fill="#f5f1e8" stroke="#d6c9b0" stroke-width="1.5"/>
+  <g fill="none" stroke="#b5462f">
+    <rect x="11" y="11" width="42" height="42" rx="5" stroke-width="2.6"/>
+    <path d="M32 11v42M11 32h42" stroke-width="1.6" stroke-dasharray="3 2.6" opacity=".7"/>
+  </g>
+  <path d="M22.5 18c1.6-1.4 4.6-.9 8 1.2 5.6 3.4 11.4 8.6 12.3 14.6.8 5.4-2.6 9.6-7.6 9.6-4.6 0-7.6-3.4-7.4-7.8.2-3.6-1-7.8-4.2-12.8-1.2-1.9-2.2-3.6-1.1-4.8Z" fill="#201d18"/>
+</svg>

@@ -1,0 +1,93 @@
+{
+  "name": "dsh-yanfield",
+  "version": "0.1.0",
+  "description": "在 DeepSeek Harness 里写长篇小说。砚田写作台：正文、大纲、资料与可审阅的 AI 改稿。",
+  "type": "module",
+  "main": "./dist/host.js",
+  "exports": {
+    ".": "./dist/host.js",
+    "./client": "./dist/client.js",
+    "./icon": "./icon.svg",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "icon": "./icon.svg",
+  "author": {
+    "name": "ZzimaR",
+    "url": "https://github.com/ZzimaR"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZzimaR/dsh-yanfield.git"
+  },
+  "homepage": "https://github.com/ZzimaR/dsh-yanfield#readme",
+  "bugs": {
+    "url": "https://github.com/ZzimaR/dsh-yanfield/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis-plugin",
+    "yanfield",
+    "writing",
+    "novel"
+  ],
+  "engines": {
+    "node": ">=22.19.0",
+    "dsh": ">=0.2.1-rc.5 <0.3.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "client",
+    "src",
+    "vendor/yanfield",
+    "icon.svg",
+    "cordis.patch.yml",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "test": "node scripts/build.mjs && node scripts/check.mjs && node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.16",
+    "@tiptap/extension-character-count": "^3.32.2",
+    "@tiptap/extension-highlight": "^3.32.2",
+    "@tiptap/extension-placeholder": "^3.32.2",
+    "@tiptap/extension-typography": "^3.32.2",
+    "@tiptap/react": "^3.32.2",
+    "@tiptap/starter-kit": "^3.32.2",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@types/turndown": "^5.0.6",
+    "clsx": "^2.1.1",
+    "esbuild": "^0.25.12",
+    "lucide-react": "^1.65.0",
+    "marked": "^18.1.2",
+    "nanoid": "^6.0.2",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.1.16",
+    "turndown": "^7.2.2",
+    "typescript": "^5.9.3",
+    "zod": "^4.6.7"
+  }
+}

@@ -1,0 +1,5 @@
+# dsh-yanfield：一个包同时提供 Host 半区与浏览器半区。
+# name 必须等于 package.json 的 name，市场才会把它当成可安装的 loader 行。
+- insert:
+    - id: yanfield
+      name: dsh-yanfield
