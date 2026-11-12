@@ -43132,6 +43132,7 @@ ${config2.customInstruction || ""}
     if (run2.messageId) updateMessage(run2.messageId, { actions: [{ id: run2.id, type: "agent-run", label: "\u4EFB\u52A1\u4E0E\u6539\u52A8", payload: { runId: run2.id }, applied: false }], content: run2.summary || "\u6B63\u5728\u5904\u7406\u4EFB\u52A1", status: run2.status === "running" ? "streaming" : run2.status === "error" ? "error" : run2.status === "aborted" ? "aborted" : "complete", usage: run2.usage, error: run2.error });
   };
   let completionCalls = 0, pricedCalls = 0;
+  let decisionCapRelaxed = false;
   async function* complete(input2, decisionOutput = false, materialOutput = false, shortWrite = false) {
     let raw = "", prompt = 0, output2 = 0;
     if (decisionOutput) lastDecisionReasoning = "";
@@ -43142,20 +43143,36 @@ ${config2.customInstruction || ""}
       const canOff = thinkingOptions.some((option) => option.value === "off");
       const canLow = thinkingOptions.some((option) => option.value === "low");
       const decideThinking = (decisionOutput || materialOutput) && canOff ? "off" : shortWrite && canLow ? "low" : target.thinkingLevel;
-      const callMaxTokens = decisionOutput ? 1400 : config2.maxTokens > 0 ? config2.maxTokens : void 0;
-      for await (const chunk of streamCompletion({ provider: target.provider, model: target.model, messages: input2, maxTokens: callMaxTokens, temperature: 0.4, signal, disableThinking: true, thinkingLevel: decideThinking, ...decisionOutput ? usesDecisionTool(target.provider, target.model) ? { decisionTools: DECISION_TOOLS } : supportsDecisionJson(target.provider, target.model) ? { outputFormat: "json" } : {} : materialOutput && supportsDecisionJson(target.provider, target.model) ? { outputFormat: "json" } : {} })) {
-        if (signal?.aborted) throw new DOMException("\u5DF2\u505C\u6B62", "AbortError");
-        if (chunk.type === "reasoning" && decisionOutput && deepThinking) lastDecisionReasoning += chunk.text;
-        if (chunk.type === "delta") {
-          raw += chunk.text;
-          yield chunk.text;
-        }
-        if (chunk.type === "usage") {
-          prompt = chunk.promptTokens;
-          output2 = chunk.completionTokens;
-          reported = true;
-          cachedInputTokens = chunk.cachedInputTokens;
-          if (chunk.cost) cost = chunk.cost;
+      const baseMaxTokens = config2.maxTokens > 0 ? config2.maxTokens : void 0;
+      let retried = false;
+      for (; ; ) {
+        raw = "";
+        const capped = decisionOutput && !retried && !decisionCapRelaxed;
+        const callMaxTokens = capped ? 1400 : baseMaxTokens;
+        try {
+          for await (const chunk of streamCompletion({ provider: target.provider, model: target.model, messages: input2, maxTokens: callMaxTokens, temperature: 0.4, signal, disableThinking: true, thinkingLevel: decideThinking, ...decisionOutput ? usesDecisionTool(target.provider, target.model) ? { decisionTools: DECISION_TOOLS } : supportsDecisionJson(target.provider, target.model) ? { outputFormat: "json" } : {} : materialOutput && supportsDecisionJson(target.provider, target.model) ? { outputFormat: "json" } : {} })) {
+            if (signal?.aborted) throw new DOMException("\u5DF2\u505C\u6B62", "AbortError");
+            if (chunk.type === "reasoning" && decisionOutput && deepThinking) lastDecisionReasoning += chunk.text;
+            if (chunk.type === "delta") {
+              raw += chunk.text;
+              yield chunk.text;
+            }
+            if (chunk.type === "usage") {
+              prompt = chunk.promptTokens;
+              output2 = chunk.completionTokens;
+              reported = true;
+              cachedInputTokens = chunk.cachedInputTokens;
+              if (chunk.cost) cost = chunk.cost;
+            }
+          }
+          break;
+        } catch (error62) {
+          if (capped && isOutputLimitError(error62) && !signal?.aborted) {
+            decisionCapRelaxed = true;
+            retried = true;
+            continue;
+          }
+          throw error62;
         }
       }
     } finally {

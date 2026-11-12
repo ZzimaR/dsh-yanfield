@@ -7,7 +7,7 @@ import { parseAgentDecision, supportsDecisionJson, usesDecisionTool, DECISION_TO
 import { protocolDiagnostic } from "./diagnostics";
 import * as repo from "@/lib/repo";
 import { resolveTarget, mergeContextConfig } from "@/lib/ai/engine";
-import { streamCompletion, type AiMessage } from "@/lib/ai/provider";
+import { isOutputLimitError, streamCompletion, type AiMessage } from "@/lib/ai/provider";
 import { trimChatHistory } from "@/lib/ai/history";
 import { agentPreamble, extractJson } from "@/lib/ai/prompts";
 import { countWords, estimateTokens, stripHtml, uid } from "@/lib/ui/cn";
@@ -102,6 +102,9 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
     if(run.messageId)repo.updateMessage(run.messageId,{actions:[{id:run.id,type:"agent-run",label:"任务与改动",payload:{runId:run.id},applied:false}],content:run.summary||"正在处理任务",status:run.status==="running"?"streaming":run.status==="error"?"error":run.status==="aborted"?"aborted":"complete",usage:run.usage,error:run.error});
   };
   let completionCalls=0,pricedCalls=0;
+  // 决策轮的结构化输出（可能一次拆多张卡）会撑爆 1400 token 的小上限：
+  // 一旦真的被截断，就放宽本轮上限重试一次，并在本次任务后续决策轮保持放宽。
+  let decisionCapRelaxed=false;
   async function* complete(input:AiMessage[],decisionOutput=false,materialOutput=false,shortWrite=false):AsyncGenerator<string> {
     let raw="",prompt=0,output=0;
     if(decisionOutput)lastDecisionReasoning="";
@@ -114,12 +117,24 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
       const canOff = thinkingOptions.some(option=>option.value==="off");
       const canLow = thinkingOptions.some(option=>option.value==="low");
       const decideThinking = (decisionOutput||materialOutput) && canOff ? "off" as const : shortWrite && canLow ? "low" as const : target.thinkingLevel;
-      const callMaxTokens = decisionOutput ? 1400 : config.maxTokens>0?config.maxTokens:undefined;
-      for await(const chunk of streamCompletion({provider:target.provider,model:target.model,messages:input,maxTokens:callMaxTokens,temperature:0.4,signal,disableThinking:true,thinkingLevel:decideThinking,...(decisionOutput ? usesDecisionTool(target.provider,target.model)?{decisionTools:DECISION_TOOLS}:supportsDecisionJson(target.provider,target.model)?{outputFormat:"json" as const}:{} : materialOutput&&supportsDecisionJson(target.provider,target.model)?{outputFormat:"json" as const}:{})})) {
-        if(signal?.aborted) throw new DOMException("已停止","AbortError");
-        if(chunk.type==="reasoning"&&decisionOutput&&deepThinking)lastDecisionReasoning+=chunk.text;
-        if(chunk.type==="delta") {raw+=chunk.text;yield chunk.text;}
-        if(chunk.type==="usage") {prompt=chunk.promptTokens;output=chunk.completionTokens;reported=true;cachedInputTokens=chunk.cachedInputTokens;if(chunk.cost)cost=chunk.cost;}
+      const baseMaxTokens = config.maxTokens>0?config.maxTokens:undefined;
+      let retried=false;
+      for(;;) {
+        raw="";
+        const capped = decisionOutput && !retried && !decisionCapRelaxed;
+        const callMaxTokens = capped ? 1400 : baseMaxTokens;
+        try {
+          for await(const chunk of streamCompletion({provider:target.provider,model:target.model,messages:input,maxTokens:callMaxTokens,temperature:0.4,signal,disableThinking:true,thinkingLevel:decideThinking,...(decisionOutput ? usesDecisionTool(target.provider,target.model)?{decisionTools:DECISION_TOOLS}:supportsDecisionJson(target.provider,target.model)?{outputFormat:"json" as const}:{} : materialOutput&&supportsDecisionJson(target.provider,target.model)?{outputFormat:"json" as const}:{})})) {
+            if(signal?.aborted) throw new DOMException("已停止","AbortError");
+            if(chunk.type==="reasoning"&&decisionOutput&&deepThinking)lastDecisionReasoning+=chunk.text;
+            if(chunk.type==="delta") {raw+=chunk.text;yield chunk.text;}
+            if(chunk.type==="usage") {prompt=chunk.promptTokens;output=chunk.completionTokens;reported=true;cachedInputTokens=chunk.cachedInputTokens;if(chunk.cost)cost=chunk.cost;}
+          }
+          break;
+        } catch(error) {
+          if(capped && isOutputLimitError(error) && !signal?.aborted) {decisionCapRelaxed=true;retried=true;continue;}
+          throw error;
+        }
       }
     } finally {
       completionCalls++;
