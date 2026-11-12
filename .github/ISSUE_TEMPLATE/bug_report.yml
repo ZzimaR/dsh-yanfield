@@ -1,0 +1,148 @@
+name: 🐛 Bug 报告
+description: 报告一个可以复现的问题，帮助我们更快定位（English is welcome too）
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请尽量把「环境 + 复现步骤 + 完整报错」写全；只写「坏了 / 用不了」很难定位。
+        ⚠️ 提交前请删除 API Key、书稿正文、数据库路径里的隐私信息。
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题描述
+      description: 一句话说清楚发生了什么，以及它影响你做什么。
+      placeholder: 打开「新建作品」弹窗时，输入框没有边框，看不出能输入。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从打开 DSH 开始，一步一步写；能稳定复现最好，偶发也请说明频率。
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      placeholder: 输入框应该有 1px 的描边，暗色下也能看清。
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 实际发生了什么；有报错请贴**完整文本**，不要只贴截图里的半句。
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: 错误文本 / 日志
+      description: 面板里的红色报错、DSH 控制台输出、或 `%USERPROFILE%\.dsh\profiles\<profile>\` 下的日志。
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 安装方式
+      options:
+        - DSH 桌面版（DeepSeek Harness 应用）
+        - DSH Web（`dsh web`）
+        - yanfield-dev 联调 profile（源码本地链接）
+        - 不确定
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS
+        - Linux
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DSH 版本
+      description: 设置 → 关于，或启动页上的版本号。
+      placeholder: 0.2.x
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: 砚田版本 / 构建时间
+      description: 砚田 → 设置 → 关于 → 「构建」那一行的时间；或 `package.json` 里的 version。
+      placeholder: 2026-11-12T11:59:00Z
+    validations:
+      required: true
+
+  - type: dropdown
+    id: model-route
+    attributes:
+      label: 模型路由（AI 相关问题必填）
+      description: 设置 → 模型服务里，DeepSeek Harness 卡片上的「模型路由」。
+      options:
+        - DeepSeek 账号登录（用 DSH 里已登录的账号）
+        - DeepSeek 官方 API Key
+        - 离线演示模式
+        - 没配置 / 不确定
+        - 与 AI 无关
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: 使用的模型
+      placeholder: deepseek-flash / deepseek-v4-pro
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图 / 录屏（可选）
+      description: 直接拖入图片；能看清界面与报错更好。
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: tried
+    attributes:
+      label: 已尝试的排查
+      options:
+        - label: 完全退出 DSH 再重开（不是刷新页面）
+        - label: 重新安装最新构建（`node scripts/reinstall.mjs`）
+        - label: 查过 docs/faq.md 并搜索过现有 Issue
+        - label: 换过模型 / 新建过空白作品复现
+        - label: 以上都没试
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 隐私确认
+      options:
+        - label: 我已删除 API Key、书稿正文与个人路径等隐私信息
+          required: true

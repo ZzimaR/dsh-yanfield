@@ -19,7 +19,7 @@ Your book stays local, the model is the DeepSeek you already configured, and eve
 </div>
 
 > [!NOTE]
-> Yanfield is still being polished; UI and behavior will keep changing. Bugs and ideas are welcome in [Issues](https://github.com/ZzimaR/dsh-yanfield/issues), and pull requests are welcome too.
+> Yanfield is still being polished; UI and behavior will keep changing. Bugs and ideas are welcome in [Issues](https://github.com/ZzimaR/dsh-yanfield/issues) — the Bug report / Feature request forms (with environment and steps) get fixed faster. Pull requests are welcome too.
 
 ![Yanfield workspace: outline and notes on the left, prose in the middle, AI assistant on the right](docs/screenshots/workspace.png)
 

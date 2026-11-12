@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> 砚田还在打磨中，界面与行为会继续调整。遇到问题、有想法，欢迎在 [Issues](https://github.com/ZzimaR/dsh-yanfield/issues) 里说；也欢迎直接提 PR。
+> 砚田还在打磨中，界面与行为会继续调整。遇到问题、有想法，欢迎在 [Issues](https://github.com/ZzimaR/dsh-yanfield/issues) 里说——用「Bug 报告 / 功能建议」模板带上环境与复现步骤会快很多；也欢迎直接提 PR。
 
 ![砚田工作台：左侧目录与资料，中间正文，右侧 AI 助手](docs/screenshots/workspace.png)
 
