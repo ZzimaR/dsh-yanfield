@@ -21,6 +21,7 @@ import {
 import type { AiFeature, AiStreamEvent, AiUsage, AppSettings, ID } from "@/lib/types";
 import { AI_FEATURE_LABEL } from "@/lib/types";
 import { describeAiSpend } from "@/components/ai/AiSpendLine";
+import { useT, type Translate } from "@/lib/i18n";
 
 export type AiAssistMode = AssistMode;
 
@@ -62,16 +63,16 @@ const MODE_LABEL: Record<AiAssistMode, string> = {
 const FIELD_ASSIST_MODES: AiAssistMode[] = ["write", "continue", "polish"];
 
 /** 把网络 / 鉴权 / 限流等底层错误翻译成可执行的中文提示 */
-function friendlyAiError(raw: string): string {
+function friendlyAiError(raw: string, tr: Translate): string {
   const text = (raw || "").trim();
-  if (!text) return "生成失败，请稍后重试。";
+  if (!text) return tr("生成失败，请稍后重试。");
   if (/fetch failed|failed to fetch|networkerror|load failed|network request failed/i.test(text))
-    return "网络请求失败：没能连上 AI 服务。请确认服务在运行，或点「重新生成」重试。";
-  if (/aborterror|aborted/i.test(text)) return "已停止本次生成。";
-  if (/timeout|timed out|ETIMEDOUT/i.test(text)) return "请求超时：模型响应较慢，请重试或换用更快的模型。";
-  if (/401|unauthorized|api key|apikey/i.test(text)) return "鉴权失败：请到「设置 → AI 服务」检查 API Key 是否有效。";
-  if (/429|rate limit|quota/i.test(text)) return "请求过于频繁或额度不足：请稍后重试，或检查模型额度。";
-  if (/5\d\d|internal server error/i.test(text)) return "AI 服务异常（服务端错误）：请稍后重试。";
+    return tr("网络请求失败：没能连上 AI 服务。请确认服务在运行，或点「重新生成」重试。");
+  if (/aborterror|aborted/i.test(text)) return tr("已停止本次生成。");
+  if (/timeout|timed out|ETIMEDOUT/i.test(text)) return tr("请求超时：模型响应较慢，请重试或换用更快的模型。");
+  if (/401|unauthorized|api key|apikey/i.test(text)) return tr("鉴权失败：请到「设置 → AI 服务」检查 API Key 是否有效。");
+  if (/429|rate limit|quota/i.test(text)) return tr("请求过于频繁或额度不足：请稍后重试，或检查模型额度。");
+  if (/5\d\d|internal server error/i.test(text)) return tr("AI 服务异常（服务端错误）：请稍后重试。");
   return text;
 }
 
@@ -81,18 +82,20 @@ function modeIcon(mode: AiAssistMode): React.ReactNode {
   return <WandSparkles className="size-3.5" />;
 }
 
-function ideaPlaceholder(mode: AiAssistMode | null, hasDraft: boolean): string {
+function ideaPlaceholder(mode: AiAssistMode | null, hasDraft: boolean, tr: Translate): string {
   switch (mode) {
     case "write":
       return hasDraft
-        ? "还想怎么完善？例如：补上代价和例外。留空就按已有内容来写。"
-        : "先写你已经想到的。例如：渡口只在退潮时开启，进去的人要留下一段记忆。";
+        ? tr("还想怎么完善？例如：补上代价和例外。留空就按已有内容来写。")
+        : tr("先写你已经想到的。例如：渡口只在退潮时开启，进去的人要留下一段记忆。");
     case "continue":
-      return hasDraft ? "接着往哪写？例如：补一条没人知道的例外。可留空。" : "从哪写起？可留空，按本书已有设定来补。";
+      return hasDraft
+        ? tr("接着往哪写？例如：补一条没人知道的例外。可留空。")
+        : tr("从哪写起？可留空，按本书已有设定来补。");
     case "polish":
-      return "想改哪一点？例如：更具体，少一点空话。可留空。";
+      return tr("想改哪一点？例如：更具体，少一点空话。可留空。");
     case null:
-      return hasDraft ? "还想怎么完善？留空则按已有内容和本书设定来写。" : "先写你已经想到的。留空则按本书已有设定来补。";
+      return hasDraft ? tr("还想怎么完善？留空则按已有内容和本书设定来写。") : tr("先写你已经想到的。留空则按本书已有设定来补。");
     default: {
       const exhaustive: never = mode;
       return exhaustive;
@@ -121,6 +124,7 @@ export function AiAssistSheet({
   onAdopt,
   adoptHint,
 }: AiAssistSheetProps) {
+  const tr = useT();
   const { toast } = useToast();
   const settingsApi = useApi<AppSettings>(open ? "/api/settings" : null);
   const [text, setText] = React.useState("");
@@ -189,7 +193,7 @@ export function AiAssistSheet({
           if (event.type === "meta") setMeta({ provider: event.provider, model: event.model });
           else if (event.type === "delta") setText((prev) => prev + event.text);
           else if (event.type === "error") {
-            setError(friendlyAiError(event.message));
+            setError(friendlyAiError(event.message, tr));
             runningRef.current = false;
             setRunning(false);
           }           else if (event.type === "done") {
@@ -203,7 +207,7 @@ export function AiAssistSheet({
       .catch((err: unknown) => {
         if (seq !== seqRef.current) return;
         if (controller.signal.aborted) return;
-        setError(friendlyAiError(err instanceof Error ? err.message : ""));
+        setError(friendlyAiError(err instanceof Error ? err.message : "", tr));
         runningRef.current = false;
         setRunning(false);
       })
@@ -213,7 +217,7 @@ export function AiAssistSheet({
           setRunning(false);
         }
       });
-  }, [novelId, chapterId, feature, instruction, selection, field, modeChoices]);
+  }, [novelId, chapterId, feature, instruction, selection, field, modeChoices, tr]);
 
   React.useEffect(() => {
     if (!open) {
@@ -256,7 +260,7 @@ export function AiAssistSheet({
     if (!value) return;
     const selected = targets.find((item) => item.value === target) ?? targets[0];
     onAdopt(value, selected?.value ?? "");
-    toast({ title: "已采纳 AI 结果", description: adoptHint ?? "内容已回填到编辑区，记得点击保存。", tone: "success" });
+    toast({ title: tr("已采纳 AI 结果"), description: tr(adoptHint ?? "内容已回填到编辑区，记得点击保存。"), tone: "success" });
     onClose();
   };
 
@@ -266,7 +270,7 @@ export function AiAssistSheet({
     start();
   };
 
-  const modelLabel = meta ? `${meta.provider} · ${meta.model}` : running ? "等待模型响应…" : "尚未请求模型";
+  const modelLabel = meta ? `${meta.provider} · ${meta.model}` : running ? tr("等待模型响应…") : tr("尚未请求模型");
   const activeMode = modeChoices ? mode : null;
 
   return (
@@ -284,15 +288,15 @@ export function AiAssistSheet({
         <div className="flex items-center gap-2 [&_a:focus-visible]:outline-none [&_a:focus-visible]:ring-2 [&_a:focus-visible]:ring-accent/60 [&_button:focus-visible]:outline-none [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-accent/60">
           {targets.length > 1 ? (
             <div className="min-w-0 flex-1">
-              <Select aria-label="采纳到" value={target} onChange={(event) => setTarget(event.target.value)} options={targets} />
+              <Select aria-label={tr("采纳到")} value={target} onChange={(event) => setTarget(event.target.value)} options={targets} />
             </div>
           ) : (
-            <span className="hidden min-w-0 flex-1 truncate text-[11.5px] text-ink-3 sm:inline">采纳后写入当前编辑区，保存后生效</span>
+            <span className="hidden min-w-0 flex-1 truncate text-[11.5px] text-ink-3 sm:inline">{tr("采纳后写入当前编辑区，保存后生效")}</span>
           )}
           <div className="flex shrink-0 items-center gap-2">
             {running ? (
               <Button variant="secondary" size="sm" icon={<Square className="size-3.5" />} onClick={stop}>
-                停止
+                {tr("停止")}
               </Button>
             ) : (
               <Button
@@ -301,11 +305,11 @@ export function AiAssistSheet({
                 icon={hasRun ? <RefreshCw className="size-3.5" /> : <Sparkles className="size-3.5" />}
                 onClick={start}
               >
-                {hasRun ? "重新生成" : "开始生成"}
+                {hasRun ? tr("重新生成") : tr("开始生成")}
               </Button>
             )}
             <Button variant="primary" size="sm" icon={<Check className="size-3.5" />} disabled={running || !text.trim()} onClick={adopt}>
-              采纳
+              {tr("采纳")}
             </Button>
           </div>
         </div>
@@ -315,7 +319,7 @@ export function AiAssistSheet({
         <div className="flex items-center justify-between gap-3 text-[11px] text-ink-3">
           <span className="inline-flex items-center gap-1.5">
             <WandSparkles className="size-3.5 text-jade" />
-            {AI_FEATURE_LABEL[feature]}
+            {tr(AI_FEATURE_LABEL[feature])}
           </span>
           <span className="min-w-0 truncate text-ink-3" title={modelLabel}>
             {modelLabel}
@@ -323,7 +327,7 @@ export function AiAssistSheet({
         </div>
         {runUsage ? (
           <p className="text-[12px] tabular-nums text-ink-2">
-            本次 {describeAiSpend(runUsage.promptTokens, runUsage.completionTokens, settingsApi.data?.aiPricing ?? { inputPerMillion: 0, outputPerMillion: 0 })}
+            {tr("本次 {spend}", { spend: describeAiSpend(runUsage.promptTokens, runUsage.completionTokens, settingsApi.data?.aiPricing ?? { inputPerMillion: 0, outputPerMillion: 0 }) })}
           </p>
         ) : null}
 
@@ -336,7 +340,7 @@ export function AiAssistSheet({
             }}
             options={modeChoices.map((item) => ({
               value: item,
-              label: MODE_LABEL[item],
+              label: tr(MODE_LABEL[item]),
               icon: modeIcon(item),
             }))}
           />
@@ -344,7 +348,7 @@ export function AiAssistSheet({
 
         <div ref={ideaBoxRef}>
           <Textarea
-            label="你的想法"
+            label={tr("你的想法")}
             hint={
               <span className="inline-flex items-center gap-1">
                 <Kbd>Ctrl</Kbd>
@@ -354,20 +358,20 @@ export function AiAssistSheet({
             }
             rows={4}
             value={idea}
-            placeholder={ideaPlaceholder(activeMode, hasDraft)}
+            placeholder={ideaPlaceholder(activeMode, hasDraft, tr)}
             onChange={(event) => setIdea(event.target.value)}
             onKeyDown={onIdeaKeyDown}
           />
         </div>
         <p className="text-[11.5px] leading-relaxed text-ink-3">
           {hasDraft
-            ? "会在已有内容上完善，并保留你写下的关键信息。点「开始生成」才会请求模型。"
-            : "先把想到的写在这里，再让它写成能直接用的成稿。点「开始生成」才会请求模型。"}
+            ? tr("会在已有内容上完善，并保留你写下的关键信息。点「开始生成」才会请求模型。")
+            : tr("先把想到的写在这里，再让它写成能直接用的成稿。点「开始生成」才会请求模型。")}
         </p>
 
         {hasDraft ? (
           <div className="rounded-md border border-line bg-surface-2 px-3 py-2">
-            <p className="text-[11px] text-ink-3">已有内容</p>
+            <p className="text-[11px] text-ink-3">{tr("已有内容")}</p>
             <p className="mt-1 max-h-36 overflow-y-auto whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink-2">{selection?.trim()}</p>
           </div>
         ) : null}
@@ -392,13 +396,13 @@ export function AiAssistSheet({
                 <Skeleton className="h-3.5 w-2/5" />
               </div>
             ) : (
-              <p className="text-[13px] text-ink-3">这次没有生成出内容。可以改一下想法，再点「重新生成」。</p>
+              <p className="text-[13px] text-ink-3">{tr("这次没有生成出内容。可以改一下想法，再点「重新生成」。")}</p>
             )}
           </div>
         ) : null}
 
         <p className="text-[11px] leading-relaxed text-ink-3">
-          AI 只提供草稿。面板不会自动改写作品数据，采纳并保存后才会写回；如与设定冲突，以你确认后的版本为准。
+          {tr("AI 只提供草稿。面板不会自动改写作品数据，采纳并保存后才会写回；如与设定冲突，以你确认后的版本为准。")}
         </p>
       </div>
     </Sheet>
@@ -431,6 +435,7 @@ export function AiAssistButton({
   size = "sm",
   className,
 }: AiAssistButtonProps) {
+  const tr = useT();
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -442,12 +447,12 @@ export function AiAssistButton({
         icon={<Sparkles className="size-3.5" />}
         onClick={() => setOpen(true)}
       >
-        {label ?? "AI 帮我写"}
+        {label ?? tr("AI 帮我写")}
       </Button>
       <AiAssistSheet
         open={open}
         onClose={() => setOpen(false)}
-        title={`AI 帮我写 · ${field}`}
+        title={tr("AI 帮我写 · {field}", { field })}
         feature={feature}
         novelId={novelId}
         chapterId={chapterId}

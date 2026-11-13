@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Button, Dropdown, IconButton, Kbd, Segmented, type DropdownItem } from "@/components/ui/kit";
 import { cn } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import type { MentionRef, MentionOption, PanelMode } from "./types";
 import { MENTION_TYPE_LABEL } from "./utils";
 import { STYLE_OPTIONS } from "./styles";
@@ -88,7 +89,7 @@ export function ChatComposer({
   disabled = false,
   novelId,
   chapterId,
-  placeholder = "说说想写什么，或选一段文字交给我…",
+  placeholder,
   onOpenContext,
   includeSelection = true,
   agentName,
@@ -102,6 +103,8 @@ export function ChatComposer({
   focusSignal,
   className,
 }: ChatComposerProps) {
+  const tr = useT();
+  const placeholderText = placeholder ?? tr("说说想写什么，或选一段文字交给我…");
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const mentionPickFirstRef = React.useRef<(() => boolean) | null>(null);
   const [mention, setMention] = React.useState<{ open: boolean; query: string; start: number }>({
@@ -289,17 +292,17 @@ export function ChatComposer({
     const items: DropdownItem[] = STYLE_OPTIONS.map((option) => ({
       label: (
         <span className="flex w-full items-center justify-between gap-2">
-          <span>{option.label}</span>
-          <span className="text-[10px] text-ink-4">{option.hint}</span>
+          <span>{tr(option.label)}</span>
+          <span className="text-[10px] text-ink-4">{tr(option.hint)}</span>
         </span>
       ),
       icon: style === option.value ? <Check className="size-3.5" /> : undefined,
       onSelect: () => onStyleChange?.(option.value),
     }));
     items.push({ separator: true });
-    items.push({ label: "清除文风", disabled: !style, onSelect: () => onStyleChange?.(null) });
+    items.push({ label: tr("清除文风"), disabled: !style, onSelect: () => onStyleChange?.(null) });
     return items;
-  }, [onStyleChange, style]);
+  }, [onStyleChange, style, tr]);
 
   const selectionLength = includeSelection ? selectionText.trim().length : 0;
 
@@ -319,7 +322,7 @@ export function ChatComposer({
       {/* `/` 技能菜单：选中后把示例指令填入输入框 */}
       {slash.open && visibleSkills.length > 0 ? (
         <div className="absolute bottom-full left-2 right-2 z-20 mb-1 overflow-hidden rounded-md border border-line bg-surface p-1 shadow-float rise-in">
-          <p className="px-2 py-1 text-[10.5px] text-ink-4">选择技能（会填入输入框）</p>
+          <p className="px-2 py-1 text-[10.5px] text-ink-4">{tr("选择技能（会填入输入框）")}</p>
           <div className="scroll-thin max-h-56 overflow-y-auto">
             {visibleSkills.map((option) => (
               <button
@@ -329,9 +332,9 @@ export function ChatComposer({
                 onClick={() => pickSkill(option)}
                 className="block w-full rounded-sm px-2 py-1.5 text-left transition-colors duration-150 hover:bg-surface-2"
               >
-                <span className="block text-[12px] text-ink-2">{option.label}</span>
+                <span className="block text-[12px] text-ink-2">{tr(option.label)}</span>
                 {option.hint ? (
-                  <span className="mt-0.5 block truncate text-[10.5px] text-ink-4">{option.hint}</span>
+                  <span className="mt-0.5 block truncate text-[10.5px] text-ink-4">{tr(option.hint)}</span>
                 ) : null}
               </button>
             ))}
@@ -347,11 +350,11 @@ export function ChatComposer({
               key={`${item.type}:${item.id}`}
               className="inline-flex max-w-[190px] items-center gap-1 rounded-full border border-line bg-surface-2 px-2 py-0.5 text-[11px] text-ink-2"
             >
-              <span className="shrink-0 text-ink-4 dark:text-ink-3">{MENTION_TYPE_LABEL[item.type]}</span>
+              <span className="shrink-0 text-ink-4 dark:text-ink-3">{tr(MENTION_TYPE_LABEL[item.type])}</span>
               <span className="truncate">{item.label}</span>
               <button
                 type="button"
-                aria-label={`移除引用：${item.label}`}
+                aria-label={tr("移除引用：{label}", { label: item.label })}
                 onClick={() => removeMention(item)}
                 className="shrink-0 text-ink-4 transition-colors hover:text-danger dark:text-ink-3"
               >
@@ -366,9 +369,9 @@ export function ChatComposer({
         {task ? (
           <div className="mb-1.5 flex flex-wrap gap-1">
             <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-line bg-paper px-2 py-0.5 text-[11px] text-ink-2">
-              <span className="truncate">任务：{task.label}</span>
+              <span className="truncate">{tr("任务：{label}", { label: tr(task.label) })}</span>
               {onClearTask ? (
-                <button type="button" aria-label="移除任务" onClick={onClearTask} className="shrink-0 text-ink-4 hover:text-danger">
+                <button type="button" aria-label={tr("移除任务")} onClick={onClearTask} className="shrink-0 text-ink-4 hover:text-danger">
                   <X className="size-3" />
                 </button>
               ) : null}
@@ -376,10 +379,10 @@ export function ChatComposer({
           </div>
         ) : null}
         <div className="mb-1 flex items-center justify-between gap-2">
-          <button type="button" className="flex items-center gap-1.5 rounded-md px-1 py-1 text-[11px] text-ink-3 transition-colors hover:text-jade" onClick={()=>handleModeChange(mode==="skill"?"chat":"skill")} aria-expanded={mode==="skill"}><Sparkles className="size-3"/>技能</button>
+          <button type="button" className="flex items-center gap-1.5 rounded-md px-1 py-1 text-[11px] text-ink-3 transition-colors hover:text-jade" onClick={()=>handleModeChange(mode==="skill"?"chat":"skill")} aria-expanded={mode==="skill"}><Sparkles className="size-3"/>{tr("技能")}</button>
           {selectionLength > 0 ? (
             <span className="min-w-0 truncate text-[10.5px] text-jade" title={selectionText}>
-              将引用选中正文 · {selectionLength} 字
+              {tr("将引用选中正文 · {count} 字", { count: selectionLength })}
             </span>
           ) : null}
         </div>
@@ -387,7 +390,7 @@ export function ChatComposer({
         {/* 「技能」mode：在输入框内展开技能列表，选中后填 prompt 并切回对话 */}
         {skillPanelOpen && !slash.open ? (
           <div className="mb-1.5 rounded-sm border border-line bg-surface p-1 rise-in">
-            <p className="px-1.5 py-0.5 text-[10.5px] text-ink-4">选一个技能填入输入框（可改完再发送）</p>
+            <p className="px-1.5 py-0.5 text-[10.5px] text-ink-4">{tr("选一个技能填入输入框（可改完再发送）")}</p>
             <div className="scroll-thin max-h-52 overflow-y-auto">
               {(skillOptions ?? []).map((option) => (
                 <button
@@ -399,9 +402,9 @@ export function ChatComposer({
                 >
                   <Sparkles className="mt-0.5 size-3 shrink-0 text-ink-4" />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] text-ink-2">{option.label}</span>
+                    <span className="block text-[12px] text-ink-2">{tr(option.label)}</span>
                     {option.hint ? (
-                      <span className="mt-0.5 block text-[10.5px] leading-snug text-ink-4">{option.hint}</span>
+                      <span className="mt-0.5 block text-[10.5px] leading-snug text-ink-4">{tr(option.hint)}</span>
                     ) : null}
                   </span>
                 </button>
@@ -420,7 +423,7 @@ export function ChatComposer({
               className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-ink-3 transition-colors duration-150 hover:border-accent/30 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
             >
               <UserCog className="size-3" />
-              {agentName ? `+ 智能体 · ${agentName}` : "+ 智能体"}
+              {agentName ? tr("+ 智能体 · {name}", { name: agentName }) : tr("+ 智能体")}
             </button>
           ) : null}
           {onStyleChange ? (
@@ -429,7 +432,7 @@ export function ChatComposer({
               trigger={
                 <span className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-ink-3 transition-colors duration-150 hover:border-accent/30 hover:text-ink">
                   <Palette className="size-3" />
-                  {style ? `文风 · ${style}` : "文风"}
+                  {style ? tr("文风 · {style}", { style: tr(style) }) : tr("文风")}
                   <ChevronDown className="size-2.5" />
                 </span>
               }
@@ -443,7 +446,7 @@ export function ChatComposer({
               className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-ink-3 transition-colors duration-150 hover:border-accent/30 hover:text-ink"
             >
               <BookMarked className="size-3" />
-              档案
+              {tr("档案")}
             </button>
           ) : null}
         </div>
@@ -465,18 +468,18 @@ export function ChatComposer({
           }}
           onClick={(event) => detectMention(event.currentTarget)}
           onSelect={(event) => detectMention(event.currentTarget)}
-          placeholder={placeholder}
-          aria-label="输入消息"
+          placeholder={placeholderText}
+          aria-label={tr("输入消息")}
           className="scroll-thin block min-h-[72px] max-h-[180px] w-full resize-none bg-transparent px-0.5 py-1 text-[13.5px] leading-6 text-ink outline-none placeholder:text-ink-4 dark:placeholder:text-ink-3"
         />
 
         <div className="mt-1 flex min-w-0 items-center gap-1">
           {modelSlot ? <span className="min-w-0 max-w-[46%] shrink overflow-hidden">{modelSlot}</span> : null}
-          <IconButton label="引用资料" size="sm" onClick={insertAt} disabled={disabled || streaming}>
+          <IconButton label={tr("引用资料")} size="sm" onClick={insertAt} disabled={disabled || streaming}>
             <AtSign className="size-3.5" />
           </IconButton>
           {onOpenContext ? (
-            <IconButton label="上下文设置" size="sm" onClick={onOpenContext}>
+            <IconButton label={tr("上下文设置")} size="sm" onClick={onOpenContext}>
               <Gauge className="size-3.5" />
             </IconButton>
           ) : null}
@@ -489,7 +492,7 @@ export function ChatComposer({
               onClick={onStop}
               className="ml-1 min-h-8 shrink-0 justify-center whitespace-nowrap rounded-xl px-3 shadow-none"
             >
-              停止
+              {tr("停止")}
             </Button>
           ) : (
             <Button
@@ -500,7 +503,7 @@ export function ChatComposer({
               disabled={disabled || sending || !value.trim()}
               className="ml-1 min-h-8 shrink-0 justify-center whitespace-nowrap rounded-xl px-3 shadow-none"
             >
-              {sending?"准备中…":"发送"}
+              {sending?tr("准备中…"):tr("发送")}
             </Button>
           )}
         </div>

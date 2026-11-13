@@ -9,6 +9,7 @@ import { Dropdown, IconButton } from "@/components/ui/kit";
 import { resolveCoverStyle } from "@/lib/cover";
 import { NOVEL_STATUS_LABEL } from "@/lib/types";
 import { formatRelativeTime, formatWords } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import { downloadNovelExport } from "./utils";
 import { editorHref, type NovelListItem } from "./types";
 
@@ -21,10 +22,11 @@ export interface NovelCardProps {
 /** 书架作品卡片：封面渐变 + 汇总信息 + 操作菜单。 */
 export function NovelCard({ novel, onDelete, onEdit }: NovelCardProps) {
   const router = useRouter();
+  const tr = useT();
   const cover = resolveCoverStyle(novel.coverKey);
   const meta = (
     <>
-      {novel.volumeCount ?? 0} 卷 · {novel.chapterCount ?? 0} 章
+      {tr("{volumes} 卷 · {chapters} 章", { volumes: novel.volumeCount ?? 0, chapters: novel.chapterCount ?? 0 })}
     </>
   );
 
@@ -40,11 +42,10 @@ export function NovelCard({ novel, onDelete, onEdit }: NovelCardProps) {
         >
           <div className="relative flex h-full flex-col p-3.5">
             <div className="flex items-center justify-between gap-2 pr-8 text-[11px] tracking-[0.14em] opacity-75">
-              <span className="inline-flex min-w-0 items-center gap-1.5">
-                <InkstoneMark className="size-5 shrink-0 rounded-[4px]" />
-                <span className="truncate">砚田</span>
+              <span className="inline-flex min-w-0 items-center gap-1.5" title={tr("砚田")}>
+                <InkstoneMark className="size-4 shrink-0 rounded-[4px]" />
               </span>
-              <span className="shrink-0 tracking-[0.05em]">{NOVEL_STATUS_LABEL[novel.status]}</span>
+              <span className="shrink-0 tracking-[0.05em]">{tr(NOVEL_STATUS_LABEL[novel.status])}</span>
             </div>
             <h3 className="mt-3 line-clamp-4 font-serif text-[20px] leading-snug tracking-wide">
               {novel.title}
@@ -52,9 +53,9 @@ export function NovelCard({ novel, onDelete, onEdit }: NovelCardProps) {
             {novel.subtitle ? (
               <p className="mt-1.5 line-clamp-2 text-[12.5px] leading-5 opacity-80">{novel.subtitle}</p>
             ) : null}
-            <div className="mt-auto flex items-center justify-between pt-2 text-[12px] opacity-85">
-              <span className="rounded-full border border-current px-1.5 py-0.5">{novel.genre}</span>
-              <span>{meta}</span>
+            <div className="mt-auto flex flex-col items-start gap-1 pt-2 text-[12px] opacity-85">
+              <span className="whitespace-nowrap rounded-full border border-current px-1.5 py-0.5">{tr(novel.genre)}</span>
+              <span className="whitespace-nowrap text-[11px]">{meta}</span>
             </div>
           </div>
         </div>
@@ -64,43 +65,43 @@ export function NovelCard({ novel, onDelete, onEdit }: NovelCardProps) {
         <Dropdown
           width={188}
           trigger={
-            <IconButton label="更多操作" size="sm" className="bg-surface/85 text-ink-2 backdrop-blur hover:bg-surface">
+            <IconButton label={tr("更多操作")} size="sm" className="bg-surface/85 text-ink-2 backdrop-blur hover:bg-surface">
               <Ellipsis className="size-4" />
             </IconButton>
           }
           items={[
             {
-              label: "继续写作",
+              label: tr("继续写作"),
               icon: <PenLine className="size-3.5" />,
               onSelect: () => {
                 router.push(editorHref(novel.id, novel.lastChapterId));
               },
-              hint: novel.lastChapterId ? "最近一章" : undefined,
+              hint: novel.lastChapterId ? tr("最近一章") : undefined,
             },
             ...(onEdit
               ? [
                   {
-                    label: "编辑信息",
+                    label: tr("编辑信息"),
                     icon: <Pencil className="size-3.5" />,
                     onSelect: () => onEdit(novel),
                   },
                 ]
               : []),
             {
-              label: "作品概览",
+              label: tr("作品概览"),
               icon: <BookOpen className="size-3.5" />,
               onSelect: () => {
                 window.location.href = `/novel/${novel.id}`;
               },
             },
             {
-              label: "导出 Markdown",
+              label: tr("导出 Markdown"),
               icon: <Download className="size-3.5" />,
               onSelect: () => downloadNovelExport(novel.id),
             },
             { separator: true },
             {
-              label: "删除作品",
+              label: tr("删除作品"),
               icon: <Trash className="size-3.5" />,
               danger: true,
               onSelect: () => onDelete(novel),
@@ -114,12 +115,12 @@ export function NovelCard({ novel, onDelete, onEdit }: NovelCardProps) {
           {novel.title}
         </Link>
         <p className="mt-1 line-clamp-2 min-h-8 text-[11.5px] leading-4 text-ink-3">
-          {novel.synopsis || "还没有简介，点开写两句梗概吧。"}
+          {novel.synopsis || tr("还没有简介，点开写两句梗概吧。")}
         </p>
         <div className="mt-2 flex items-center justify-between border-t border-line/70 pt-2 text-[10.5px] text-ink-3">
           <span className="inline-flex items-center gap-1">
             <PenLine className="size-3" aria-hidden />
-            {formatWords(novel.wordCount ?? 0)} 字
+            {tr("{words} 字", { words: formatWords(novel.wordCount ?? 0) })}
           </span>
           <span>{novel.updatedAt ? formatRelativeTime(novel.updatedAt) : "—"}</span>
         </div>

@@ -1,24 +1,27 @@
-# 截图说明
+# Screenshot notes / 截图说明
 
-本目录的截图用于 README 与文档，界面语言为中文。
+Screenshots in this directory are used by the READMEs and docs. The `en-*` files show the English UI; the others were captured in the Chinese UI.
 
-| 文件 | 内容 |
+| File | Content |
 | --- | --- |
-| `yanfield-in-dsh.gif` | DSH 宿主内操作演示，含书架、三栏写作、章纲、设定、档案、上下文预览、示例改动的审阅与撤回、模型路由 |
-| `dsh-workspace.jpg` | 市场首图，保留 DSH 宿主侧栏的写作台截图 |
-| `market-icon.png` | 从 `icon.svg` 栅格化的 192×192 市场卡片图标 |
-| `workspace.png` | 写作台三栏：左栏目录、中间正文、右侧 AI 助手（宣纸主题） |
-| `library.png` | 书架：作品卡片、封面底色、类型与字数 |
-| `review-light.png` | 正文审阅：绿色为新增、红色划线为删除，逐段保留 / 还原 |
-| `settings-models.png` | 设置 → 模型服务：模型路由切换、模型目录、查询余额 |
-| `workspace-dark.png` | 写作台（夜航主题） |
-| `task-card.png` | AI 任务卡：候选正文与资料改动常驻可见，资料改动按字段给出「原 / 改」对比 |
+| `en-library.png` | Bookshelf in English: book cards, covers, genres, word counts |
+| `en-editor.png` | Three-column writing desk in English: contents, prose, AI panel |
+| `en-settings.png` | Settings → Model services in English |
+| `yanfield-in-dsh.gif` | 24-second DSH walkthrough (recorded in Chinese): shelf, desk, outline, codex, archives, context preview, reviewing and reverting an example edit, model routes |
+| `dsh-workspace.jpg` | Marketplace hero image with the DSH sidebar |
+| `market-icon.png` | 192×192 marketplace icon rasterized from `icon.svg` |
+| `workspace.png` | Writing desk (rice-paper theme) |
+| `library.png` | Bookshelf (Chinese UI) |
+| `review-light.png` | Prose review: green insertions, red deletions, keep or revert per paragraph |
+| `settings-models.png` | Settings → Model services (Chinese UI) |
+| `workspace-dark.png` | Writing desk (night-sail theme) |
+| `task-card.png` | AI task card with candidate prose and field-by-field note changes |
 
-说明：
+Notes:
 
-- 截图使用隔离的示例数据库，书稿为演示内容。
-- 用量、费用、余额等数字是运行过程中的真实数值，但不代表你的账户。
-- 截图录于 1400×950 的窗口（插件面板部分），已按面板区域裁切。
-- 静态截图重新生成时使用同一窗口尺寸与主题，并压缩到 300KB 以内。
-- 演示 GIF 为 1440×960，保留 DSH 左侧栏以展示插件入口，底部加说明字幕。审阅使用隔离书库中预置的示例改动。
-- 仓库根目录的 [screenshots.json](../../screenshots.json) 决定市场详情页的截图与顺序。
+- Screenshots use an isolated sample database; manuscripts are demo content.
+- Usage, cost and balance figures are real values from that run, not your account.
+- Static screenshots are captured at 1440×900 and cropped to the panel area.
+- Regenerate static screenshots at the same size and theme, and keep them under 300 KB.
+- The demo GIF is 1440×960, keeps the DSH sidebar to show the plugin entry, and includes captions.
+- [`screenshots.json`](../../screenshots.json) controls the marketplace gallery and its order.

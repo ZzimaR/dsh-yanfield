@@ -7,6 +7,7 @@ import { cn, formatWords } from "@/lib/ui/cn";
 import type { SaveState, SelectionInfo } from "@/lib/editor/types";
 import styles from "./EditorStatusBar.module.css";
 import { SaveIndicator } from "./SaveIndicator";
+import { useT } from "@/lib/i18n";
 
 /** 阅读时长：按 400 字/分钟向上取整 */
 export function estimateReadingMinutes(wordCount: number): number {
@@ -47,6 +48,7 @@ export function EditorStatusBar({
   onToggleFocusParagraph,
   className,
 }: EditorStatusBarProps) {
+  const tr = useT();
   const minutes = estimateReadingMinutes(wordCount);
 
   return (
@@ -56,36 +58,36 @@ export function EditorStatusBar({
         "border-t border-line bg-surface/80 text-[11.5px] text-ink-3",
         className,
       )}
-      aria-label="写作状态栏"
+      aria-label={tr("写作状态栏")}
     >
       <div className={styles.content}>
-        <span className="tabular-nums">{formatWords(wordCount)} 字</span>
+        <span className="tabular-nums">{tr("{words} 字", { words: formatWords(wordCount) })}</span>
         <span className="h-3 w-px bg-line" aria-hidden />
-        <span className={cn(styles.paragraphs, "tabular-nums")} title="按非空段落统计">
-          段落 {paragraphCount}
+        <span className={cn(styles.paragraphs, "tabular-nums")} title={tr("按非空段落统计")}>
+          {tr("段落 {n}", { n: paragraphCount, count: paragraphCount })}
         </span>
         <span className={cn(styles.paragraphs, "h-3 w-px bg-line")} aria-hidden />
-        <span className={cn(styles.reading, "tabular-nums")} title="按 400 字/分钟估算">
-          阅读 {minutes} 分钟
+        <span className={cn(styles.reading, "tabular-nums")} title={tr("按 400 字/分钟估算")}>
+          {tr("阅读 {n} 分钟", { n: minutes })}
         </span>
         <span className={cn(styles.reading, "h-3 w-px bg-line")} aria-hidden />
         <SaveIndicator state={saveState} lastSavedAt={lastSavedAt} />
         {selection.empty ? null : (
-          <span className={cn(styles.selection, "tabular-nums text-accent")}>已选中 {selection.text.length} 字</span>
+          <span className={cn(styles.selection, "tabular-nums text-accent")}>{tr("已选中 {n} 字", { n: selection.text.length })}</span>
         )}
         <div className={styles.controls}>
-          <span className={cn(styles.shortcut, "mr-1 items-center gap-1 text-ink-4")} title="保存快捷键">
+          <span className={cn(styles.shortcut, "mr-1 items-center gap-1 text-ink-4")} title={tr("保存快捷键")}>
             <Kbd>Ctrl</Kbd>
             <span>+</span>
             <Kbd>S</Kbd>
           </span>
-          <Tooltip label="打字机滚动（光标保持在屏幕约 38% 高度）">
-            <IconButton label="打字机滚动" size="sm" active={typewriter} onClick={onToggleTypewriter}>
+          <Tooltip label={tr("打字机滚动（光标保持在屏幕约 38% 高度）")}>
+            <IconButton label={tr("打字机滚动")} size="sm" active={typewriter} onClick={onToggleTypewriter}>
               <Type className="size-3.5" />
             </IconButton>
           </Tooltip>
-          <Tooltip label="专注段落（淡化其他段落）">
-            <IconButton label="专注段落" size="sm" active={focusParagraph} onClick={onToggleFocusParagraph}>
+          <Tooltip label={tr("专注段落（淡化其他段落）")}>
+            <IconButton label={tr("专注段落")} size="sm" active={focusParagraph} onClick={onToggleFocusParagraph}>
               <Focus className="size-3.5" />
             </IconButton>
           </Tooltip>

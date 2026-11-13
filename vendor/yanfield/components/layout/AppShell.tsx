@@ -25,6 +25,7 @@ import type { Novel } from "@/lib/types";
 import { applyTheme, getStoredTheme, resolveTheme, type ThemeMode } from "@/lib/ui/theme";
 import { InkstoneMark } from "@/components/brand/InkstoneMark";
 import { IconButton, Tooltip } from "@/components/ui/kit";
+import { useT } from "@/lib/i18n";
 import { LinkPendingIcon } from "@/components/ui/LinkPendingIcon";
 
 export type AppShellActive = "library" | "overview" | "outline" | "bible" | "archives" | "editor" | "settings";
@@ -73,6 +74,7 @@ export function AppShell({
   flush?: boolean;
 }) {
   const pathname = usePathname();
+  const tr = useT();
   const back = novelId ? novelBackTarget(pathname, novelId) : null;
   const [mode, setMode, mounted] = useThemeMode();
   const { data: novel } = useApi<Novel>(novelId ? `/api/novels/${novelId}` : null);
@@ -93,9 +95,9 @@ export function AppShell({
           "sticky top-0 z-30 hidden h-dvh w-14 shrink-0 flex-col items-center border-r border-line bg-surface py-4 md:flex",
           flush && "h-dvh",
         )}
-        aria-label="主导航"
+        aria-label={tr("主导航")}
       >
-        <Link href="/" aria-label="砚田首页" className="mb-5 flex size-9 items-center justify-center rounded-md transition-transform duration-200 hover:scale-105">
+        <Link href="/" aria-label={tr("砚田首页")} className="mb-5 flex size-9 items-center justify-center rounded-md transition-transform duration-200 hover:scale-105">
           <InkstoneMark className="size-9" />
         </Link>
 
@@ -110,13 +112,13 @@ export function AppShell({
               isActive ? "bg-accent-soft text-accent" : "text-ink-3 hover:bg-surface-2 hover:text-ink",
             );
             return (
-              <Tooltip key={item.key} label={item.label} side="right">
+              <Tooltip key={item.key} label={tr(item.label)} side="right">
                 {item.key === "settings" ? (
-                  <button type="button" aria-label={item.label} onClick={openSettings} className={itemClass}>
+                  <button type="button" aria-label={tr(item.label)} onClick={openSettings} className={itemClass}>
                     {icon}
                   </button>
                 ) : (
-                  <Link href={item.href} aria-label={item.label} className={itemClass}>
+                  <Link href={item.href} aria-label={tr(item.label)} className={itemClass}>
                     {icon}
                   </Link>
                 )}
@@ -126,8 +128,8 @@ export function AppShell({
         </div>
 
         <div className="mt-auto flex flex-col items-center gap-1.5">
-          <Tooltip label={resolved === "dark" ? "切换到宣纸主题" : "切换到夜航主题"} side="right">
-            <IconButton label="切换主题" size="lg" onClick={toggleTheme}>
+          <Tooltip label={resolved === "dark" ? tr("切换到宣纸主题") : tr("切换到夜航主题")} side="right">
+            <IconButton label={tr("切换主题")} size="lg" onClick={toggleTheme}>
               {resolved === "dark" ? <Sun className="size-[18px]" /> : <Moon className="size-[18px]" />}
             </IconButton>
           </Tooltip>
@@ -149,18 +151,18 @@ export function AppShell({
       <div className="fixed inset-x-0 top-0 z-30 flex h-12 items-center justify-between border-b border-line bg-surface px-3 md:hidden">
         <Link href="/" className="flex items-center gap-2">
           <InkstoneMark className="size-6" />
-          <span className="font-serif text-[15px] font-semibold">砚田</span>
+          <span className="font-serif text-[15px] font-semibold">{tr("砚田")}</span>
         </Link>
         <div className="flex items-center gap-1">
-          <IconButton label={resolved === "dark" ? "宣纸主题" : "夜航主题"} onClick={toggleTheme}>
+          <IconButton label={resolved === "dark" ? tr("宣纸主题") : tr("夜航主题")} onClick={toggleTheme}>
             {resolved === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </IconButton>
-          <Link href="/library" aria-label="书架" className="flex size-8 items-center justify-center rounded-md text-ink-2 hover:bg-surface-2">
+          <Link href="/library" aria-label={tr("书架")} className="flex size-8 items-center justify-center rounded-md text-ink-2 hover:bg-surface-2">
             <Library className="size-4" />
           </Link>
           <button
             type="button"
-            aria-label="设置"
+            aria-label={tr("设置")}
             onClick={openSettings}
             className="flex size-8 items-center justify-center rounded-md text-ink-2 hover:bg-surface-2"
           >
@@ -175,13 +177,13 @@ export function AppShell({
             <div className="flex h-12 items-center gap-2 px-3 md:px-5">
               <Link
                 href={back?.href ?? "/library"}
-                aria-label={back?.label ?? "返回书架"}
+                aria-label={tr(back?.label ?? "返回书架")}
                 className="flex size-7 items-center justify-center rounded-md text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
               >
                 <ChevronLeft className="size-4" />
               </Link>
-              <span className="min-w-0 truncate font-serif text-[15px] font-semibold text-ink">{novel?.title ?? "加载中…"}</span>
-              {novel?.genre ? <span className="hidden shrink-0 rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-ink-3 sm:inline">{novel.genre}</span> : null}
+              <span className="min-w-0 truncate font-serif text-[15px] font-semibold text-ink">{novel?.title ?? tr("加载中…")}</span>
+              {novel?.genre ? <span className="hidden shrink-0 rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] text-ink-3 sm:inline">{tr(novel.genre)}</span> : null}
               <div className="ml-auto flex items-center gap-2">
                 <Link
                   href={`/editor/${novelId}`}
@@ -190,7 +192,7 @@ export function AppShell({
                   <LinkPendingIcon className="size-3.5">
                     <PenLine className="size-3.5" />
                   </LinkPendingIcon>{" "}
-                  继续写作
+                  {tr("继续写作")}
                 </Link>
               </div>
             </div>
@@ -207,7 +209,7 @@ export function AppShell({
                     )}
                   >
                     <tab.icon className="size-3.5" />
-                    {tab.label}
+                    {tr(tab.label)}
                   </Link>
                 );
               })}

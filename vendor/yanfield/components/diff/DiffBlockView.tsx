@@ -5,6 +5,7 @@
  * 左上角勾选框控制该块是否被接受；纯展示模式隐藏勾选框。
  */
 import { Check } from "lucide-react";
+import { useT } from "@/lib/i18n";
 import type { BlockChange } from "@/lib/diff/blocks";
 import { cn } from "@/lib/ui/cn";
 import { InlineDiffText } from "./InlineDiffText";
@@ -40,7 +41,8 @@ export function DiffBlockView({
   readOnly = false,
   className,
 }: DiffBlockViewProps) {
-  const typeLabel = BLOCK_TYPE_LABEL[item.type] ?? item.type;
+  const tr = useT();
+  const typeLabel = tr(BLOCK_TYPE_LABEL[item.type] ?? item.type);
   const previewText = item.afterText ?? item.beforeText ?? "";
   const charCount = previewText.replace(/\s+/g, "").length;
 
@@ -60,7 +62,7 @@ export function DiffBlockView({
             type="button"
             role="checkbox"
             aria-checked={checked}
-            aria-label={`接受第 ${index + 1} 块改动`}
+            aria-label={tr("接受第 {n} 块改动", { n: index + 1 })}
             onClick={() => onToggle(!checked)}
             className={cn(
               "flex size-4 shrink-0 items-center justify-center rounded-sm border transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20",
@@ -80,20 +82,20 @@ export function DiffBlockView({
         >
           {typeLabel}
         </span>
-        <span className="text-[10.5px] text-ink-4">第 {index + 1} 块</span>
+        <span className="text-[10.5px] text-ink-4">{tr("第 {n} 块", { n: index + 1 })}</span>
         <span className="ml-auto shrink-0 text-[10.5px] tabular-nums text-ink-4">
-          {charCount} 字
+          {tr("{count} 字", { count: charCount })}
         </span>
       </div>
 
       <div className="scroll-thin max-h-64 overflow-y-auto px-3 py-2 font-serif text-[14px] leading-[1.95] text-ink-2">
         {item.type === "added" ? (
           <div className="diff-add whitespace-pre-wrap break-words rounded-sm px-1.5 py-0.5">
-            {item.afterText ?? "（空段落）"}
+            {item.afterText ?? tr("（空段落）")}
           </div>
         ) : item.type === "removed" ? (
           <div className="diff-del whitespace-pre-wrap break-words rounded-sm px-1.5 py-0.5">
-            {item.beforeText ?? "（空段落）"}
+            {item.beforeText ?? tr("（空段落）")}
           </div>
         ) : item.inline && item.inline.length > 0 ? (
           <InlineDiffText parts={item.inline} />

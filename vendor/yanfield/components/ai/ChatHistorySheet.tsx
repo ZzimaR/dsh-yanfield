@@ -6,6 +6,7 @@
  * 后端会话接口不可用时优雅降级：提示错误或由面板新开本地会话。
  */
 import * as React from "react";
+import { localizedAgentName } from "@/lib/ai/agent-display";
 import { CircleAlert, MessagesSquare, Plus, RefreshCw, Trash } from "lucide-react";
 import type { AgentId, ChatSession } from "@/lib/types";
 import { apiDelete, apiGet, apiPost, notifyDataChanged } from "@/lib/client/api";
@@ -19,6 +20,7 @@ import {
   useToast,
 } from "@/components/ui/kit";
 import { cn, formatRelativeTime } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import { resolveAgent } from "./utils";
 
 export interface ChatHistorySheetProps {
@@ -61,6 +63,7 @@ export function ChatHistorySheet({
   onDeleted,
 }: ChatHistorySheetProps) {
   const { toast } = useToast();
+  const tr = useT();
   const [sessions, setSessions] = React.useState<ChatSession[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -76,11 +79,11 @@ export function ChatHistorySheet({
       const data = await apiGet<unknown>(`/api/chat/sessions?novelId=${encodeURIComponent(novelId)}`);
       setSessions(normalizeSessions(data));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "会话列表加载失败");
+      setError(err instanceof Error ? err.message : tr("会话列表加载失败"));
     } finally {
       setLoading(false);
     }
-  }, [novelId]);
+  }, [novelId, tr]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -101,8 +104,8 @@ export function ChatHistorySheet({
     } catch (err) {
       // 后端会话接口尚未就绪时，降级为本地会话，不阻塞使用
       toast({
-        title: "已新开本地会话",
-        description: err instanceof Error ? err.message : "云端会话暂不可用",
+        title: tr("已新开本地会话"),
+        description: err instanceof Error ? err.message : tr("云端会话暂不可用"),
         tone: "default",
       });
       onClose();
@@ -121,11 +124,11 @@ export function ChatHistorySheet({
       setSessions((prev) => prev.filter((item) => item.id !== deleting.id));
       onDeleted?.(deleting.id);
       setDeleting(null);
-      toast({ title: "会话已删除", tone: "success" });
+      toast({ title: tr("会话已删除"), tone: "success" });
     } catch (err) {
       toast({
-        title: "删除失败",
-        description: err instanceof Error ? err.message : "请稍后重试",
+        title: tr("删除失败"),
+        description: err instanceof Error ? err.message : tr("请稍后重试"),
         tone: "error",
       });
     } finally {
@@ -138,12 +141,12 @@ export function ChatHistorySheet({
       <Sheet
         open={open}
         onClose={onClose}
-        title="会话历史"
+        title={tr("会话历史")}
         width={400}
         footer={
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] text-ink-4">
-              {maxTabsReached ? "已打开 3 个会话，请先关闭一个" : `共 ${sessions.length} 个会话`}
+              {maxTabsReached ? tr("已打开 3 个会话，请先关闭一个") : tr("共 {count} 个会话", { count: sessions.length })}
             </span>
             <Button
               variant="primary"
@@ -153,7 +156,7 @@ export function ChatHistorySheet({
               disabled={maxTabsReached}
               onClick={() => void create()}
             >
-              新建会话
+              {tr("新建会话")}
             </Button>
           </div>
         }
@@ -170,14 +173,14 @@ export function ChatHistorySheet({
               <CircleAlert className="size-4 text-danger" />
               <p className="text-[12px] text-danger">{error}</p>
               <Button size="sm" variant="secondary" icon={<RefreshCw className="size-3" />} onClick={() => void load()}>
-                重新加载
+                {tr("重新加载")}
               </Button>
             </div>
           ) : sessions.length === 0 ? (
             <EmptyState
               icon={<MessagesSquare className="size-5" />}
-              title="还没有历史会话"
-              description="新建一个会话，或直接在 AI 面板里提问（首次发送会自动创建会话）。"
+              title={tr("还没有历史会话")}
+              description={tr("新建一个会话，或直接在 AI 面板里提问（首次发送会自动创建会话）。")}
               action={
                 <Button
                   size="sm"
@@ -187,7 +190,7 @@ export function ChatHistorySheet({
                   disabled={maxTabsReached}
                   onClick={() => void create()}
                 >
-                  新建会话
+                  {tr("新建会话")}
                 </Button>
               }
             />
@@ -216,19 +219,19 @@ export function ChatHistorySheet({
                     >
                       <span className="block">
                         <span className="line-clamp-2 break-words text-[13px] font-medium leading-5 text-ink">
-                          {session.title || "未命名会话"}
+                          {session.title || tr("未命名会话")}
                         </span>
 
                       </span>
                       <span className="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] text-ink-3">
-                        <span className="truncate">{agent.name}</span>
+                        <span className="truncate">{localizedAgentName(agent)}</span>
                         <span>·</span>
                         <span className="shrink-0 whitespace-nowrap">{formatRelativeTime(session.updatedAt)}</span>
-                        {active ? <span className="ml-auto shrink-0 whitespace-nowrap rounded bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">当前</span> : null}
+                        {active ? <span className="ml-auto shrink-0 whitespace-nowrap rounded bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">{tr("当前")}</span> : null}
                       </span>
                     </button>
                     <IconButton
-                      label={session.id === busySessionId ? "请先停止此会话的生成，再删除" : "删除会话"}
+                      label={session.id === busySessionId ? tr("请先停止此会话的生成，再删除") : tr("删除会话")}
                       size="sm"
                       disabled={session.id === busySessionId}
                       className="shrink-0 text-ink-4 opacity-50 transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100"
@@ -246,13 +249,13 @@ export function ChatHistorySheet({
 
       <ConfirmDialog
         open={deleting !== null}
-        title="删除会话"
+        title={tr("删除会话")}
         description={
           deleting
-            ? `将删除「${deleting.title || "未命名会话"}」及其历史消息，删除后不可恢复。`
+            ? tr("将删除「{title}」及其历史消息，删除后不可恢复。", { title: deleting.title || tr("未命名会话") })
             : undefined
         }
-        confirmText="删除"
+        confirmText={tr("删除")}
         danger
         loading={deleteLoading}
         onConfirm={() => void remove()}

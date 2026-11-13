@@ -1,11 +1,11 @@
 # Features
 
-Everything the Yanfield plugin can do, by area. The interface is in Chinese.
+Everything the Yanfield plugin can do, by area. The interface follows the Harness language (English or Chinese); this guide uses the English labels.
 
 ## 1. Shelf
 
-- Novel cards: cover colour (eight presets), status (draft / serialising / finished), genre, volume and chapter counts, word count, last updated.
-- New novel: title, genre, one-line pitch, cover colour, synopsis, optional first volume.
+- Novel cards: cover color (eight presets), status (draft / serializing / finished), genre, volume and chapter counts, word count, last updated.
+- New novel: title, genre, one-line pitch, cover color, synopsis, optional first volume.
 - Search (title / synopsis), filter by genre, sort by recent update or word count.
 - "Sample novel" creates a demo manuscript for trying the UI.
 - Card menu: rename, change status, copy synopsis, delete (with confirmation).
@@ -31,7 +31,7 @@ Writing features:
 
 - Autosave with adjustable delay (default 1.2s) plus manual save; save state shown in the header.
 - Word / paragraph / reading-time stats; chapter status (draft, final, …).
-- Focus mode (hide side rails), typewriter mode (caret stays vertically centred).
+- Focus mode (hide side rails), typewriter mode (caret stays vertically centered).
 - Typography: serif or sans, size, weight, line height, letter spacing, paragraph spacing, margins, max line width, with a live preview.
 - Find in chapter; `Alt + 1` collapses the outline; `Alt + J` focuses the AI box.
 
@@ -46,7 +46,7 @@ Writing features:
 
 ## 5. Import and export
 
-- **Import TXT**: detects chapter titles ("Chapter N", "Volume N"), previews chapters, then writes them; about 2000 chapters per import.
+- **Import TXT**: detects headings such as "Chapter 12", "Chapter Twelve", "Chapter IV", "Volume Two: The Sea", "Prologue" and "Epilogue" (Chinese 第X章 / 卷 and `1、` numbering also work), previews the chapters, then writes them; about 2000 chapters per import.
 - **Export**: whole novel or a single chapter as Markdown / TXT.
 - **Backup**: open the database folder from Settings → Data, or copy the path.
 
@@ -84,7 +84,7 @@ Review flow:
 - **Editor**: font, size, line height, letter spacing, paragraph spacing, margins, max line width, live preview.
 - **Appearance**: theme (rice paper / night sail / follow system), autosave, typewriter mode, focus mode, autosave delay, daily word target.
 - **Data**: database path, open folder, copy path, export everything, import TXT, danger zone (regenerate sample novel).
-- **About**: version, repository, docs, issues, build time, licence, stack, credits.
+- **About**: version, repository, docs, issues, build time, license, stack, credits.
 
 ## 8. Shortcuts
 

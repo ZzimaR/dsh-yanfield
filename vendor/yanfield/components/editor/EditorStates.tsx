@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Feather, Undo2 } from "lucide-react";
 import { Button, EmptyState, Skeleton } from "@/components/ui/kit";
 import { cn } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 
 /** 与 kit Button primary 对齐的链接按钮样式（Button 不能渲染成 <a>，这里手写一份） */
 const linkButtonClass =
@@ -12,8 +13,9 @@ const linkButtonClass =
 
 /** 加载骨架：还原三栏布局，避免首屏跳动 */
 export function EditorLoading() {
+  const tr = useT();
   return (
-    <div className="relative flex h-full min-h-0 flex-col bg-paper" aria-busy="true" aria-label="正在加载写作台">
+    <div className="relative flex h-full min-h-0 flex-col bg-paper" aria-busy="true" aria-label={tr("正在加载写作台")}>
       <div className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-3">
         <Skeleton className="size-8 rounded-md" />
         <Skeleton className="h-3.5 w-44" />
@@ -47,7 +49,7 @@ export function EditorLoading() {
             <span className="ink-write-line absolute bottom-1 left-0 h-[2px] w-full rounded-full bg-accent/70" />
             <Feather className="ink-write-pen absolute bottom-1 left-0 size-5 text-accent" />
           </div>
-          <p className="text-[12.5px] text-ink-3">正在铺开稿纸…</p>
+          <p className="text-[12.5px] text-ink-3">{tr("正在铺开稿纸…")}</p>
         </div>
       </div>
     </div>
@@ -56,16 +58,17 @@ export function EditorLoading() {
 
 /** 作品不存在（404） */
 export function EditorNotFound() {
+  const tr = useT();
   return (
     <div className="flex h-full min-h-0 items-center justify-center bg-paper px-6">
       <EmptyState
         icon={<Feather className="size-5" />}
-        title="没有找到这部作品"
-        description="它可能已被删除，或者链接里的作品 ID 不正确。回到书架看看还有哪些作品。"
+        title={tr("没有找到这部作品")}
+        description={tr("它可能已被删除，或者链接里的作品 ID 不正确。回到书架看看还有哪些作品。")}
         action={
           <Link href="/library" className={linkButtonClass}>
             <ArrowLeft className="size-3.5" />
-            返回书架
+            {tr("返回书架")}
           </Link>
         }
       />
@@ -80,15 +83,16 @@ interface EditorErrorProps {
 
 /** 加载失败（网络 / 接口异常），提供重试 */
 export function EditorError({ message, onRetry }: EditorErrorProps) {
+  const tr = useT();
   return (
     <div className="flex h-full min-h-0 items-center justify-center bg-paper px-6">
       <EmptyState
         icon={<Undo2 className="size-5" />}
-        title="写作台没能加载出来"
+        title={tr("写作台没能加载出来")}
         description={message}
         action={
           <Button variant="primary" size="sm" icon={<Undo2 className="size-3.5" />} onClick={onRetry}>
-            重新加载
+            {tr("重新加载")}
           </Button>
         }
       />

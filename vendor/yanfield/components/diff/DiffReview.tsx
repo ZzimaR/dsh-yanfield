@@ -10,6 +10,7 @@
 import * as React from "react";
 import { FileText } from "lucide-react";
 import { Button, Dialog, EmptyState } from "@/components/ui/kit";
+import { useT } from "@/lib/i18n";
 import { applyBlockDiff, diffBlocks, type BlockDiff } from "@/lib/diff/blocks";
 import { cn } from "@/lib/ui/cn";
 import { DiffBlockView } from "./DiffBlockView";
@@ -47,6 +48,7 @@ export function DiffReview({
   onApply,
   className,
 }: DiffReviewProps) {
+  const tr = useT();
   // 弹窗关闭时不计算 diff，避免无谓的逐块比较
   const diff = React.useMemo<BlockDiff>(() => {
     if (mode === "dialog" && !open) return EMPTY_DIFF;
@@ -84,29 +86,29 @@ export function DiffReview({
 
   const summary = (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-1.5">
-      <span className="text-[11px] text-ink-3">共 {diff.items.length} 块改动</span>
+      <span className="text-[11px] text-ink-3">{tr("共 {count} 块改动", { count: diff.items.length })}</span>
       {diff.added > 0 ? (
         <span className="rounded-full bg-success/10 px-1.5 py-0.5 text-[10.5px] text-success">
-          新增 {diff.added} 处
+          {tr("新增 {count} 处", { count: diff.added })}
         </span>
       ) : null}
       {diff.removed > 0 ? (
         <span className="rounded-full bg-danger/10 px-1.5 py-0.5 text-[10.5px] text-danger">
-          删除 {diff.removed} 处
+          {tr("删除 {count} 处", { count: diff.removed })}
         </span>
       ) : null}
       {diff.changed > 0 ? (
         <span className="rounded-full bg-gold-soft px-1.5 py-0.5 text-[10.5px] text-gold">
-          修改 {diff.changed} 处
+          {tr("修改 {count} 处", { count: diff.changed })}
         </span>
       ) : null}
       {readOnly ? null : (
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={selectAll} disabled={diff.items.length === 0}>
-            全选
+            {tr("全选")}
           </Button>
           <Button variant="ghost" size="sm" onClick={clearAll} disabled={accepted.size === 0}>
-            全不选
+            {tr("全不选")}
           </Button>
         </div>
       )}
@@ -117,8 +119,8 @@ export function DiffReview({
     diff.items.length === 0 ? (
       <EmptyState
         icon={<FileText className="size-5" />}
-        title="没有可审阅的改动"
-        description="AI 输出与当前正文一致，无需应用。"
+        title={tr("没有可审阅的改动")}
+        description={tr("AI 输出与当前正文一致，无需应用。")}
       />
     ) : (
       <div className="flex flex-col gap-2">
@@ -135,13 +137,13 @@ export function DiffReview({
       </div>
     );
 
-  const disabledHint = applyDisabledHint ?? "当前页面没有可写入的编辑器";
+  const disabledHint = applyDisabledHint ?? tr("当前页面没有可写入的编辑器");
 
   if (mode === "inline") {
     return (
       <div className={cn("rounded-md border border-line bg-surface p-3", className)}>
         <div className="mb-2">
-          <div className="font-serif text-[14px] text-ink">{title ?? "改动预览"}</div>
+          <div className="font-serif text-[14px] text-ink">{title ?? tr("改动预览")}</div>
           {description ? (
             <div className="mt-0.5 text-[11.5px] leading-relaxed text-ink-3">{description}</div>
           ) : null}
@@ -151,7 +153,7 @@ export function DiffReview({
         {readOnly || !onApply ? null : (
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             <span className="mr-auto text-[11px] text-ink-4">
-              {canApply ? `已选 ${accepted.size} / ${diff.items.length} 块` : disabledHint}
+              {canApply ? tr("已选 {selected} / {total} 块", { selected: accepted.size, total: diff.items.length }) : disabledHint}
             </span>
             <Button
               variant="primary"
@@ -160,7 +162,7 @@ export function DiffReview({
               disabled={!canApply || accepted.size === 0}
               title={!canApply ? disabledHint : undefined}
             >
-              应用到正文（接受 {accepted.size} 项）
+              {tr("应用到正文（接受 {count} 项）", { count: accepted.size })}
             </Button>
           </div>
         )}
@@ -173,10 +175,10 @@ export function DiffReview({
   const footer = (
     <div className="flex w-full flex-wrap items-center gap-2">
       <span className="min-w-0 flex-1 text-[11px] text-ink-4">
-        {canApply ? `将应用已勾选的 ${accepted.size} 项改动，未勾选的保持原样` : disabledHint}
+        {canApply ? tr("将应用已勾选的 {count} 项改动，未勾选的保持原样", { count: accepted.size }) : disabledHint}
       </span>
       <Button variant="ghost" size="sm" onClick={onClose ?? (() => undefined)}>
-        取消
+        {tr("取消")}
       </Button>
       <Button
         variant="primary"
@@ -185,7 +187,7 @@ export function DiffReview({
         disabled={!canApply || accepted.size === 0}
         title={!canApply ? disabledHint : undefined}
       >
-        应用到正文（接受 {accepted.size} 项）
+        {tr("应用到正文（接受 {count} 项）", { count: accepted.size })}
       </Button>
     </div>
   );
@@ -194,10 +196,10 @@ export function DiffReview({
     <Dialog
       open={open}
       onClose={onClose ?? (() => undefined)}
-      title={title ?? "逐块审阅 AI 改动"}
+      title={title ?? tr("逐块审阅 AI 改动")}
       description={
         description ??
-        `AI 改动了 ${diff.items.length} 块内容，请逐块确认；只有勾选的块会被写入正文。`
+        tr("AI 改动了 {count} 块内容，请逐块确认；只有勾选的块会被写入正文。", { count: diff.items.length })
       }
       footer={footer}
       width={820}

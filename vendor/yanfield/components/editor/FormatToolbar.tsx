@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { IconButton, Tooltip } from "@/components/ui/kit";
 import { cn } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 
 interface FormatToolbarProps {
   /** 编辑器实例；未就绪时工具栏不渲染 */
@@ -59,10 +60,12 @@ interface ToolbarButtonProps {
 
 /** 统一的工具栏按钮：IconButton + Tooltip + 中文 aria-label */
 function ToolbarButton({ label, active, disabled, onClick, className, children }: ToolbarButtonProps) {
+  const tr = useT();
+  const text = tr(label);
   return (
-    <Tooltip label={label}>
+    <Tooltip label={text}>
       <IconButton
-        label={label}
+        label={text}
         size="sm"
         active={active}
         disabled={disabled}
@@ -86,6 +89,7 @@ const TEXT_BUTTON_CLASS = "size-auto h-7 min-w-7 w-auto px-1.5 text-[11px] font-
  * 与图标按钮共用 aria-label 中文 + Tooltip，方便键盘与读屏。
  */
 export function FormatToolbar({ editor, className, children }: FormatToolbarProps) {
+  const tr = useT();
   useEditorTick(editor);
 
   if (!editor) return null;
@@ -93,7 +97,7 @@ export function FormatToolbar({ editor, className, children }: FormatToolbarProp
   const isParagraph = editor.isActive("paragraph");
 
   return (
-    <div role="toolbar" aria-label="格式工具栏" className={cn("scroll-thin flex flex-nowrap items-center gap-0.5 overflow-x-auto", className)}>
+    <div role="toolbar" aria-label={tr("格式工具栏")} className={cn("scroll-thin flex flex-nowrap items-center gap-0.5 overflow-x-auto", className)}>
       <ToolbarButton label="撤销" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
         <Undo2 className="size-3.5" />
       </ToolbarButton>
@@ -109,7 +113,7 @@ export function FormatToolbar({ editor, className, children }: FormatToolbarProp
         className={TEXT_BUTTON_CLASS}
         onClick={() => editor.chain().focus().setParagraph().run()}
       >
-        正文
+        {tr("正文")}
       </ToolbarButton>
       <ToolbarButton
         label="标题 2"

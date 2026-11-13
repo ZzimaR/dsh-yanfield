@@ -15,6 +15,7 @@ import { apiDelete, apiPatch, apiPost, notifyDataChanged, useApi } from "@/lib/c
 import type { Foreshadow, ForeshadowStatus } from "@/lib/types";
 import { FORESHADOW_STATUS_LABEL } from "@/lib/types";
 import { stripChapterNumber, unwrapEntity, useErrorToast } from "@/components/outline/form-kit";
+import { useT } from "@/lib/i18n";
 
 interface ForeshadowDraft {
   title: string;
@@ -60,6 +61,7 @@ export function ForeshadowEditor({
   /** 写作台里用可拖动的窗口，不盖成整页。 */
   presentation?: "sheet" | "float";
 }) {
+  const tr = useT();
   const { toast } = useToast();
   const editing = Boolean(foreshadow);
   const detailApi = useApi<Foreshadow>(open && foreshadow ? `/api/foreshadows/${foreshadow.id}` : null);
@@ -101,22 +103,24 @@ export function ForeshadowEditor({
   };
 
   const chapterOptions = [
-    { value: "", label: "未关联" },
+    { value: "", label: tr("未关联") },
     ...chapters.map((chapter) => ({
       value: chapter.id,
-      label: `第 ${chapter.orderIndex + 1} 章 · ${stripChapterNumber(chapter.title)}`,
+      label: tr("第 {order} 章 · {title}", { order: chapter.orderIndex + 1, title: stripChapterNumber(chapter.title, tr) }),
     })),
   ];
 
   const chapterTitle = (id: string | null) => {
     const chapter = chapters.find((item) => item.id === id);
-    return chapter ? `第 ${chapter.orderIndex + 1} 章 · ${stripChapterNumber(chapter.title)}` : null;
+    return chapter
+      ? tr("第 {order} 章 · {title}", { order: chapter.orderIndex + 1, title: stripChapterNumber(chapter.title, tr) })
+      : null;
   };
 
   const save = async () => {
     const title = draft.title.trim();
     if (!title) {
-      toast({ title: "请先填写伏笔标题", tone: "error" });
+      toast({ title: tr("请先填写伏笔标题"), tone: "error" });
       return;
     }
     setSaving(true);
@@ -129,10 +133,10 @@ export function ForeshadowEditor({
       setSavedId(entity.id);
       onSaved(entity);
       notifyDataChanged("foreshadows");
-      toast({ title: editing ? "伏笔已保存" : "已新建伏笔", description: title, tone: "success" });
+      toast({ title: editing ? tr("伏笔已保存") : tr("已新建伏笔"), description: title, tone: "success" });
       onClose();
     } catch (err) {
-      toast({ title: "保存伏笔失败", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      toast({ title: tr("保存伏笔失败"), description: err instanceof Error ? err.message : String(err), tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -146,23 +150,23 @@ export function ForeshadowEditor({
       setConfirmDeleteOpen(false);
       onDeleted();
       notifyDataChanged("foreshadows");
-      toast({ title: "伏笔已删除", description: foreshadow.title, tone: "success" });
+      toast({ title: tr("伏笔已删除"), description: foreshadow.title, tone: "success" });
       onClose();
     } catch (err) {
-      toast({ title: "删除伏笔失败", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      toast({ title: tr("删除伏笔失败"), description: err instanceof Error ? err.message : String(err), tone: "error" });
     } finally {
       setDeleting(false);
     }
   };
 
   const openAssistant = () => {
-    referenceCardInAssistant("foreshadow",savedId,draft.title.trim()||"新伏笔",{...draft});
+    referenceCardInAssistant("foreshadow",savedId,draft.title.trim()||tr("新伏笔"),{...draft});
     if(presentation==="float")setMinimized(true);
   };
 
   const plantedTitle = chapterTitle(draft.plantedChapterId);
   const payoffTitle = chapterTitle(draft.payoffChapterId);
-  const subtitle = [FORESHADOW_STATUS_LABEL[draft.status], plantedTitle ? `埋于${plantedTitle}` : "未关联埋设章"]
+  const subtitle = [tr(FORESHADOW_STATUS_LABEL[draft.status]), plantedTitle ? tr("埋于{ref}", { ref: plantedTitle }) : tr("未关联埋设章")]
     .filter(Boolean)
     .join(" · ");
 
@@ -170,15 +174,15 @@ export function ForeshadowEditor({
     <div className="card-editor-actions flex items-center gap-2 [&_a:focus-visible]:outline-none [&_a:focus-visible]:ring-2 [&_a:focus-visible]:ring-accent/60 [&_button:focus-visible]:outline-none [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-accent/60">
       {editing ? (
         <Button variant="ghost" className="text-ink-4 hover:text-danger" size="sm" icon={<Trash2 className="size-3.5" />} onClick={() => setConfirmDeleteOpen(true)}>
-          删除
+          {tr("删除")}
         </Button>
       ) : null}
       <div className="ml-auto flex items-center gap-2">
         <Button variant="ghost" size="sm" onClick={onClose}>
-          取消
+          {tr("取消")}
         </Button>
         <Button variant="primary" className="min-w-20 bg-accent text-accent-ink hover:bg-accent-hover" size="sm" loading={saving} onClick={save}>
-          {savedId ? "保存" : "创建伏笔"}
+          {savedId ? tr("保存") : tr("创建伏笔")}
         </Button>
       </div>
     </div>
@@ -187,67 +191,67 @@ export function ForeshadowEditor({
   const body = (
     <>
       <CardEditorDocument key={`${open}:${savedId??"new"}`}>
-        <CardEditorHero kind="伏笔" value={draft.title} onChange={value=>update("title",value)} subtitle={subtitle} actions={<Button variant="ghost" size="sm" className="font-semibold text-[#315b80] hover:bg-[#315b80]/[0.07] hover:text-[#20496e] dark:text-[#9dc4e7] dark:hover:bg-[#9dc4e7]/10 dark:hover:text-[#c1dbee]" icon={<Sparkles className="size-3.5"/>} onClick={openAssistant}>AI 助手</Button>}/>
+        <CardEditorHero kind="伏笔" value={draft.title} onChange={value=>update("title",value)} subtitle={subtitle} actions={<Button variant="ghost" size="sm" className="font-semibold text-[#315b80] hover:bg-[#315b80]/[0.07] hover:text-[#20496e] dark:text-[#9dc4e7] dark:hover:bg-[#9dc4e7]/10 dark:hover:text-[#c1dbee]" icon={<Sparkles className="size-3.5"/>} onClick={openAssistant}>{tr("AI 助手")}</Button>}/>
         <ModelKeyHint />
 
-        <EditorSection title="基本信息" hint="一句话让读者记住它，状态决定统计里算不算「未收」。">
+        <EditorSection title="基本信息" hint={tr("一句话让读者记住它，状态决定统计里算不算「未收」。")}>
           <div className="grid gap-3">
             <Select
-              label="状态"
+              label={tr("状态")}
               value={draft.status}
               onChange={(event) => update("status", event.target.value as ForeshadowStatus)}
-              options={Object.entries(FORESHADOW_STATUS_LABEL).map(([value, label]) => ({ value, label }))}
+              options={Object.entries(FORESHADOW_STATUS_LABEL).map(([value, label]) => ({ value, label: tr(label) }))}
             />
           </div>
         </EditorSection>
 
-        <EditorSection title="说明" hint="埋了什么、读者该记住什么、将来怎么回收。">
+        <EditorSection title="说明" hint={tr("埋了什么、读者该记住什么、将来怎么回收。")}>
           <Textarea
             label=""
             rows={4}
             value={draft.description}
-            placeholder="埋了什么、读者该记住什么、将来怎么回收。"
+            placeholder={tr("埋了什么、读者该记住什么、将来怎么回收。")}
             onChange={(event) => update("description", event.target.value)}
-            hint="写清「埋什么、怎么收」，AI 续写时才不会提前泄底。"
+            hint={tr("写清「埋什么、怎么收」，AI 续写时才不会提前泄底。")}
           />
         </EditorSection>
 
-        <EditorSection title="章节" hint="标出埋设与回收的章节，故事档案与大纲会按这里对齐。">
+        <EditorSection title="章节" hint={tr("标出埋设与回收的章节，故事档案与大纲会按这里对齐。")}>
           <div className="grid gap-3 sm:grid-cols-2">
             <Select
-              label="埋设章节"
+              label={tr("埋设章节")}
               value={draft.plantedChapterId ?? ""}
               onChange={(event) => update("plantedChapterId", event.target.value || null)}
               options={chapterOptions}
             />
             <Select
-              label="回收章节"
+              label={tr("回收章节")}
               value={draft.payoffChapterId ?? ""}
               onChange={(event) => update("payoffChapterId", event.target.value || null)}
               options={chapterOptions}
-              hint={payoffTitle ? `计划回收：${payoffTitle}` : "还没想好可以留空。"}
+              hint={payoffTitle ? tr("计划回收：{ref}", { ref: payoffTitle }) : tr("还没想好可以留空。")}
             />
           </div>
         </EditorSection>
 
-        <EditorSection title="备注" hint="补充线索、回收计划和写作提醒，可供助手参考。">
+        <EditorSection title="备注" hint={tr("补充线索、回收计划和写作提醒，可供助手参考。")}>
           <Textarea
             label=""
             rows={3}
             value={draft.notes}
-            placeholder="写作提醒、注意事项（可选）。"
+            placeholder={tr("写作提醒、注意事项（可选）。")}
             onChange={(event) => update("notes", event.target.value)}
           />
         </EditorSection>
 
-        {detailApi.loading ? <p className="text-[11px] text-ink-3">正在获取伏笔最新详情…</p> : null}
+        {detailApi.loading ? <p className="text-[11px] text-ink-3">{tr("正在获取伏笔最新详情…")}</p> : null}
       </CardEditorDocument>
 
       <ConfirmDialog
         open={confirmDeleteOpen}
-        title="删除这条伏笔？"
-        description={`「${foreshadow?.title ?? ""}」的登记会被删除。此操作不可撤销。`}
-        confirmText="删除"
+        title={tr("删除这条伏笔？")}
+        description={tr("「{title}」的登记会被删除。此操作不可撤销。", { title: foreshadow?.title ?? "" })}
+        confirmText={tr("删除")}
         danger
         loading={deleting}
         onConfirm={() => void remove()}
@@ -260,7 +264,7 @@ export function ForeshadowEditor({
     return (
       <FloatWindow
         open={open}
-        title={editing ? "编辑伏笔" : "新伏笔"}
+        title={editing ? tr("编辑伏笔") : tr("新伏笔")}
         minimized={minimized}
         onMinimizedChange={setMinimized}
         onClose={onClose}
@@ -273,7 +277,7 @@ export function ForeshadowEditor({
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={editing ? "编辑伏笔" : "新建伏笔"} width={640} footer={footer}>
+    <Sheet open={open} onClose={onClose} title={editing ? tr("编辑伏笔") : tr("新建伏笔")} width={640} footer={footer}>
       {body}
     </Sheet>
   );

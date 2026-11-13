@@ -8,10 +8,12 @@
  * - 简短的提问入口，点击填入输入框；
  * - 离线演示模式下说明「无需 Key」与接入真实模型的入口。
  */
+import { localizedAgentName } from "@/lib/ai/agent-display";
 import Link from "next/link";
 import { ArrowRight, CircleAlert, Sparkles } from "lucide-react";
 import type { AgentDef, PromptPreset } from "@/lib/types";
 import { cn } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import { openSettingsDialog } from "@/components/settings/open";
 import { AGENT_TINT_CLASS, agentInitial } from "./utils";
 import type { ModelTargetInfo } from "./model-info";
@@ -42,6 +44,7 @@ export function WelcomePanel({
   disabled = false,
   className,
 }: WelcomePanelProps) {
+  const tr = useT();
   const tint = AGENT_TINT_CLASS[agent.tint];
   const presetName = (feature: PromptPreset["feature"]) =>
     presets?.find((preset) => preset.feature === feature)?.name ?? null;
@@ -55,10 +58,10 @@ export function WelcomePanel({
         <div className="rounded-md border border-gold/25 bg-gold-soft/60 px-3 py-2 text-[11px] leading-relaxed text-ink-2 dark:bg-gold-soft/30">
           <p className="flex items-center gap-1 font-medium text-ink">
             <CircleAlert className="size-3.5 shrink-0 text-gold" />
-            离线演示模式（无需 Key）
+            {tr("离线演示模式（无需 Key）")}
           </p>
           <p className="mt-0.5 text-ink-3">
-            当前不会调用外部服务。多步任务需要真实模型，请在设置 → 模型服务中配置。
+            {tr("当前不会调用外部服务。多步任务需要真实模型，请在设置 → 模型服务中配置。")}
           </p>
           <Link
             href="/settings"
@@ -68,7 +71,7 @@ export function WelcomePanel({
             }}
             className="mt-1 inline-flex items-center gap-0.5 font-medium text-accent underline-offset-2 hover:underline"
           >
-            去设置模型与 API Key
+            {tr("去设置模型与 API Key")}
             <ArrowRight className="size-3" />
           </Link>
         </div>
@@ -76,7 +79,7 @@ export function WelcomePanel({
         <div className="rounded-md border border-gold/25 bg-gold-soft/60 px-3 py-2 text-[11px] leading-relaxed text-ink-2 dark:bg-gold-soft/30">
           <p className="flex items-center gap-1 font-medium text-ink">
             <CircleAlert className="size-3.5 shrink-0 text-gold" />
-            还没有可用的模型，发送会失败
+            {tr("还没有可用的模型，发送会失败")}
           </p>
           <Link
             href="/settings"
@@ -86,7 +89,7 @@ export function WelcomePanel({
             }}
             className="mt-0.5 inline-flex items-center gap-0.5 font-medium text-accent underline-offset-2 hover:underline"
           >
-            去设置添加 Provider
+            {tr("去设置添加 Provider")}
             <ArrowRight className="size-3" />
           </Link>
         </div>
@@ -103,50 +106,50 @@ export function WelcomePanel({
         >
           {agentInitial(agent)}
         </span>
-        <h3 className="mt-2.5 font-serif text-[17px] text-ink">{agent.name}</h3>
-        <p className="mt-0.5 text-[11.5px] text-ink-4">{agent.role}</p>
+        <h3 className="mt-2.5 font-serif text-[17px] text-ink">{localizedAgentName(agent)}</h3>
+        <p className="mt-0.5 text-[11.5px] text-ink-4">{tr(agent.role)}</p>
         <p className="mt-2 max-w-[340px] whitespace-pre-wrap text-[12px] leading-relaxed text-ink-3">
-          {agent.greeting}
+          {tr(agent.greeting)}
         </p>
       </div>
 
       <p className="rounded-sm bg-surface-2/60 px-3 py-2 text-[11.5px] leading-relaxed text-ink-3">
-        可以让我续写正文、修改设定、整理角色或完善章纲。正文和资料都会先展示改动，确认后才写入，也可以撤回。
+        {tr("可以让我续写正文、修改设定、整理角色或完善章纲。正文和资料都会先展示改动，确认后才写入，也可以撤回。")}
       </p>
 
       {/* 技能 */}
       <div>
-        <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-ink-4">技能</p>
+        <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-ink-4">{tr("技能")}</p>
         <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
           {SKILL_CARDS.map((skill) => {
-            const name = presetName(skill.feature) ?? skill.label;
+            const name = presetName(skill.feature) ?? tr(skill.label);
             return (
               <button
                 key={skill.feature}
                 type="button"
                 disabled={disabled}
                 onClick={() => onPickSkill(skill.prompt, skill.label)}
-                title={`内置预设：${name}`}
+                title={tr("内置预设：{name}", { name })}
                 className="group flex items-start gap-1.5 rounded-md border border-line bg-surface px-2.5 py-2 text-left transition-colors duration-150 hover:border-accent/30 hover:bg-accent-soft focus-visible:border-accent/30 focus-visible:bg-accent-soft focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Sparkles className="mt-0.5 size-3.5 shrink-0 text-ink-4 transition-colors group-hover:text-accent" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[12px] font-medium text-ink-2 transition-colors group-hover:text-accent">
-                    {skill.label}
+                    {tr(skill.label)}
                   </span>
                   <span className="mt-0.5 block text-[10.5px] leading-snug text-ink-4">
-                    {skill.description}
+                    {tr(skill.description)}
                   </span>
                 </span>
               </button>
             );
           })}
         </div>
-        <p className="mt-1.5 text-[10px] text-ink-4">技能会先填入输入框，确认后再发送。</p>
+        <p className="mt-1.5 text-[10px] text-ink-4">{tr("技能会先填入输入框，确认后再发送。")}</p>
       </div>
 
       {/* 示例问题 */}
-      <div role="group" aria-label="示例提问" className="flex flex-wrap items-center gap-1.5">
+      <div role="group" aria-label={tr("示例提问")} className="flex flex-wrap items-center gap-1.5">
         {EXAMPLES.map(({ label, prompt }) => (
           <button
             key={label}
@@ -156,7 +159,7 @@ export function WelcomePanel({
             onClick={() => onPickSkill(prompt, label)}
             className="rounded-full bg-surface-2 px-2.5 py-1 text-[11px] text-ink-2 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {label}
+            {tr(label)}
           </button>
         ))}
       </div>

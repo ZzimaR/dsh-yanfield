@@ -6,6 +6,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { Button, IconButton, Input, Select } from "@/components/ui/kit";
 import type { Character, CharacterRelation } from "@/lib/types";
+import { useT } from "@/lib/i18n";
 
 export function RelationsEditor({
   relations,
@@ -21,6 +22,7 @@ export function RelationsEditor({
   title?: React.ReactNode;
   onChange: (relations: CharacterRelation[]) => void;
 }) {
+  const tr = useT();
   const candidates = characters.filter((character) => character.id !== selfId);
 
   const update = (index: number, patch: Partial<CharacterRelation>) => {
@@ -30,7 +32,9 @@ export function RelationsEditor({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        {title === null ? null : <span className="text-[12.5px] font-medium text-ink-2">{title}</span>}
+        {title === null ? null : (
+          <span className="text-[12.5px] font-medium text-ink-2">{typeof title === "string" ? tr(title) : title}</span>
+        )}
         <Button
           variant="subtle"
           size="sm"
@@ -38,13 +42,13 @@ export function RelationsEditor({
           disabled={candidates.length === 0}
           onClick={() => onChange([...relations, { targetId: candidates[0]?.id ?? "", relation: "", note: "" }])}
         >
-          添加关系
+          {tr("添加关系")}
         </Button>
       </div>
 
       {relations.length === 0 ? (
         <p className="rounded-md border border-dashed border-line px-3 py-2.5 text-[12px] leading-relaxed text-ink-3">
-          还没有关系。关系会影响 AI 写人物互动时的称呼与态度。
+          {tr("还没有关系。关系会影响 AI 写人物互动时的称呼与态度。")}
         </p>
       ) : (
         <div className="space-y-2">
@@ -52,7 +56,7 @@ export function RelationsEditor({
             // 旧数据里可能存着已经不在角色表里的名字，补一个只读选项，避免下拉框显示为空
             const options = candidates.map((character) => ({ value: character.id, label: character.name }));
             if (relation.targetId && !candidates.some((character) => character.id === relation.targetId)) {
-              options.unshift({ value: relation.targetId, label: `${relation.targetId}（未建卡）` });
+              options.unshift({ value: relation.targetId, label: tr("{id}（未建卡）", { id: relation.targetId }) });
             }
             return (
               <div key={`${relation.targetId}-${index}`} className="rounded-md border border-line bg-surface-2/50 p-2">
@@ -63,22 +67,22 @@ export function RelationsEditor({
                       value={relation.targetId}
                       onChange={(event) => update(index, { targetId: event.target.value })}
                       options={options}
-                      placeholder="对角色"
+                      placeholder={tr("对角色")}
                     />
                   </div>
                   <Input
                     value={relation.relation}
-                    placeholder="关系类型：师徒 / 宿敌"
+                    placeholder={tr("关系类型：师徒 / 宿敌")}
                     className="h-8 flex-1 text-[12.5px]"
                     onChange={(event) => update(index, { relation: event.target.value })}
                   />
-                  <IconButton label="删除关系" size="sm" onClick={() => onChange(relations.filter((_, i) => i !== index))}>
+                  <IconButton label={tr("删除关系")} size="sm" onClick={() => onChange(relations.filter((_, i) => i !== index))}>
                     <Trash2 className="size-3.5" />
                   </IconButton>
                 </div>
                 <Input
                   value={relation.note}
-                  placeholder="补充说明（可空）"
+                  placeholder={tr("补充说明（可空）")}
                   className="mt-1.5 h-8 text-[12.5px]"
                   onChange={(event) => update(index, { note: event.target.value })}
                 />

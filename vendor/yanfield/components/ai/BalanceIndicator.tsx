@@ -14,6 +14,7 @@ import { Wallet } from "lucide-react";
 import { apiPost } from "@/lib/client/api";
 import { providerShowsBalance, type ProviderBalance } from "@/lib/ai/balance";
 import type { ProviderConfig } from "@/lib/types";
+import { useT, type Translate } from "@/lib/i18n";
 import { cn } from "@/lib/ui/cn";
 
 type BalanceState =
@@ -32,15 +33,20 @@ function formatMoney(currency: "CNY" | "USD", amount: string): string {
   return `${sign}${Number.isFinite(numeric) ? numeric.toFixed(2) : amount}`;
 }
 
-function buildTitle(value: ProviderBalance): string {
+function buildTitle(value: ProviderBalance, tr: Translate): string {
   const lines = value.balances.map((item) =>
-    `${item.currency === "CNY" ? "人民币" : "美元"}：余额 ${item.total}（赠送 ${item.granted} · 充值 ${item.toppedUp}）`,
+    tr("{currency}：余额 {total}（赠送 {granted} · 充值 {toppedUp}）", {
+      currency: item.currency === "CNY" ? tr("人民币") : tr("美元"),
+      total: item.total,
+      granted: item.granted,
+      toppedUp: item.toppedUp,
+    }),
   );
   return [
-    `DeepSeek 账户${value.isAvailable ? "可用" : "不可用（余额不足）"}`,
+    value.isAvailable ? tr("DeepSeek 账户可用") : tr("DeepSeek 账户不可用（余额不足）"),
     ...lines,
-    `查询于 ${new Date(value.fetchedAt).toLocaleString()}`,
-    "点击刷新余额",
+    tr("查询于 {time}", { time: new Date(value.fetchedAt).toLocaleString() }),
+    tr("点击刷新余额"),
   ].join("\n");
 }
 
@@ -56,6 +62,7 @@ export interface BalanceIndicatorProps {
 }
 
 export function BalanceIndicator({ provider, className }: BalanceIndicatorProps) {
+  const tr = useT();
   const [state, setState] = React.useState<BalanceState>({ status: "idle" });
   const aliveRef = React.useRef(true);
   const requestRef = React.useRef(0);
@@ -89,36 +96,36 @@ export function BalanceIndicator({ provider, className }: BalanceIndicatorProps)
       if (aliveRef.current && requestId === requestRef.current) {
         setState({
           status: "error",
-          message: error instanceof Error ? error.message : "余额查询失败，请稍后重试",
+          message: error instanceof Error ? error.message : tr("余额查询失败，请稍后重试"),
         });
       }
     }
-  }, [providerId, supported]);
+  }, [providerId, supported, tr]);
 
   if (!provider || !supported) return null;
 
   const balance = state.status === "ready" ? primaryBalance(state.value) : null;
   const busy = state.status === "loading";
   const label = busy
-    ? "查询中…"
+    ? tr("查询中…")
     : state.status === "error"
-      ? "查询失败"
+      ? tr("查询失败")
       : balance
-        ? `余额 ${formatMoney(balance.currency, balance.total)}`
-        : "余额";
+        ? tr("余额 {amount}", { amount: formatMoney(balance.currency, balance.total) })
+        : tr("余额");
   const title = busy
-    ? "正在查询 DeepSeek 账户余额…"
+    ? tr("正在查询 DeepSeek 账户余额…")
     : state.status === "error"
-      ? `${state.message}（点击重试）`
+      ? tr("{message}（点击重试）", { message: state.message })
       : state.status === "ready"
-        ? buildTitle(state.value)
-        : "查询 DeepSeek 账户余额（点击查询）";
+        ? buildTitle(state.value, tr)
+        : tr("查询 DeepSeek 账户余额（点击查询）");
 
   return (
     <button
       type="button"
       data-testid="balance-indicator"
-      aria-label={busy ? "正在查询 DeepSeek 账户余额" : "查询 DeepSeek 账户余额"}
+      aria-label={busy ? tr("正在查询 DeepSeek 账户余额") : tr("查询 DeepSeek 账户余额")}
       aria-busy={busy}
       title={title}
       onClick={() => void query()}

@@ -15,6 +15,7 @@ import type { ContextConfig } from "@/lib/types";
 import { MAX_CONTEXT_BUDGET, MAX_OUTPUT_TOKENS } from "@/lib/types";
 import { Badge, Button, Sheet, Skeleton, Switch } from "@/components/ui/kit";
 import { cn, formatNumber, truncate } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import type { ContextPreview, ContextSection } from "./types";
 import { CHAPTER_SUMMARY_TOGGLE, resolveContextToggle } from "./utils";
 import { BUDGET_OPTIONS, budgetLabel, recommendedContextBudget } from "./model-info";
@@ -78,6 +79,7 @@ export function ContextDrawer({
   modelContextWindow,
   modelMaxOutputTokens,
 }: ContextDrawerProps) {
+  const tr = useT();
   const total = data?.totalTokens ?? 0;
   const activeBudget = typeof budget === "number" ? budget : (data?.budget ?? 0);
   const percent = activeBudget > 0 ? Math.min(100, Math.round((total / activeBudget) * 100)) : 0;
@@ -89,13 +91,13 @@ export function ContextDrawer({
     const recommended = recommendedContextBudget(modelContextWindow, modelMaxOutputTokens);
     const options = [...BUDGET_OPTIONS];
     if (recommended && recommended <= MAX_CONTEXT_BUDGET && !options.some((option) => option.value === recommended)) {
-      options.push({ value: recommended, label: `建议 ${budgetLabel(recommended)}` });
+      options.push({ value: recommended, label: tr("建议 {budget}", { budget: tr(budgetLabel(recommended)) }) });
     }
     if (options.some((option) => option.value === activeBudget)) return options;
-    return [...options, { value: activeBudget, label: budgetLabel(activeBudget) }].sort(
+    return [...options, { value: activeBudget, label: tr(budgetLabel(activeBudget)) }].sort(
       (left, right) => left.value - right.value,
     );
-  }, [activeBudget, modelContextWindow, modelMaxOutputTokens]);
+  }, [activeBudget, modelContextWindow, modelMaxOutputTokens, tr]);
   const recommendedBudget = recommendedContextBudget(modelContextWindow, modelMaxOutputTokens);
 
   /** 合并「服务端已启用分节」与「已知但当前未启用的分节」，id 稳定且去重 */
@@ -127,7 +129,7 @@ export function ContextDrawer({
     <Sheet
       open={open}
       onClose={onClose}
-      title="上下文预览"
+      title={tr("上下文预览")}
       width={420}
       footer={
         <div className="flex justify-end">
@@ -138,7 +140,7 @@ export function ContextDrawer({
             loading={loading}
             onClick={onRefresh}
           >
-            重新估算
+            {tr("重新估算")}
           </Button>
         </div>
       }
@@ -148,13 +150,13 @@ export function ContextDrawer({
         <div className="rounded-md border border-line bg-surface-2 px-3 py-2.5">
           <div className="flex items-center justify-between gap-2 text-[12px]">
             <span className="min-w-0 text-ink-2">
-              已用 <span className="font-medium tabular-nums text-ink">{formatNumber(total)}</span>
-              {activeBudget > 0 ? ` / ${formatNumber(activeBudget)} tokens` : " tokens"}
+              {tr("已用")} <span className="font-medium tabular-nums text-ink">{formatNumber(total)}</span>
+              {activeBudget > 0 ? tr(" / {budget} tokens", { budget: formatNumber(activeBudget) }) : tr(" tokens")}
             </span>
             {activeBudget > 0 ? (
               <span className={cn("shrink-0 tabular-nums", toneText)}>{percent}%</span>
             ) : (
-              <span className="shrink-0 text-ink-4 dark:text-ink-3">由模型决定</span>
+              <span className="shrink-0 text-ink-4 dark:text-ink-3">{tr("由模型决定")}</span>
             )}
           </div>
           {activeBudget > 0 ? (
@@ -163,11 +165,11 @@ export function ContextDrawer({
             </div>
           ) : null}
           <p className="mt-1.5 text-[10px] leading-relaxed text-ink-4 dark:text-ink-3">
-            仅估算作品资料，不含系统提示和聊天记录。
+            {tr("仅估算作品资料，不含系统提示和聊天记录。")}
           </p>
 
           <label className="mt-3 flex items-center justify-between gap-2 text-[11px] text-ink-2">
-            单次输出上限（0 为自动）
+            {tr("单次输出上限（0 为自动）")}
             <input type="number" min={0} max={MAX_OUTPUT_TOKENS} step={1} value={config.maxTokens}
               onChange={event=>{const value=Number(event.target.value);if(Number.isFinite(value))onConfigChange({...config,maxTokens:Math.min(MAX_OUTPUT_TOKENS,Math.max(0,Math.round(value)))});}}
               className="w-24 rounded-sm border border-line bg-surface px-1.5 py-1" />
@@ -178,7 +180,7 @@ export function ContextDrawer({
               htmlFor="context-budget"
               className="shrink-0 text-[11px] text-ink-2"
             >
-              上下文预算
+              {tr("上下文预算")}
             </label>
             <select
               id="context-budget"
@@ -193,11 +195,11 @@ export function ContextDrawer({
                 "focus-visible:border-accent/50 focus-visible:outline-none dark:[color-scheme:dark]",
                 (!onBudgetChange || loading) && "cursor-not-allowed opacity-60",
               )}
-              title="超出预算的分节会被服务端从低优先级开始丢弃"
+              title={tr("超出预算的分节会被服务端从低优先级开始丢弃")}
             >
               {budgetOptions.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.value === 0 ? "由模型决定" : option.label}
+                  {option.value === 0 ? tr("由模型决定") : tr(option.label)}
                 </option>
               ))}
             </select>
@@ -208,13 +210,13 @@ export function ContextDrawer({
               "mt-1 text-[10.5px] leading-relaxed",
               recommendedBudget && activeBudget > recommendedBudget ? "text-gold" : "text-ink-4 dark:text-ink-3",
             )}>
-              当前模型窗口 {formatNumber(modelContextWindow)} tokens
-              {recommendedBudget ? `；建议资料预算不超过 ${formatNumber(recommendedBudget)}` : ""}。
-              发送时还会检查完整请求及输出预留。
+              {recommendedBudget
+                ? tr("当前模型窗口 {window} tokens；建议资料预算不超过 {recommended}。发送时还会检查完整请求及输出预留。", { window: formatNumber(modelContextWindow), recommended: formatNumber(recommendedBudget) })
+                : tr("当前模型窗口 {window} tokens。发送时还会检查完整请求及输出预留。", { window: formatNumber(modelContextWindow) })}
             </p>
           ) : (
             <p className="mt-1 text-[10.5px] leading-relaxed text-ink-4 dark:text-ink-3">
-              当前模型未提供上下文窗口信息，无法预估上限；发送时只能由服务商判断。
+              {tr("当前模型未提供上下文窗口信息，无法预估上限；发送时只能由服务商判断。")}
             </p>
           )}
         </div>
@@ -225,7 +227,7 @@ export function ContextDrawer({
             <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 break-words">{error}</span>
             <Button size="sm" variant="secondary" onClick={onRefresh}>
-              重试
+              {tr("重试")}
             </Button>
           </div>
         ) : loading && !data ? (
@@ -237,9 +239,9 @@ export function ContextDrawer({
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center gap-1.5 rounded-md border border-line bg-surface px-3 py-6 text-center">
             <Layers className="size-4 text-ink-4 dark:text-ink-3" />
-            <p className="text-[12px] text-ink-3 dark:text-ink-2">还没有可装配的上下文</p>
+            <p className="text-[12px] text-ink-3 dark:text-ink-2">{tr("还没有可装配的上下文")}</p>
             <p className="text-[11px] text-ink-4 dark:text-ink-3">
-              补充章节、角色或设定后，这里会显示各分节的 token 占用。
+              {tr("补充章节、角色或设定后，这里会显示各分节的 token 占用。")}
             </p>
           </div>
         ) : (
@@ -259,11 +261,11 @@ export function ContextDrawer({
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="truncate text-[12.5px] text-ink">{section.label || section.id}</span>
-                        {section.mode ? <Badge tone="default">{section.mode}</Badge> : null}
-                        {section.fallback ? <Badge tone="default">{enabled ? "暂无可用内容" : "未启用"}</Badge> : null}
-                        {section.truncated ? <Badge tone="gold">已截断</Badge> : null}
-                        {!spec && section.included ? <Badge tone="default">自动包含</Badge> : null}
+                        <span className="truncate text-[12.5px] text-ink">{tr(section.label || section.id)}</span>
+                        {section.mode ? <Badge tone="default">{tr(section.mode)}</Badge> : null}
+                        {section.fallback ? <Badge tone="default">{enabled ? tr("暂无可用内容") : tr("未启用")}</Badge> : null}
+                        {section.truncated ? <Badge tone="gold">{tr("已截断")}</Badge> : null}
+                        {!spec && section.included ? <Badge tone="default">{tr("自动包含")}</Badge> : null}
                         <span className="ml-auto shrink-0 text-[11px] tabular-nums text-ink-3 dark:text-ink-2">
                           {section.tokens > 0 ? `${formatNumber(section.tokens)} tokens` : "—"}
                         </span>
@@ -272,7 +274,7 @@ export function ContextDrawer({
                       {section.text ? (
                         <details className="group mt-1">
                           <summary className="cursor-pointer select-none text-[10.5px] text-ink-4 transition-colors hover:text-ink-2 dark:text-ink-3 dark:hover:text-ink-2">
-                            查看装配内容
+                            {tr("查看装配内容")}
                           </summary>
                           <pre className="scroll-thin mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-sm bg-surface-2 px-2 py-1.5 font-sans text-[11px] leading-relaxed text-ink-3 dark:text-ink-2">
                             {truncate(section.text, 800)}
@@ -282,7 +284,7 @@ export function ContextDrawer({
 
                       {summary && enabled ? (
                         <label className="mt-1.5 flex items-center gap-1.5 text-[10.5px] text-ink-4 dark:text-ink-3">
-                          <span className="shrink-0">携带最近</span>
+                          <span className="shrink-0">{tr("携带最近")}</span>
                           <select
                             value={config.includeChapterSummaries}
                             onChange={(event) => {
@@ -297,22 +299,22 @@ export function ContextDrawer({
                           >
                             {summaryCountOptions.map((count) => (
                               <option key={count} value={count}>
-                                {count} 章
+                                {tr("{count} 章", { count })}
                               </option>
                             ))}
                           </select>
-                          <span>的情节摘要</span>
+                          <span>{tr("的情节摘要")}</span>
                         </label>
                       ) : null}
 
                       {spec?.hint ? (
-                        <p className="mt-1 text-[10.5px] leading-relaxed text-ink-4 dark:text-ink-3">{spec.hint}</p>
+                        <p className="mt-1 text-[10.5px] leading-relaxed text-ink-4 dark:text-ink-3">{tr(spec.hint)}</p>
                       ) : null}
                     </div>
 
                     {spec ? <div className="shrink-0 pt-0.5">
                       <Switch
-                        aria-label={section.label || section.id}
+                        aria-label={tr(section.label || section.id)}
                         checked={enabled}
                         onChange={(next) => onConfigChange({ ...config, ...spec.set(config, next) })}
                       />
@@ -324,7 +326,7 @@ export function ContextDrawer({
 
             {data?.dropped && data.dropped.length > 0 ? (
               <p className="px-2.5 py-2 text-[10.5px] leading-relaxed text-ink-4 dark:text-ink-3">
-                预算不足已省略：{data.dropped.join("、")}（可调高上下文预算或关闭部分分节）
+                {tr("预算不足已省略：{list}（可调高上下文预算或关闭部分分节）", { list: data.dropped.join(tr("、")) })}
               </p>
             ) : null}
           </div>

@@ -23,6 +23,7 @@ import type { Novel } from "@/lib/types";
 import type { SaveState } from "@/lib/editor/types";
 import { SaveIndicator } from "./SaveIndicator";
 import { SaveButton } from "./SaveButton";
+import { useT } from "@/lib/i18n";
 
 export type EditorTheme = "light" | "dark";
 
@@ -75,7 +76,7 @@ export function EditorHeader({
   onOverview,
   onSave,
   canSave,
-  backLabel = "返回概览",
+  backLabel,
   onToggleLeft,
   onToggleRight,
   onToggleImmersive,
@@ -87,23 +88,25 @@ export function EditorHeader({
   onPrevChapter,
   onNextChapter,
 }: EditorHeaderProps) {
+  const tr = useT();
+  const backText = tr(backLabel ?? "返回概览");
   const moreItems: DropdownItem[] = [
-    { label: "作品概览", icon: <BookOpen className="size-3.5" />, onSelect: onOverview },
+    { label: tr("作品概览"), icon: <BookOpen className="size-3.5" />, onSelect: onOverview },
     { separator: true },
-    { label: "设置", icon: <Settings2 className="size-3.5" />, onSelect: () => openSettingsDialog() },
+    { label: tr("设置"), icon: <Settings2 className="size-3.5" />, onSelect: () => openSettingsDialog() },
   ];
 
   return (
     <header className="@container/editor-header flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-surface/85 px-2 backdrop-blur">
-      <Tooltip label={backLabel}>
-        <IconButton label={backLabel} onClick={onBack}>
+      <Tooltip label={backText}>
+        <IconButton label={backText} onClick={onBack}>
           <ArrowLeft className="size-4" />
         </IconButton>
       </Tooltip>
 
       {/* 左栏开关：放在左侧返回按钮旁（移动端用它打开目录抽屉） */}
-      <Tooltip label={`${leftCollapsed ? "打开目录" : "收起目录"} (Alt+1)`}>
-        <IconButton label="切换目录栏" active={!leftCollapsed} onClick={onToggleLeft}>
+      <Tooltip label={leftCollapsed ? tr("打开目录 (Alt+1)") : tr("收起目录 (Alt+1)")}>
+        <IconButton label={tr("切换目录栏")} active={!leftCollapsed} onClick={onToggleLeft}>
           <PanelLeft className="size-4" />
         </IconButton>
       </Tooltip>
@@ -117,9 +120,9 @@ export function EditorHeader({
             onOverview();
           }}
           className="min-w-0 max-w-[150px] truncate font-medium text-ink transition-colors duration-150 hover:text-accent motion-reduce:transition-none"
-          title={novel?.title ?? "未命名作品"}
+          title={novel?.title ?? tr("未命名作品")}
         >
-          {novel?.title ?? "未命名作品"}
+          {novel?.title ?? tr("未命名作品")}
         </Link>
         {volumeTitle ? (
           <>
@@ -130,17 +133,17 @@ export function EditorHeader({
           </>
         ) : null}
         <ChevronRight className="size-3 shrink-0 text-ink-4" aria-hidden />
-        <span className="max-w-[200px] truncate text-ink-2" title={title || "未命名章节"}>
-          {title || "未命名章节"}
+        <span className="max-w-[200px] truncate text-ink-2" title={title || tr("未命名章节")}>
+          {title || tr("未命名章节")}
         </span>
       </div>
 
       {/* 上下章导航：顺序未知（如新建/移出）时不展示 */}
       {chapterPosition != null && chapterTotal > 0 ? (
         <div className="hidden shrink-0 items-center gap-0.5 @min-[640px]/editor-header:flex">
-          <Tooltip label={prevChapterTitle ? `上一章：${prevChapterTitle}` : "上一章"}>
+          <Tooltip label={prevChapterTitle ? tr("上一章：{title}", { title: prevChapterTitle }) : tr("上一章")}>
             <IconButton
-              label="上一章"
+              label={tr("上一章")}
               onClick={onPrevChapter}
               disabled={!onPrevChapter}
               className="disabled:pointer-events-none disabled:opacity-35"
@@ -150,13 +153,13 @@ export function EditorHeader({
           </Tooltip>
           <span
             className="select-none px-1 text-[11.5px] tabular-nums text-ink-3"
-            title={`第 ${chapterPosition} / ${chapterTotal} 章`}
+            title={tr("第 {n} / {total} 章", { n: chapterPosition, total: chapterTotal })}
           >
-            第 {chapterPosition} / {chapterTotal} 章
+            {tr("第 {n} / {total} 章", { n: chapterPosition, total: chapterTotal })}
           </span>
-          <Tooltip label={nextChapterTitle ? `下一章：${nextChapterTitle}` : "下一章"}>
+          <Tooltip label={nextChapterTitle ? tr("下一章：{title}", { title: nextChapterTitle }) : tr("下一章")}>
             <IconButton
-              label="下一章"
+              label={tr("下一章")}
               onClick={onNextChapter}
               disabled={!onNextChapter}
               className="disabled:pointer-events-none disabled:opacity-35"
@@ -171,33 +174,33 @@ export function EditorHeader({
         <SaveIndicator state={saveState} lastSavedAt={lastSavedAt} className="mr-1 hidden @min-[640px]/editor-header:inline-flex" />
         <SaveButton onSave={onSave} saving={saveState === "saving"} disabled={!canSave} />
 
-        <Tooltip label="更多">
+        <Tooltip label={tr("更多")}>
             <Dropdown
               align="end"
               width={180}
               items={moreItems}
               trigger={
-                <IconButton label="更多操作">
+                <IconButton label={tr("更多操作")}>
                   <Ellipsis className="size-4" />
                 </IconButton>
               }
             />
         </Tooltip>
-        <Tooltip label={immersive ? "退出沉浸模式 (Esc)" : "沉浸模式"}>
+        <Tooltip label={immersive ? tr("退出沉浸模式 (Esc)") : tr("沉浸模式")}>
           <span className="hidden @min-[640px]/editor-header:inline-flex">
-            <IconButton label="沉浸模式" active={immersive} onClick={onToggleImmersive}>
+            <IconButton label={tr("沉浸模式")} active={immersive} onClick={onToggleImmersive}>
               {immersive ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
             </IconButton>
           </span>
         </Tooltip>
-        <Tooltip label="切换深浅主题">
-          <IconButton label="切换主题" onClick={onToggleTheme}>
+        <Tooltip label={tr("切换深浅主题")}>
+          <IconButton label={tr("切换主题")} onClick={onToggleTheme}>
             {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </IconButton>
         </Tooltip>
-        <Tooltip label="AI 面板 (Alt+J)">
+        <Tooltip label={tr("AI 面板 (Alt+J)")}>
           <IconButton
-            label="AI 面板"
+            label={tr("AI 面板")}
             active={!rightCollapsed}
             onClick={onToggleRight}
             className={cn(!rightCollapsed && "text-accent")}

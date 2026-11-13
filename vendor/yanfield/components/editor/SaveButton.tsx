@@ -2,6 +2,7 @@
 
 import { Save } from "lucide-react";
 import { Button, Tooltip } from "@/components/ui/kit";
+import { useT } from "@/lib/i18n";
 
 interface SaveButtonProps {
   onSave: () => void;
@@ -10,19 +11,20 @@ interface SaveButtonProps {
 }
 
 export function SaveButton({ onSave, saving, disabled = false }: SaveButtonProps) {
+  const tr = useT();
   return (
-    <Tooltip label="保存当前章节（Ctrl/⌘+S）">
+    <Tooltip label={tr("保存当前章节（Ctrl/⌘+S）")}>
       <Button
         variant="secondary"
         size="sm"
         className="shrink-0 px-2 text-[12px]"
-        aria-label="保存当前章节"
+        aria-label={tr("保存当前章节")}
         icon={<Save className="size-3.5" aria-hidden />}
         loading={saving}
         disabled={disabled}
         onClick={onSave}
       >
-        保存
+        {tr("保存")}
       </Button>
     </Tooltip>
   );

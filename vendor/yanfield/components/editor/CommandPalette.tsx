@@ -8,6 +8,7 @@ import { cn } from "@/lib/ui/cn";
 import type { Chapter, SearchResult } from "@/lib/types";
 import type { EditorLeftTab } from "./LeftPanel";
 import { stashPendingCodexCard } from "./CodexPanel";
+import { useT } from "@/lib/i18n";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -77,6 +78,7 @@ export function CommandPalette({
   onOpenChapter,
   onOpenTab,
 }: CommandPaletteProps) {
+  const tr = useT();
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<SearchResult[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -190,8 +192,8 @@ export function CommandPalette({
     <Dialog
       open={open}
       onClose={() => onOpenChange(false)}
-      title="快速跳转"
-      description="搜章节、角色、设定、档案；没输入时可以直接切左栏页签"
+      title={tr("快速跳转")}
+      description={tr("搜章节、角色、设定、档案；没输入时可以直接切左栏页签")}
       width={580}
     >
       <div className="space-y-2.5">
@@ -202,9 +204,9 @@ export function CommandPalette({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="搜索章节、角色、设定、档案…"
+            placeholder={tr("搜索章节、角色、设定、档案…")}
             className="pl-8"
-            aria-label="搜索"
+            aria-label={tr("搜索")}
           />
           {loading ? <Spinner className="absolute right-2.5 top-1/2 -translate-y-1/2" /> : null}
         </div>
@@ -212,10 +214,10 @@ export function CommandPalette({
         <ul className="scroll-thin max-h-[46vh] space-y-0.5 overflow-y-auto">
           {items.map((item, index) => {
             const isTab = item.kind === "tab";
-            const label = isTab ? item.label : item.result.title;
+            const label = isTab ? tr(item.label) : item.result.title;
             const hint = isTab
-              ? item.hint
-              : `${RESULT_TYPE_LABEL[item.result.type]}${item.result.snippet ? ` · ${item.result.snippet}` : ""}`;
+              ? tr(item.hint)
+              : `${tr(RESULT_TYPE_LABEL[item.result.type])}${item.result.snippet ? ` · ${item.result.snippet}` : ""}`;
             return (
               <li key={item.key}>
                 <button
@@ -242,7 +244,7 @@ export function CommandPalette({
 
         {empty ? (
           <p className="px-2 py-6 text-center text-[12px] text-ink-3">
-            {chapters.length === 0 ? "这本书还没有可搜索的内容。" : "没找到匹配的章节 / 角色 / 设定 / 档案。"}
+            {chapters.length === 0 ? tr("这本书还没有可搜索的内容。") : tr("没找到匹配的章节 / 角色 / 设定 / 档案。")}
           </p>
         ) : null}
 
@@ -250,13 +252,13 @@ export function CommandPalette({
           <span className="flex items-center gap-1">
             <Kbd>↑</Kbd>
             <Kbd>↓</Kbd>
-            选择
+            {tr("选择")}
             <span className="mx-1">·</span>
             <Kbd>↵</Kbd>
-            打开
+            {tr("打开")}
             <span className="mx-1">·</span>
             <Kbd>Esc</Kbd>
-            关闭
+            {tr("关闭")}
           </span>
           <span className="flex items-center gap-1">
             <Kbd>⌘</Kbd>

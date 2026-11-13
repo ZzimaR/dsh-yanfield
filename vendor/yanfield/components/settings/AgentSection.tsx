@@ -21,6 +21,7 @@ import {
   type AppSettings,
 } from "@/lib/types";
 import { AGENT_TINT_CLASS, agentInitial } from "@/components/ai/utils";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/ui/cn";
 
 export interface AgentSectionProps {
@@ -142,6 +143,7 @@ function buildEditableAgents(settings: AppSettings, customAgent: CustomAgent): E
 }
 
 export function AgentSection({ settings, update }: AgentSectionProps) {
+  const tr = useT();
   const { toast } = useToast();
   if (!settings) return null;
 
@@ -183,8 +185,8 @@ export function AgentSection({ settings, update }: AgentSectionProps) {
       update({ agentOverrides: { ...agentOverrides, [agent.id]: CLEARED_OVERRIDE } });
     }
     toast({
-      title: `已恢复「${agent.display.name}」的默认人设`,
-      description: "改动会自动保存。",
+      title: tr("已恢复「{name}」的默认人设", { name: agent.display.name }),
+      description: tr("改动会自动保存。"),
       tone: "success",
     });
   };
@@ -194,20 +196,20 @@ export function AgentSection({ settings, update }: AgentSectionProps) {
     for (const agent of AGENTS) cleared[agent.id] = CLEARED_OVERRIDE;
     cleared.custom = CLEARED_OVERRIDE;
     update({ agentOverrides: cleared, customAgent: DEFAULT_APP_SETTINGS.customAgent });
-    toast({ title: "已恢复全部智能体的默认人设", description: "改动会自动保存。", tone: "success" });
+    toast({ title: tr("已恢复全部智能体的默认人设"), description: tr("改动会自动保存。"), tone: "success" });
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="font-serif text-lg text-ink">智能体</h2>
+          <h2 className="font-serif text-lg text-ink">{tr("智能体")}</h2>
           <p className="mt-1 max-w-[62ch] text-[12px] leading-6 text-ink-3">
-            这里改的是右侧 AI 面板里智能体的名字、职责、人设与额外要求，改动会同时用于对话提示词，并自动保存。留空表示沿用内置默认。
+            {tr("这里改的是右侧 AI 面板里智能体的名字、职责、人设与额外要求，改动会同时用于对话提示词，并自动保存。留空表示沿用内置默认。")}
           </p>
         </div>
         <Button variant="secondary" size="sm" className="shrink-0" icon={<RotateCcw className="size-3.5" />} onClick={resetAll} disabled={!canReset}>
-          恢复默认
+          {tr("恢复默认")}
         </Button>
       </div>
 
@@ -233,11 +235,11 @@ export function AgentSection({ settings, update }: AgentSectionProps) {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-[13.5px] font-medium text-ink">{agent.display.name}</span>
                     {agent.isCustom ? (
-                      <Badge>自定义</Badge>
+                      <Badge>{tr("自定义")}</Badge>
                     ) : agent.overridden ? (
-                      <Badge tone="accent">已自定义</Badge>
+                      <Badge tone="accent">{tr("已自定义")}</Badge>
                     ) : (
-                      <Badge>默认</Badge>
+                      <Badge>{tr("默认")}</Badge>
                     )}
                   </div>
                   <p className="mt-0.5 truncate text-[11.5px] text-ink-3">{agent.display.role}</p>
@@ -251,7 +253,7 @@ export function AgentSection({ settings, update }: AgentSectionProps) {
                 onClick={() => resetAgent(agent)}
                 disabled={resetDisabled}
               >
-                恢复默认
+                {tr("恢复默认")}
               </Button>
             </div>
 
@@ -260,12 +262,12 @@ export function AgentSection({ settings, update }: AgentSectionProps) {
                 const value = agent.values[field.key];
                 const hint =
                   field.key === "instructions"
-                    ? `${field.hint ?? ""} ${value.length}/${OVERRIDE_LIMIT} 字`.trim()
-                    : field.hint;
+                    ? `${tr(field.hint ?? "")} ${tr("{count}/{limit} 字", { count: value.length, limit: OVERRIDE_LIMIT })}`.trim()
+                    : tr(field.hint ?? "");
                 const shared = {
-                  label: field.label,
+                  label: tr(field.label),
                   value,
-                  placeholder: agent.defaults[field.key] || undefined,
+                  placeholder: field.key === "instructions" ? tr(INSTRUCTIONS_PLACEHOLDER) : agent.defaults[field.key] || undefined,
                   maxLength: OVERRIDE_LIMIT,
                   hint,
                 };

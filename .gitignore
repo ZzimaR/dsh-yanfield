@@ -7,3 +7,6 @@ src/generated/
 .tmp-test/
 /dist/
 /*.tgz
+
+# ACL recovery backups from the Windows sandbox fix
+.acl-recovery/

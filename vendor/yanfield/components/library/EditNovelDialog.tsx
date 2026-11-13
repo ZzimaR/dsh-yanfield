@@ -6,6 +6,7 @@ import { Button, Dialog, Input, Select, Textarea } from "@/components/ui/kit";
 import { apiPatch, notifyDataChanged } from "@/lib/client/api";
 import { isValidNovelWordGoal, MAX_NOVEL_WORD_GOAL } from "@/lib/novel-goal";
 import { GENRES, type Novel } from "@/lib/types";
+import { getYanfieldLocale, useT } from "@/lib/i18n";
 import { CoverPicker } from "./CoverPicker";
 
 export interface EditNovelDialogProps {
@@ -48,6 +49,7 @@ function formFromNovel(novel: Novel | undefined): EditForm {
 
 /** 作品信息编辑 Dialog：PATCH /api/novels/[novelId]。 */
 export function EditNovelDialog({ open, novel, focusField = "title", onClose, onSaved }: EditNovelDialogProps) {
+  const tr = useT();
   const [form, setForm] = React.useState<EditForm>(EMPTY_FORM);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -87,14 +89,16 @@ export function EditNovelDialog({ open, novel, focusField = "title", onClose, on
     setError(null);
     const title = form.title.trim();
     if (!title) {
-      setFieldErrors({ title: "书名不能为空。" });
+      setFieldErrors({ title: tr("书名不能为空。") });
       return;
     }
     const wordGoalText = form.wordGoal.trim();
     const wordGoal = Number(wordGoalText);
     if (!/^\d+$/.test(wordGoalText) || !isValidNovelWordGoal(wordGoal)) {
       setFieldErrors({
-        wordGoal: `目标字数需为 0 至 ${MAX_NOVEL_WORD_GOAL.toLocaleString("zh-CN")} 的整数；填 0 可不设置。`,
+        wordGoal: tr("目标字数需为 0 至 {max} 的整数；填 0 可不设置。", {
+          max: MAX_NOVEL_WORD_GOAL.toLocaleString(getYanfieldLocale() === "en" ? "en-US" : "zh-CN"),
+        }),
       });
       return;
     }
@@ -111,7 +115,7 @@ export function EditNovelDialog({ open, novel, focusField = "title", onClose, on
       notifyDataChanged("novels");
       onSaved(updated);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "保存失败，请稍后再试。");
+      setError(cause instanceof Error ? cause.message : tr("保存失败，请稍后再试。"));
     } finally {
       setSaving(false);
     }
@@ -121,16 +125,16 @@ export function EditNovelDialog({ open, novel, focusField = "title", onClose, on
     <Dialog
       open={open}
       onClose={onClose}
-      title="编辑作品信息"
-      description="书名、类型、简介、封面底色与全书目标字数会展示在作品信息中。"
+      title={tr("编辑作品信息")}
+      description={tr("书名、类型、简介、封面底色与全书目标字数会展示在作品信息中。")}
       width={560}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving}>
-            取消
+            {tr("取消")}
           </Button>
           <Button variant="primary" icon={<Save className="size-4" />} onClick={submit} loading={saving}>
-            保存修改
+            {tr("保存修改")}
           </Button>
         </>
       }
@@ -144,33 +148,33 @@ export function EditNovelDialog({ open, novel, focusField = "title", onClose, on
       >
         <Input
           id="novel-title"
-          label="书名"
+          label={tr("书名")}
           autoFocus={focusField === "title"}
           maxLength={80}
           value={form.title}
           onChange={(event) => update("title", event.target.value)}
-          placeholder="例如：潮信"
+          placeholder={tr("例如：潮信")}
           error={fieldErrors.title}
         />
         <div className="grid gap-3.5 sm:grid-cols-2">
           <Select
-            label="类型"
+            label={tr("类型")}
             value={form.genre}
             onChange={(event) => update("genre", event.target.value)}
-            options={GENRES.map((item) => ({ value: item, label: item }))}
+            options={GENRES.map((item) => ({ value: item, label: tr(item) }))}
           />
           <Input
-            label="一句话简介"
+            label={tr("一句话简介")}
             maxLength={120}
             value={form.subtitle}
             onChange={(event) => update("subtitle", event.target.value)}
-            placeholder="出现在封面与书架上"
+            placeholder={tr("出现在封面与书架上")}
           />
         </div>
         <Input
           id="novel-word-goal"
-          label="全书目标字数"
-          hint="0 表示不设置"
+          label={tr("全书目标字数")}
+          hint={tr("0 表示不设置")}
           type="number"
           min={0}
           max={MAX_NOVEL_WORD_GOAL}
@@ -183,11 +187,11 @@ export function EditNovelDialog({ open, novel, focusField = "title", onClose, on
         />
         <CoverPicker value={form.coverKey} onChange={(coverKey) => update("coverKey", coverKey)} />
         <Textarea
-          label="作品简介"
+          label={tr("作品简介")}
           rows={4}
           value={form.synopsis}
           onChange={(event) => update("synopsis", event.target.value)}
-          placeholder="这本书讲什么？主角是谁？想写出什么感觉？"
+          placeholder={tr("这本书讲什么？主角是谁？想写出什么感觉？")}
         />
         {error ? <p role="alert" className="text-[12px] text-danger">{error}</p> : null}
       </form>

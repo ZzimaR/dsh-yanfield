@@ -1,22 +1,25 @@
-# Issue 模板选择页的配置
-# 文档：https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
+# Configuration for the issue template chooser
+# Docs: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
 
-# 关闭空白 Issue，引导大家用模板（模板会带上环境信息与复现步骤，修起来快很多）
+# Disable blank issues: the forms collect environment and reproduction steps.
 blank_issues_enabled: false
 
 contact_links:
-  - name: "❓ 使用问题 / 报错排查"
-    url: "https://github.com/ZzimaR/dsh-yanfield/blob/main/docs/faq.md"
-    about: "先看 FAQ；大多数安装、界面、数据和写作问题都有答案。再搜一下现有 Issue。"
-  - name: "🤖 模型 / 余额 / 费用"
-    url: "https://github.com/ZzimaR/dsh-yanfield/blob/main/docs/ai-and-cost.md"
-    about: "两条模型路由（DSH 账号登录 / 官方 API Key）、pro 模型、余额读取、峰谷单价与费用估算都在这里。"
-  - name: "🧩 想自己编译 / 改代码"
-    url: "https://github.com/ZzimaR/dsh-yanfield/blob/main/docs/development.md"
-    about: "环境要求、构建链、隔离联调（yanfield-dev + dataDir）、无头截图、发布清单。"
-  - name: "🗺 这个功能在计划里吗？"
-    url: "https://github.com/ZzimaR/dsh-yanfield/blob/main/README.md#路线图"
-    about: "提交功能建议前先看一眼路线图，避免重复讨论。"
-  - name: "🔐 安全漏洞（请勿公开提交）"
+  - name: "❓ Usage and troubleshooting"
+    url: "https://github.com/ZzimaR/dsh-yanfield/blob/main/docs/en/faq.md"
+    about: "Check the FAQ first; most install, interface, data, and writing questions are answered there. Then search existing issues."
+  - name: "🤖 Models / balance / cost"
+    url: "https://github.com/ZzimaR/dsh-yanfield/blob/main/docs/en/ai-and-cost.md"
+    about: "Both model routes (DSH sign-in / official API key), pro models, balance reading, peak pricing, and cost estimates."
+  - name: "🧩 Build or modify the code"
+    url: "https://github.com/ZzimaR/dsh-yanfield/blob/main/docs/en/development.md"
+    about: "Requirements, build pipeline, isolated dev profile (yanfield-dev + dataDir), headless screenshots, release checklist."
+  - name: "🗺 Is this feature planned?"
+    url: "https://github.com/ZzimaR/dsh-yanfield/blob/main/docs/en/features.md"
+    about: "Look at the feature overview before filing, to avoid duplicate discussions."
+  - name: "🔐 Security issue (do not file publicly)"
     url: "https://github.com/ZzimaR/dsh-yanfield/security/advisories/new"
-    about: "密钥泄露、越权访问、脚本注入等问题请走私密渠道，不要在公开 Issue 里贴细节。"
+    about: "Leaked keys, unauthorized access, script injection — report privately, not in a public issue."
+  - name: "中文文档"
+    url: "https://github.com/ZzimaR/dsh-yanfield/blob/main/README.md"
+    about: "中文使用说明、常见问题与开发文档。"

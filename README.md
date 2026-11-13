@@ -9,7 +9,7 @@
 正文、大纲、设定与 AI 助手，在同一张书桌上。<br>
 书稿留在本地，模型用你已配好的 DeepSeek，AI 的改动由你逐段审阅。
 
-[![DSH 版本](https://img.shields.io/badge/DSH-%E2%89%A5%200.2.1--rc.5%20%3C%200.3.0-4f7864?style=flat-square)](#安装)
+[![DSH 版本](https://img.shields.io/badge/DSH-%E2%89%A5%200.2.1--rc.5-4f7864?style=flat-square)](#安装)
 [![构建用 Node](https://img.shields.io/badge/Node-%E2%89%A5%2022.19-4f7864?style=flat-square)](https://nodejs.org)
 [![版本](https://img.shields.io/github/v/release/ZzimaR/dsh-yanfield?label=version&style=flat-square)](https://github.com/ZzimaR/dsh-yanfield/releases/latest)
 [![许可](https://img.shields.io/badge/license-PolyForm%20Noncommercial-a97f2b?style=flat-square)](LICENSE)
@@ -31,6 +31,8 @@
 
 砚田是一个 **DeepSeek Harness 插件**，不是独立应用：安装后 Harness 左侧导航会出现「砚田」，点开就是一个跑在面板里的长篇写作台。
 
+界面跟随 DSH 的语言设置（设置 → 通用 → 语言）：DSH 用英文时，侧栏显示 **Yanfield**，工作台、AI 面板与设置页也全部切换为英文；中文界面保持原样。书稿内容不会被翻译，AI 用你写作的语言回复。
+
 - **写作台**：作品 / 卷 / 章三级结构，三栏布局（目录 · 正文 · AI），自动保存、字数统计、专注模式、排版可调、宣纸 / 夜航双主题。
 - **资料随写随查**：章纲、设定、角色、伏笔、故事档案都在左栏，浮窗就地编辑，不离开正文。
 - **AI 改稿，作者做主**：AI 读资料、多步执行，提出正文与资料改动；正文逐段对比（绿色新增、红色删除），你决定保留哪几段，确认后才写进书稿。
@@ -38,7 +40,7 @@
 
 ## 安装
 
-需要 DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`。按你启动的 profile 选择下面一条命令，安装 [npm](https://www.npmjs.com/package/dsh-yanfield) 上的预构建包。
+需要 DeepSeek Harness `>=0.2.1-rc.5`。按你启动的 profile 选择下面一条命令，安装 [npm](https://www.npmjs.com/package/dsh-yanfield) 上的预构建包。
 
 ```bash
 # Web 版

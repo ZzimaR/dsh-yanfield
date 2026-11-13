@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises"
+import { readFile, readdir, stat } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -45,6 +45,36 @@ for (const file of ["dist/host.js", "dist/client.js", "LICENSE", "icon.svg", "do
     fail(`缺少 ${file}`)
   }
 }
+// Localization: plugin metadata for the market, plus the English dictionary.
+if (!manifest.exports?.["./locale/*.json"]) fail("package.json 缺少 ./locale/*.json 导出")
+if (!manifest.files?.includes("locale/*.json")) fail("package.json files 缺少 locale/*.json")
+if (!manifest.dsh?.client?.inject?.includes("@deepseek-ai/dsh-client-locale")) {
+  fail("dsh.client.inject 缺少 @deepseek-ai/dsh-client-locale")
+}
+for (const file of ["locale/zh.json", "locale/en.json"]) {
+  try {
+    const meta = JSON.parse(await readFile(path.join(root, file), "utf8"))?.meta
+    if (!meta?.title || !meta?.description) fail(`${file} 缺少 meta.title / meta.description`)
+  } catch {
+    fail(`缺少或无法解析 ${file}`)
+  }
+}
+const enDir = path.join(root, "vendor/yanfield/lib/i18n/en")
+try {
+  const modules = (await readdir(enDir)).filter((file) => file.endsWith(".ts"))
+  if (modules.length < 10) fail("en/ 字典模块不完整")
+  for (const file of modules) {
+    const source = await readFile(path.join(enDir, file), "utf8")
+    const seen = new Set()
+    for (const match of source.matchAll(/^\s*"((?:[^"\\]|\\.)*)"\s*:/gm)) {
+      if (seen.has(match[1])) fail(`en/${file} 有重复键 ${match[1]}`)
+      seen.add(match[1])
+    }
+  }
+} catch {
+  fail("缺少 vendor/yanfield/lib/i18n/en/")
+}
+
 const client = await readFile(path.join(root, "dist", "client.js"), "utf8")
 if (!client.includes('id:"dsh-yanfield"') && !client.includes("id:\\\"dsh-yanfield\\\"")) fail("客户端产物不是 ModuleLoader 格式")
 if (!client.includes("sidebar.panellist")) fail("客户端没有注册侧栏入口")

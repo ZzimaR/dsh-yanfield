@@ -14,6 +14,8 @@ import {
   useToast,
 } from "@/components/ui/kit";
 import { apiDelete, notifyDataChanged, useApi } from "@/lib/client/api";
+import { getYanfieldLocale, useT } from "@/lib/i18n";
+import { PRESET_EN } from "@/lib/ai/preset-en";
 import { AI_FEATURE_LABEL, type PromptPreset } from "@/lib/types";
 import { cn, formatRelativeTime } from "@/lib/ui/cn";
 import { PresetDialog } from "./PresetDialog";
@@ -35,7 +37,12 @@ const FILTER_OPTIONS: { value: Filter; label: string }[] = [
   { value: "builtin", label: "内置" },
 ];
 
+function onEn(preset: { name: string }) {
+  return getYanfieldLocale() === "en" ? PRESET_EN[preset.name] : undefined;
+}
+
 export function PresetsSection({ novelId }: PresetsSectionProps) {
+  const tr = useT();
   const url = novelId ? `/api/presets?novelId=${encodeURIComponent(novelId)}` : "/api/presets";
   const presetsApi = useApi<PresetListResponse>(url);
   const { toast } = useToast();
@@ -74,12 +81,12 @@ export function PresetsSection({ novelId }: PresetsSectionProps) {
       await apiDelete(`/api/presets/${removing.id}`);
       await presetsApi.refresh();
       notifyDataChanged("presets");
-      toast({ title: "已删除", description: `「${removing.name}」已移除`, tone: "success" });
+      toast({ title: tr("已删除"), description: tr("「{name}」已移除", { name: removing.name }), tone: "success" });
       setRemoving(null);
     } catch (cause) {
       toast({
-        title: "删除失败",
-        description: cause instanceof Error ? cause.message : "请稍后再试",
+        title: tr("删除失败"),
+        description: cause instanceof Error ? cause.message : tr("请稍后再试"),
         tone: "error",
       });
     } finally {
@@ -91,25 +98,25 @@ export function PresetsSection({ novelId }: PresetsSectionProps) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-serif text-lg text-ink">提示词预设</h2>
+          <h2 className="font-serif text-lg text-ink">{tr("提示词预设")}</h2>
           <p className="mt-1 text-[12px] leading-6 text-ink-3">
-            每个 AI 场景的 system / user 模板都在这里，可改、可停用、可恢复默认（内置预设只读）。
+            {tr("每个 AI 场景的 system / user 模板都在这里，可改、可停用、可恢复默认（内置预设只读）。")}
           </p>
         </div>
         <Button variant="primary" size="sm" icon={<Plus className="size-3.5" />} onClick={openCreate}>
-          新建预设
+          {tr("新建预设")}
         </Button>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Segmented
-          options={FILTER_OPTIONS}
+          options={FILTER_OPTIONS.map((option) => ({ ...option, label: tr(option.label) }))}
           value={filter}
           onChange={(value) => setFilter(value as Filter)}
           size="sm"
         />
         <span className="text-[11px] text-ink-3">
-          共 {items.length} 个 · 自定义 {customCount}
+          {tr("共 {total} 个 · 自定义 {custom}", { total: items.length, custom: customCount, count: items.length })}
         </span>
       </div>
 
@@ -121,19 +128,19 @@ export function PresetsSection({ novelId }: PresetsSectionProps) {
         </div>
       ) : presetsApi.error ? (
         <Card className="flex items-center justify-between gap-3 border-danger/30 bg-danger/5 p-3.5">
-          <p className="text-[12px] text-danger">预设加载失败：{presetsApi.error}</p>
+          <p className="text-[12px] text-danger">{tr("预设加载失败：{error}", { error: presetsApi.error })}</p>
           <Button variant="ghost" size="sm" icon={<RefreshCw className="size-3.5" />} onClick={() => void presetsApi.refresh()}>
-            重试
+            {tr("重试")}
           </Button>
         </Card>
       ) : sorted.length === 0 ? (
         <EmptyState
           icon={<ScrollText className="size-5" />}
-          title={filter === "custom" ? "还没有自定义预设" : "暂无预设"}
-          description="内置预设由项目提供；你可以复制一份改造成自己的语气与规则。"
+          title={filter === "custom" ? tr("还没有自定义预设") : tr("暂无预设")}
+          description={tr("内置预设由项目提供；你可以复制一份改造成自己的语气与规则。")}
           action={
             <Button variant="primary" icon={<Plus className="size-4" />} onClick={openCreate}>
-              新建预设
+              {tr("新建预设")}
             </Button>
           }
         />
@@ -144,32 +151,32 @@ export function PresetsSection({ novelId }: PresetsSectionProps) {
               <div className="flex items-start gap-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="truncate text-[12.5px] font-medium text-ink">{preset.name}</span>
+                    <span className="truncate text-[12.5px] font-medium text-ink">{tr(preset.name)}</span>
                     {AI_FEATURE_LABEL[preset.feature] !== preset.name ? (
-                      <Badge tone="accent">{AI_FEATURE_LABEL[preset.feature]}</Badge>
+                      <Badge tone="accent">{tr(AI_FEATURE_LABEL[preset.feature])}</Badge>
                     ) : null}
-                    <Badge tone="default">{preset.modelRole === "prose" ? "长文任务" : "通用任务"}</Badge>
+                    <Badge tone="default">{preset.modelRole === "prose" ? tr("长文任务") : tr("通用任务")}</Badge>
                     {preset.isBuiltin ? (
                       <Badge tone="jade">
                         <Lock className="mr-0.5 inline size-2.5" aria-hidden />
-                        内置
+                        {tr("内置")}
                       </Badge>
                     ) : null}
-                    {!preset.enabled ? <Badge tone="danger">已停用</Badge> : null}
+                    {!preset.enabled ? <Badge tone="danger">{tr("已停用")}</Badge> : null}
                   </div>
                   <p className="mt-1 line-clamp-2 text-[10.5px] leading-5 text-ink-3">
-                    {preset.systemPrompt || preset.userTemplate}
+                    {onEn(preset)?.systemPrompt || preset.systemPrompt || preset.userTemplate}
                   </p>
                   <p className="mt-0.5 font-mono text-[9.5px] text-ink-3">
-                    温度 {preset.temperature.toFixed(2)} · 更新于 {formatRelativeTime(preset.updatedAt)}
+                    {tr("温度 {temperature} · 更新于 {relative}", { temperature: preset.temperature.toFixed(2), relative: formatRelativeTime(preset.updatedAt) })}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-0.5">
-                  <IconButton label={preset.isBuiltin ? "查看内置预设" : "编辑预设"} size="sm" onClick={() => openEdit(preset)}>
+                  <IconButton label={preset.isBuiltin ? tr("查看内置预设") : tr("编辑预设")} size="sm" onClick={() => openEdit(preset)}>
                     <Pencil className="size-3.5" />
                   </IconButton>
                   <IconButton
-                    label="删除预设"
+                    label={tr("删除预设")}
                     size="sm"
                     disabled={preset.isBuiltin}
                     onClick={() => setRemoving(preset)}
@@ -190,15 +197,15 @@ export function PresetsSection({ novelId }: PresetsSectionProps) {
         onSaved={() => {
           setDialogOpen(false);
           void presetsApi.refresh();
-          toast({ title: editing ? "已更新预设" : "已创建预设", tone: "success" });
+          toast({ title: editing ? tr("已更新预设") : tr("已创建预设"), tone: "success" });
         }}
       />
 
       <ConfirmDialog
         open={removing !== null}
-        title={`删除预设「${removing?.name ?? ""}」`}
-        description="使用这个预设的场景会回退到内置提示词。"
-        confirmText="删除预设"
+        title={tr("删除预设「{name}」", { name: removing?.name ?? "" })}
+        description={tr("使用这个预设的场景会回退到内置提示词。")}
+        confirmText={tr("删除预设")}
         danger
         loading={deleting}
         onConfirm={() => void remove()}

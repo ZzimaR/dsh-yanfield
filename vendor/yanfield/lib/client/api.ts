@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CodexItem, CodexTurn } from "@/lib/ai/codex";
 import type { AiChatRequest, AiStreamEvent, AiTaskRequest } from "@/lib/types";
+import { getYanfieldLocale, t } from "@/lib/i18n/core";
 
 export class ApiError extends Error {
   status: number;
@@ -33,10 +34,8 @@ async function parseResponse<T>(res: Response): Promise<T> {
     data = text;
   }
   if (!res.ok) {
-    const message =
-      data && typeof data === "object" && data !== null && "error" in data
-        ? String((data as { error: unknown }).error)
-        : `请求失败（${res.status}）`;
+    const serverError = data && typeof data === "object" && data !== null && "error" in data ? String((data as { error: unknown }).error) : "";
+    const message = serverError ? t(serverError) : t("请求失败（{status}）", { status: res.status });
     throw new ApiError(message, res.status);
   }
   return data as T;
@@ -132,16 +131,16 @@ export interface StreamHandlers {
 
 async function consumeSse(res: Response, handlers: StreamHandlers): Promise<void> {
   if (!res.ok) {
-    let message = `AI 请求失败（${res.status}）`;
+    let message = t("AI 请求失败（{status}）", { status: res.status });
     try {
       const data = (await res.json()) as { error?: string };
-      if (data?.error) message = data.error;
+      if (data?.error) message = t(data.error);
     } catch {
       /* ignore */
     }
     throw new ApiError(message, res.status);
   }
-  if (!res.body) throw new ApiError("服务端没有返回流式响应", 500);
+  if (!res.body) throw new ApiError(t("服务端没有返回流式响应"), 500);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -173,7 +172,7 @@ export function streamAiChat(req: AiChatRequest, handlers: StreamHandlers): Prom
   return fetch(apiUrl("/api/ai/chat"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
+    body: JSON.stringify({ ...req, locale: getYanfieldLocale() }),
     signal: handlers.signal,
   }).then((res) => consumeSse(res, handlers));
 }
@@ -198,7 +197,7 @@ export function streamAiTask(req: AiTaskRequest, handlers: StreamHandlers): Prom
   return fetch(apiUrl("/api/ai/task"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
+    body: JSON.stringify({ ...req, locale: getYanfieldLocale() }),
     signal: handlers.signal,
   }).then((res) => consumeSse(res, handlers));
 }

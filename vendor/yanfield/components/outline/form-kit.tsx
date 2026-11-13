@@ -29,6 +29,7 @@ import {
   type BadgeTone,
 } from "@/components/ui/kit";
 import { cn } from "@/lib/ui/cn";
+import { t, useLocale, useT, type Translate } from "@/lib/i18n";
 import type { AiFeature, Chapter, ID, Volume } from "@/lib/types";
 import { AiAssistButton, AiAssistSheet } from "./ai-assist";
 
@@ -59,16 +60,16 @@ export function reindexChaptersByVolume<T extends { volumeId: string | null; ord
 }
 
 /** 去掉标题里自带的「第一章 / 第 1 章」前缀，避免与页面章号重复 */
-export function stripChapterNumber(title: string): string {
+export function stripChapterNumber(title: string, tr: Translate = t): string {
   const stripped = (title || "")
     .replace(/^第[\s0-9〇零一二三四五六七八九十百千两]+[章回节][\s·、,，.。:：\-—]*/, "")
     .trim();
-  return stripped || title || "未命名章节";
+  return stripped || title || tr("未命名章节");
 }
 
 /** 统一格式的章节引用文案（全书章号 + 去重后的章节名） */
-export function chapterRefLabel(chapter: Pick<Chapter, "orderIndex" | "title">): string {
-  return `第 ${chapter.orderIndex + 1} 章 · ${stripChapterNumber(chapter.title)}`;
+export function chapterRefLabel(chapter: Pick<Chapter, "orderIndex" | "title">, tr: Translate = t): string {
+  return tr("第 {order} 章 · {title}", { order: chapter.orderIndex + 1, title: stripChapterNumber(chapter.title, tr) });
 }
 
 /* ============================== 页头 / 卡片 ============================== */
@@ -181,13 +182,14 @@ export function PanelSkeleton({ rows = 3, className }: { rows?: number; classNam
 }
 
 export function InlineError({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const tr = useT();
   return (
     <div className="flex items-start gap-2 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-[12.5px] leading-relaxed text-danger">
       <TriangleAlert className="mt-0.5 size-4 shrink-0" />
       <span className="min-w-0 flex-1">{message}</span>
       {onRetry ? (
         <Button variant="ghost" size="sm" className="h-6 px-2 text-danger" onClick={onRetry}>
-          重试
+          {tr("重试")}
         </Button>
       ) : null}
     </div>
@@ -227,10 +229,11 @@ export function AiTextField({
   ai = true,
   className,
 }: AiTextFieldProps) {
+  const tr = useT();
   return (
     <div className={cn("min-w-0", className)}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="text-[13px] font-medium text-ink-2">{label}</span>
+        <span className="text-[13px] font-medium text-ink-2">{typeof label === "string" ? tr(label) : label}</span>
         {ai ? (
           <AiAssistButton
             feature={feature}
@@ -242,8 +245,14 @@ export function AiTextField({
           />
         ) : null}
       </div>
-      <Textarea value={value} onChange={(event) => onChange(event.target.value)} rows={rows} placeholder={placeholder} className="min-h-0" />
-      {hint ? <p className="mt-1 text-[11.5px] leading-relaxed text-ink-3">{hint}</p> : null}
+      <Textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        rows={rows}
+        placeholder={typeof placeholder === "string" ? tr(placeholder) : placeholder}
+        className="min-h-0"
+      />
+      {hint ? <p className="mt-1 text-[11.5px] leading-relaxed text-ink-3">{typeof hint === "string" ? tr(hint) : hint}</p> : null}
     </div>
   );
 }
@@ -279,7 +288,9 @@ export function TagsInput({
   placeholder?: string;
   hint?: React.ReactNode;
 }) {
-  const joined = value.join("、");
+  const tr = useT();
+  const separator = useLocale() === "en" ? ", " : "、";
+  const joined = value.join(separator);
   const [text, setText] = React.useState(joined);
   const lastJoined = React.useRef(joined);
 
@@ -292,10 +303,10 @@ export function TagsInput({
 
   return (
     <Input
-      label={label}
-      hint={hint}
+      label={typeof label === "string" ? tr(label) : label}
+      hint={typeof hint === "string" ? tr(hint) : hint}
       value={text}
-      placeholder={placeholder}
+      placeholder={tr(placeholder)}
       onChange={(event) => {
         const next = event.target.value;
         setText(next);
@@ -319,6 +330,7 @@ export interface StringListEditorProps {
 }
 
 export function StringListEditor({ items, onChange, placeholder, addLabel, emptyHint, ai }: StringListEditorProps) {
+  const tr = useT();
   const [aiOpen, setAiOpen] = React.useState(false);
 
   const updateItem = (index: number, value: string) => onChange(items.map((item, i) => (i === index ? value : item)));
@@ -335,7 +347,7 @@ export function StringListEditor({ items, onChange, placeholder, addLabel, empty
     <div className="space-y-2">
       {items.length === 0 ? (
         <p className="rounded-md border border-dashed border-line px-3 py-2.5 text-[12px] leading-relaxed text-ink-3">
-          {emptyHint ?? "还没有内容，先添加一条。"}
+          {emptyHint ?? tr("还没有内容，先添加一条。")}
         </p>
       ) : (
         <div className="space-y-1.5">
@@ -348,13 +360,13 @@ export function StringListEditor({ items, onChange, placeholder, addLabel, empty
                 placeholder={placeholder}
                 className="h-8 text-[13px]"
               />
-              <IconButton label="上移" size="sm" disabled={index === 0} onClick={() => moveItem(index, -1)}>
+              <IconButton label={tr("上移")} size="sm" disabled={index === 0} onClick={() => moveItem(index, -1)}>
                 <ArrowUp className="size-3.5" />
               </IconButton>
-              <IconButton label="下移" size="sm" disabled={index === items.length - 1} onClick={() => moveItem(index, 1)}>
+              <IconButton label={tr("下移")} size="sm" disabled={index === items.length - 1} onClick={() => moveItem(index, 1)}>
                 <ArrowDown className="size-3.5" />
               </IconButton>
-              <IconButton label="删除" size="sm" onClick={() => removeItem(index)}>
+              <IconButton label={tr("删除")} size="sm" onClick={() => removeItem(index)}>
                 <Trash2 className="size-3.5" />
               </IconButton>
             </div>
@@ -364,7 +376,7 @@ export function StringListEditor({ items, onChange, placeholder, addLabel, empty
 
       <div className="flex flex-wrap items-center gap-1.5">
         <Button variant="subtle" size="sm" icon={<Plus className="size-3.5" />} onClick={() => onChange([...items, ""])}>
-          {addLabel ?? "添加一条"}
+          {addLabel ?? tr("添加一条")}
         </Button>
         {ai ? (
           <>
@@ -375,19 +387,19 @@ export function StringListEditor({ items, onChange, placeholder, addLabel, empty
               icon={<Sparkles className="size-3.5" />}
               onClick={() => setAiOpen(true)}
             >
-              AI 补充
+              {tr("AI 补充")}
             </Button>
             <AiAssistSheet
               open={aiOpen}
               onClose={() => setAiOpen(false)}
-              title={`AI 补充 · ${ai.field}`}
+              title={tr("AI 补充 · {field}", { field: ai.field })}
               feature={ai.feature}
               novelId={ai.novelId}
               chapterId={ai.chapterId}
               instruction={`请为「${ai.field}」补充若干条内容，每行一条，用短句，不要编号，也不要解释。`}
               targets={[{ value: "append", label: ai.field }]}
               onAdopt={(text) => onChange([...items, ...splitAiLines(text)])}
-              adoptHint="已追加到列表，记得点击保存。"
+              adoptHint={tr("已追加到列表，记得点击保存。")}
             />
           </>
         ) : null}
@@ -411,10 +423,11 @@ export function SaveBar({
   hint?: React.ReactNode;
   children?: React.ReactNode;
 }) {
+  const tr = useT();
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-2 text-[11.5px] text-ink-3">
-        {dirty ? <Badge tone="gold">未保存</Badge> : <Badge tone="default">已保存</Badge>}
+        {dirty ? <Badge tone="gold">{tr("未保存")}</Badge> : <Badge tone="default">{tr("已保存")}</Badge>}
         {hint ? <span className="truncate">{hint}</span> : null}
         {children}
       </div>
@@ -427,7 +440,7 @@ export function SaveBar({
         onClick={onSave}
         className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       >
-        保存
+        {tr("保存")}
       </Button>
     </div>
   );
@@ -437,6 +450,7 @@ export function SaveBar({
 
 /** 统一的接口错误 toast：同一个错误串只弹一次，避免重复刷屏 */
 export function useErrorToast(error: string | null | undefined, title = "加载失败"): void {
+  const tr = useT();
   const { toast } = useToast();
   const lastRef = React.useRef<string | null>(null);
   React.useEffect(() => {
@@ -446,8 +460,8 @@ export function useErrorToast(error: string | null | undefined, title = "加载�
     }
     if (lastRef.current === error) return;
     lastRef.current = error;
-    toast({ title, description: error, tone: "error" });
-  }, [error, title, toast]);
+    toast({ title: tr(title), description: error, tone: "error" });
+  }, [error, title, toast, tr]);
 }
 
 /** 兼容 POST 返回「实体本身」或「{ item: 实体 }」两种形态（契约以实体为主，这里做一层防御） */

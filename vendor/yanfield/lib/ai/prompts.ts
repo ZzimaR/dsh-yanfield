@@ -8,6 +8,7 @@
 import type { AgentDef, AgentId, AiFeature, AppSettings, PromptPreset } from "@/lib/types";
 import { AGENTS, AI_FEATURE_LABEL, CUSTOM_AGENT, applyAgentOverride } from "@/lib/types";
 import { BUILTIN_PRESETS, type BuiltinPresetDef } from "@/lib/defaults";
+import { PRESET_EN } from "./preset-en";
 
 export type PresetLike = Pick<
   PromptPreset,
@@ -88,31 +89,51 @@ export function builtinPresetForFeature(feature: AiFeature): BuiltinPresetDef {
   return matched ?? fallback;
 }
 
+/** 不依赖界面语言：作者用什么语言写，就用什么语言回。 */
+const LANGUAGE_DIRECTIVE =
+  "\n\n语言要求：始终使用作者最后一条消息所用的语言写作与回复；作者用英文时用英文，用中文时用中文，不要擅自翻译成第三种语言。";
+
+const LANGUAGE_DIRECTIVE_EN =
+  "\n\nLanguage: always write and reply in the language of the author's last message. If the author writes in English, answer in English; if in Chinese, answer in Chinese. Do not translate into a third language.";
+
+function withLanguageDirective(prompt: string, locale: "zh" | "en"): string {
+  if (locale === "en") return prompt.includes("Language: always write") ? prompt : prompt + LANGUAGE_DIRECTIVE_EN;
+  return prompt.includes("语言要求：") ? prompt : prompt + LANGUAGE_DIRECTIVE;
+}
+
 /** 解析本次请求使用的预设：优先 presetId，其次同 feature 的启用预设，最后内置兜底 */
 export function resolvePreset(
   feature: AiFeature,
   presets: PresetLike[],
   presetId?: string | null,
+  locale: "zh" | "en" = "zh",
 ): { id: string | null; name: string; systemPrompt: string; userTemplate: string; temperature: number; modelRole: "chat" | "prose" } {
   const byId = presetId ? presets.find((preset) => preset.id === presetId && preset.enabled) : undefined;
   const byFeature = presets.find((preset) => preset.feature === feature && preset.enabled);
   const picked = byId ?? byFeature;
+  const localize = (name: string, systemPrompt: string, userTemplate: string) => {
+    const en = locale === "en" ? PRESET_EN[name] : undefined;
+    return {
+      systemPrompt: withLanguageDirective(en?.systemPrompt ?? systemPrompt, locale),
+      userTemplate: en?.userTemplate ?? userTemplate,
+    };
+  };
   if (picked) {
+    const body = localize(picked.name, picked.systemPrompt, picked.userTemplate);
     return {
       id: picked.id,
       name: picked.name,
-      systemPrompt: picked.systemPrompt,
-      userTemplate: picked.userTemplate,
+      ...body,
       temperature: picked.temperature,
       modelRole: picked.modelRole,
     };
   }
   const builtin = builtinPresetForFeature(feature);
+  const body = localize(builtin.name, builtin.systemPrompt, builtin.userTemplate);
   return {
     id: null,
     name: builtin.name,
-    systemPrompt: builtin.systemPrompt,
-    userTemplate: builtin.userTemplate,
+    ...body,
     temperature: builtin.temperature,
     modelRole: builtin.modelRole,
   };

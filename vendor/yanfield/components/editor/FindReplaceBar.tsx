@@ -13,6 +13,7 @@ import {
   stepMatchIndex,
   type FindMatch,
 } from "@/lib/editor/find";
+import { useT } from "@/lib/i18n";
 
 interface FindReplaceBarProps {
   editor: Editor | null;
@@ -37,6 +38,7 @@ const INPUT_CLASS =
  * 替换后查找条保持打开，方便继续替换下一处。
  */
 export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, className }: FindReplaceBarProps) {
+  const tr = useT();
   const [query, setQuery] = React.useState("");
   const [replacement, setReplacement] = React.useState("");
   const [matches, setMatches] = React.useState<FindMatch[]>([]);
@@ -133,12 +135,12 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
 
   const replaceAll = () => {
     if (!editor || matches.length === 0) return;
-    const tr = editor.state.tr;
+    const transaction = editor.state.tr;
     for (const match of sortMatchesForReplacement(matches)) {
-      if (replacement.length > 0) tr.replaceWith(match.from, match.to, editor.schema.text(replacement));
-      else tr.delete(match.from, match.to);
+      if (replacement.length > 0) transaction.replaceWith(match.from, match.to, editor.schema.text(replacement));
+      else transaction.delete(match.from, match.to);
     }
-    editor.view.dispatch(tr);
+    editor.view.dispatch(transaction);
     setMatches(findMatches(collectTextSegments(editor.state.doc), query));
     setActiveIndex(0);
     refocusLastInput();
@@ -180,7 +182,7 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
   return (
     <div
       role="dialog"
-      aria-label="查找与替换"
+      aria-label={tr("查找与替换")}
       className={cn(
         "absolute right-3 top-3 z-30 flex w-[360px] max-w-[calc(100%_-_1.5rem)] flex-col gap-1.5 rounded-lg border border-line bg-surface/95 p-2 shadow-float backdrop-blur",
         className,
@@ -196,8 +198,8 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
           onFocus={() => {
             lastFocusRef.current = "find";
           }}
-          placeholder="查找"
-          aria-label="查找内容"
+          placeholder={tr("查找")}
+          aria-label={tr("查找内容")}
           autoComplete="off"
           spellCheck={false}
           className={INPUT_CLASS}
@@ -205,9 +207,9 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
         <span className="shrink-0 tabular-nums text-[11px] text-ink-4" aria-live="polite">
           {counter}
         </span>
-        <Tooltip label="上一个 (Shift+Enter)">
+        <Tooltip label={tr("上一个 (Shift+Enter)")}>
           <IconButton
-            label="上一个"
+            label={tr("上一个")}
             size="sm"
             disabled={matches.length === 0}
             onClick={() => move(-1)}
@@ -216,9 +218,9 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
             <ChevronUp className="size-3.5" />
           </IconButton>
         </Tooltip>
-        <Tooltip label="下一个 (Enter)">
+        <Tooltip label={tr("下一个 (Enter)")}>
           <IconButton
-            label="下一个"
+            label={tr("下一个")}
             size="sm"
             disabled={matches.length === 0}
             onClick={() => move(1)}
@@ -227,8 +229,8 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
             <ChevronDown className="size-3.5" />
           </IconButton>
         </Tooltip>
-        <Tooltip label="关闭查找替换 (Esc)">
-          <IconButton label="关闭查找替换" size="sm" onClick={close}>
+        <Tooltip label={tr("关闭查找替换 (Esc)")}>
+          <IconButton label={tr("关闭查找替换")} size="sm" onClick={close}>
             <X className="size-3.5" />
           </IconButton>
         </Tooltip>
@@ -244,8 +246,8 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
           onFocus={() => {
             lastFocusRef.current = "replace";
           }}
-          placeholder="替换为"
-          aria-label="替换内容"
+          placeholder={tr("替换为")}
+          aria-label={tr("替换内容")}
           autoComplete="off"
           spellCheck={false}
           className={INPUT_CLASS}
@@ -255,20 +257,20 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
           size="sm"
           disabled={matches.length === 0}
           onClick={replaceCurrent}
-          title="替换当前命中 (Enter)"
+          title={tr("替换当前命中 (Enter)")}
           className="h-7 shrink-0 px-2 text-[12px]"
         >
-          替换
+          {tr("替换")}
         </Button>
         <Button
           variant="ghost"
           size="sm"
           disabled={matches.length === 0}
           onClick={replaceAll}
-          title="替换全部命中"
+          title={tr("替换全部命中")}
           className="h-7 shrink-0 px-2 text-[12px]"
         >
-          全部替换
+          {tr("全部替换")}
         </Button>
       </div>
     </div>

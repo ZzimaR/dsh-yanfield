@@ -16,6 +16,7 @@ import { ModelKeyHint } from "@/components/ai/ModelKeyHint";
 import { apiDelete, apiPatch, apiPost, notifyDataChanged, useApi } from "@/lib/client/api";
 import type { WorldCategory, WorldImportance, WorldSetting } from "@/lib/types";
 import { WORLD_CATEGORY_LABEL, WORLD_IMPORTANCE_LABEL } from "@/lib/types";
+import { useT } from "@/lib/i18n";
 
 interface WorldDraft {
   title: string;
@@ -85,6 +86,7 @@ export function WorldEditor({
   /** Category preset for new settings, e.g. creating from the item group. */
   defaultCategory?: WorldCategory;
 }) {
+  const tr = useT();
   const { toast } = useToast();
   const editing = Boolean(setting);
   const detailApi = useApi<WorldSetting>(open && setting ? `/api/world/${setting.id}` : null);
@@ -129,7 +131,7 @@ export function WorldEditor({
   const save = async () => {
     const title = draft.title.trim();
     if (!title) {
-      toast({ title: "请先填写设定标题", tone: "error" });
+      toast({ title: tr("请先填写设定标题"), tone: "error" });
       return;
     }
     setSaving(true);
@@ -142,10 +144,10 @@ export function WorldEditor({
       setSavedId(entity.id);
       onSaved(entity);
       notifyDataChanged("world");
-      toast({ title: editing ? "设定已保存" : "已新建设定", description: title, tone: "success" });
+      toast({ title: editing ? tr("设定已保存") : tr("已新建设定"), description: title, tone: "success" });
       onClose();
     } catch (err) {
-      toast({ title: "保存设定失败", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      toast({ title: tr("保存设定失败"), description: err instanceof Error ? err.message : String(err), tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -159,37 +161,37 @@ export function WorldEditor({
       setConfirmDeleteOpen(false);
       onDeleted();
       notifyDataChanged("world");
-      toast({ title: "设定已删除", description: setting.title, tone: "success" });
+      toast({ title: tr("设定已删除"), description: setting.title, tone: "success" });
       onClose();
     } catch (err) {
-      toast({ title: "删除设定失败", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      toast({ title: tr("删除设定失败"), description: err instanceof Error ? err.message : String(err), tone: "error" });
     } finally {
       setDeleting(false);
     }
   };
 
   const parentOptions = [
-    { value: "", label: "无（顶层设定）" },
+    { value: "", label: tr("无（顶层设定）") },
     ...settings
       .filter((item) => item.id !== setting?.id)
-      .map((item) => ({ value: item.id, label: item.title || "未命名设定" })),
+      .map((item) => ({ value: item.id, label: item.title || tr("未命名设定") })),
   ];
   const parentTitle = settings.find((item) => item.id === draft.parentId)?.title;
 
   const chapterOptions = [
-    { value: "", label: "不标注（AI 始终可见）" },
+    { value: "", label: tr("不标注（AI 始终可见）") },
     ...chapters.map((chapter) => ({
       value: String(chapter.orderIndex + 1),
-      label: `第 ${chapter.orderIndex + 1} 章 · ${stripChapterNumber(chapter.title)}`,
+      label: tr("第 {order} 章 · {title}", { order: chapter.orderIndex + 1, title: stripChapterNumber(chapter.title, tr) }),
     })),
   ];
 
-  const subtitle = [WORLD_CATEGORY_LABEL[draft.category], parentTitle ? `属于「${parentTitle}」` : "顶层设定"]
+  const subtitle = [tr(WORLD_CATEGORY_LABEL[draft.category]), parentTitle ? tr("属于「{title}」", { title: parentTitle }) : tr("顶层设定")]
     .filter(Boolean)
     .join(" · ");
 
   const openAssistant = () => {
-    referenceCardInAssistant("world",savedId,draft.title.trim()||"新设定",{...draft});
+    referenceCardInAssistant("world",savedId,draft.title.trim()||tr("新设定"),{...draft});
     if(presentation==="float")setMinimized(true);
   };
 
@@ -197,15 +199,15 @@ export function WorldEditor({
         <div className="card-editor-actions flex items-center gap-2 [&_a:focus-visible]:outline-none [&_a:focus-visible]:ring-2 [&_a:focus-visible]:ring-accent/60 [&_button:focus-visible]:outline-none [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-accent/60">
           {editing ? (
             <Button variant="ghost" className="text-ink-4 hover:text-danger" size="sm" icon={<Trash2 className="size-3.5" />} onClick={() => setConfirmDeleteOpen(true)}>
-              删除
+              {tr("删除")}
             </Button>
           ) : null}
           <div className="ml-auto flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={onClose}>
-              取消
+              {tr("取消")}
             </Button>
             <Button variant="primary" className="min-w-20 bg-accent text-accent-ink hover:bg-accent-hover" size="sm" loading={saving} onClick={save}>
-              {editing ? "保存" : "创建设定"}
+              {editing ? tr("保存") : tr("创建设定")}
             </Button>
           </div>
         </div>
@@ -214,18 +216,18 @@ export function WorldEditor({
   const body = (
     <>
       <CardEditorDocument key={`${open}:${savedId??"new"}`}>
-        <CardEditorHero kind="设定" value={draft.title} onChange={value=>update("title",value)} subtitle={subtitle} actions={<Button variant="ghost" size="sm" className="font-semibold text-[#315b80] hover:bg-[#315b80]/[0.07] hover:text-[#20496e] dark:text-[#9dc4e7] dark:hover:bg-[#9dc4e7]/10 dark:hover:text-[#c1dbee]" icon={<Sparkles className="size-3.5"/>} onClick={openAssistant}>AI 助手</Button>}/>
+        <CardEditorHero kind="设定" value={draft.title} onChange={value=>update("title",value)} subtitle={subtitle} actions={<Button variant="ghost" size="sm" className="font-semibold text-[#315b80] hover:bg-[#315b80]/[0.07] hover:text-[#20496e] dark:text-[#9dc4e7] dark:hover:bg-[#9dc4e7]/10 dark:hover:text-[#c1dbee]" icon={<Sparkles className="size-3.5"/>} onClick={openAssistant}>{tr("AI 助手")}</Button>}/>
         <ModelKeyHint />
 
-        <EditorSection title="基本信息" hint="先给这条设定一个能搜到的名字与归属，AI 会按分类理解它的约束力；重要程度高的设定会优先进入 AI 上下文。">
+        <EditorSection title="基本信息" hint={tr("先给这条设定一个能搜到的名字与归属，AI 会按分类理解它的约束力；重要程度高的设定会优先进入 AI 上下文。")}>
           <div className="grid gap-4 sm:grid-cols-3">
-            <Select label="分类" value={draft.category} onChange={event=>update("category",event.target.value as WorldCategory)} options={Object.entries(WORLD_CATEGORY_LABEL).map(([value,label])=>({value,label}))}/>
-            <Select label="重要程度" value={draft.importance} onChange={event=>update("importance",event.target.value as WorldImportance)} options={Object.entries(WORLD_IMPORTANCE_LABEL).map(([value,label])=>({value,label}))}/>
-            <Select label="归属" value={draft.parentId??""} onChange={event=>update("parentId",event.target.value||null)} options={parentOptions}/>
+            <Select label={tr("分类")} value={draft.category} onChange={event=>update("category",event.target.value as WorldCategory)} options={Object.entries(WORLD_CATEGORY_LABEL).map(([value,label])=>({value,label:tr(label)}))}/>
+            <Select label={tr("重要程度")} value={draft.importance} onChange={event=>update("importance",event.target.value as WorldImportance)} options={Object.entries(WORLD_IMPORTANCE_LABEL).map(([value,label])=>({value,label:tr(label)}))}/>
+            <Select label={tr("归属")} value={draft.parentId??""} onChange={event=>update("parentId",event.target.value||null)} options={parentOptions}/>
           </div>
         </EditorSection>
 
-        <EditorSection title="摘要" hint="一两句话说清核心，AI 在压缩上下文时会优先保留这一段。">
+        <EditorSection title="摘要" hint={tr("一两句话说清核心，AI 在压缩上下文时会优先保留这一段。")}>
           <AiTextField
             ai={false}
             label="摘要"
@@ -239,7 +241,7 @@ export function WorldEditor({
           />
         </EditorSection>
 
-        <EditorSection title="正文" hint="规则、限制、代价、已发生的事件——越具体，AI 写得越稳。">
+        <EditorSection title="正文" hint={tr("规则、限制、代价、已发生的事件——越具体，AI 写得越稳。")}>
           <AiTextField
             ai={false}
             label="正文"
@@ -253,35 +255,35 @@ export function WorldEditor({
           />
         </EditorSection>
 
-        <EditorSection title="标签" hint="用于筛选与速查，不进入正文。">
-          <TagsInput label="标签" value={draft.tags} onChange={(tags) => update("tags", tags)} placeholder="如：规则、势力、代价" />
+        <EditorSection title="标签" hint={tr("用于筛选与速查，不进入正文。")}>
+          <TagsInput label="标签" value={draft.tags} onChange={(tags) => update("tags", tags)} placeholder={tr("如：规则、势力、代价")} />
         </EditorSection>
 
-        <EditorSection title="AI 可见性与揭示章节" hint="AI 默认只收到当前章节已揭示的可见资料；作者本轮明确 @ 引用时可例外提供。">
+        <EditorSection title="AI 可见性与揭示章节" hint={tr("AI 默认只收到当前章节已揭示的可见资料；作者本轮明确 @ 引用时可例外提供。")}>
           <Switch
             checked={draft.aiVisible}
             onChange={(checked) => update("aiVisible", checked)}
-            label="对 AI 可见"
-            hint="关闭后，任何 AI 上下文都不会包含这条设定。"
+            label={tr("对 AI 可见")}
+            hint={tr("关闭后，任何 AI 上下文都不会包含这条设定。")}
           />
           <Select
-            label="揭示章节"
+            label={tr("揭示章节")}
             value={draft.revealAtChapter === null ? "" : String(draft.revealAtChapter)}
             onChange={(event) => update("revealAtChapter", event.target.value === "" ? null : Number(event.target.value))}
             options={chapterOptions}
-            hint="留空 = 不按章节隐藏；填章节号后，当前章节到达该章前 AI 不会收到这条设定。无当前章节时默认隐藏，除非作者明确 @ 引用。"
+            hint={tr("留空 = 不按章节隐藏；填章节号后，当前章节到达该章前 AI 不会收到这条设定。无当前章节时默认隐藏，除非作者明确 @ 引用。")}
           />
-          <Switch checked={draft.pinned} onChange={(checked) => update("pinned", checked)} label="置顶" hint="置顶设定排在列表最前。" />
+          <Switch checked={draft.pinned} onChange={(checked) => update("pinned", checked)} label={tr("置顶")} hint={tr("置顶设定排在列表最前。")} />
         </EditorSection>
 
-        {detailApi.loading ? <p className="text-[11px] text-ink-3">正在获取设定最新详情…</p> : null}
+        {detailApi.loading ? <p className="text-[11px] text-ink-3">{tr("正在获取设定最新详情…")}</p> : null}
       </CardEditorDocument>
 
       <ConfirmDialog
         open={confirmDeleteOpen}
-        title="删除这条设定？"
-        description={`「${setting?.title ?? ""}」会被删除，其子设定不会自动迁移。此操作不可撤销。`}
-        confirmText="删除"
+        title={tr("删除这条设定？")}
+        description={tr("「{title}」会被删除，其子设定不会自动迁移。此操作不可撤销。", { title: setting?.title ?? "" })}
+        confirmText={tr("删除")}
         danger
         loading={deleting}
         onConfirm={() => void remove()}
@@ -294,7 +296,7 @@ export function WorldEditor({
     return (
       <FloatWindow
         open={open}
-        title={editing ? "编辑设定" : "新设定"}
+        title={editing ? tr("编辑设定") : tr("新设定")}
         minimized={minimized}
         onMinimizedChange={setMinimized}
         onClose={onClose}
@@ -307,7 +309,7 @@ export function WorldEditor({
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={editing ? "编辑设定" : "新建设定"} width={700} footer={footer}>
+    <Sheet open={open} onClose={onClose} title={editing ? tr("编辑设定") : tr("新建设定")} width={700} footer={footer}>
       {body}
     </Sheet>
   );

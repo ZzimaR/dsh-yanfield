@@ -23,7 +23,7 @@ Browser entry `client/index.tsx` attaches an open shadow root to the host elemen
 | Slot | Content |
 | --- | --- |
 | `main` | the Yanfield panel (key `yanfield`) |
-| `sidebar.panellist` | the 「砚田」 sidebar entry |
+| `sidebar.panellist` | the **Yanfield** sidebar entry |
 | `sidebarRightTabs` / `sidebar.right.pane.tab` | right-hand tab |
 
 ## 2. Why Shadow DOM
@@ -83,7 +83,7 @@ user message
   → optional undo (op:"undo")
 ```
 
-Prose requests are serialised with stable notes first, current prose and task last, deduplicating repeated prose to improve prefix-cache hits.
+Prose requests are serialized with stable notes first, current prose and task last, deduplicating repeated prose to improve prefix-cache hits.
 
 ## 6. Boundaries
 

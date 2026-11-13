@@ -1,79 +1,79 @@
-name: ✨ 功能建议
-description: 提出一个新功能、改进点或产品建议（English is welcome too）
+name: ✨ Feature request
+description: Suggest a feature, improvement, or product idea (中文提交也欢迎)
 title: "[Feature] "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        先说你**卡在哪一步**，再谈希望的交互；这样比直接提「加个按钮」更好判断值不值得做。
+        Start with the step where you get stuck, then describe the interaction you want. That is easier to evaluate than "add a button".
 
   - type: textarea
     id: problem
     attributes:
-      label: 想解决的问题
-      description: 哪个写作流程让你不舒服？现在只能怎么绕过？
-      placeholder: 写到第二卷时角色关系变化很多，AI 续写会写出已经不存在的角色状态。
+      label: Problem to solve
+      description: Which writing workflow feels awkward? How do you work around it today?
+      placeholder: In book two the character relationships shift a lot, and AI continuation still writes states that no longer exist.
     validations:
       required: true
 
   - type: textarea
     id: proposal
     attributes:
-      label: 你的设想
-      description: 你希望砚田怎么做？描述交互即可，不必是技术方案。
+      label: Your idea
+      description: How should Yanfield behave? Describe the interaction; it does not have to be a technical design.
     validations:
       required: true
 
   - type: textarea
     id: workaround
     attributes:
-      label: 现在的替代方案
-      description: 手动补上下文 / 用别的工具 / 忍着——都能帮我们判断优先级。
+      label: Current workaround
+      description: Manual context, another tool, or just living with it — all help us judge priority.
     validations:
       required: false
 
   - type: dropdown
     id: area
     attributes:
-      label: 影响范围
+      label: Area
       multiple: true
       options:
-        - 写作台（正文编辑 / 审阅 / 格式化）
-        - 大纲与章纲
-        - 角色 / 设定 / 伏笔 / 档案
-        - AI 助手（对话 / 改稿 / 任务卡）
-        - 书架与概览
-        - 设置（模型 / 提示词 / 外观 / 数据）
-        - 导入导出
-        - 安装、构建与兼容性
-        - 文档
-        - 其他
+        - Writing desk (prose editing / review / formatting)
+        - Story and chapter outlines
+        - Characters / world / foreshadowing / archives
+        - AI assistant (chat / revisions / task cards)
+        - Library and overview
+        - Settings (models / prompts / appearance / data)
+        - Import and export
+        - Installation, builds, and compatibility
+        - Documentation
+        - Other
     validations:
       required: true
 
   - type: textarea
     id: ai-cost
     attributes:
-      label: 与 AI 费用有关吗？
-      description: 如果这个建议会增加模型调用，请说明大概多几次、值不值。
-      placeholder: 希望审阅前先本地 diff，只在确认后调用一次模型。
+      label: Does this affect AI cost?
+      description: If the idea adds model calls, roughly how many, and is it worth it?
+      placeholder: Diff locally before review, and call the model once after confirmation.
     validations:
       required: false
 
   - type: dropdown
     id: pr
     attributes:
-      label: 愿意提交 PR 吗
+      label: Would you submit a PR?
       options:
-        - 愿意（会先按 docs/development.md 说明实现思路）
-        - 只能提供使用反馈
-        - 不确定
+        - Yes (I will outline the approach following docs/development.md first)
+        - Feedback only
+        - Not sure
     validations:
       required: true
 
   - type: markdown
     attributes:
       value: |
-        > 提示：涉及新依赖、存储结构变更、AI 协议变更的建议，先开 Issue 讨论，避免 PR 白做。
-        > 提交前可以先看一眼 [路线图](https://github.com/ZzimaR/dsh-yanfield#路线图)。
+        > New dependencies, storage changes, and AI protocol changes should be discussed in an issue first, so a PR does not go to waste.
+        > See the [roadmap](https://github.com/ZzimaR/dsh-yanfield#roadmap) before filing.

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/kit";
+import { t } from "@/lib/i18n";
 
 interface EditorErrorBoundaryProps {
   children: React.ReactNode;
@@ -48,12 +49,12 @@ export class EditorErrorBoundary extends React.Component<EditorErrorBoundaryProp
   render(): React.ReactNode {
     if (!this.state.hasError) return this.props.children;
 
-    const name = this.props.title ?? "AI 面板";
+    const name = this.props.title ?? t("AI 面板");
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-        <span className="text-[13px] font-medium text-ink">{name}渲染出错</span>
+        <span className="text-[13px] font-medium text-ink">{t("{name}渲染出错", { name })}</span>
         <p className="max-w-[240px] text-[12px] leading-relaxed text-ink-3">
-          已隔离故障，正文写作与保存不受影响。
+          {t("已隔离故障，正文写作与保存不受影响。")}
         </p>
         {this.state.message ? (
           <p className="max-w-[240px] break-words rounded-sm bg-surface-2 px-2 py-1 text-[11px] text-ink-4">
@@ -61,7 +62,7 @@ export class EditorErrorBoundary extends React.Component<EditorErrorBoundaryProp
           </p>
         ) : null}
         <Button variant="secondary" size="sm" onClick={this.handleRetry}>
-          重新加载{name}
+          {t("重新加载{name}", { name })}
         </Button>
       </div>
     );

@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { estimateAiCost, formatCny, type TokenPrice } from "@/lib/ai/cost";
+import { t } from "@/lib/i18n";
 import { formatTokens } from "./utils";
 
 export function describeAiSpend(promptTokens: number, completionTokens: number, price: TokenPrice, cache: {cachedInputTokens?:number;cacheReportedInputTokens?:number}={}): string {
-  const tokens = `输入 ${formatTokens(promptTokens)} · 输出 ${formatTokens(completionTokens)}`;
+  const tokens = t("输入 {input} · 输出 {output}", { input: formatTokens(promptTokens), output: formatTokens(completionTokens) });
   const cost = estimateAiCost(promptTokens, completionTokens, price,cache);
-  return cost == null ? tokens : `${tokens} · 约 ${formatCny(cost)}`;
+  return cost == null ? tokens : t("{tokens} · 约 {cost}", { tokens, cost: formatCny(cost) });
 }
 
 export function AiSpendLine({
@@ -26,7 +27,7 @@ export function AiSpendLine({
   cachedInputTokens?:number;cacheReportedInputTokens?:number;
 }) {
   const detail = describeAiSpend(promptTokens, completionTokens, price,{cachedInputTokens,cacheReportedInputTokens});
-  const times = calls != null ? ` · ${calls} 次` : "";
+  const times = calls != null ? t(" · {calls} 次", { count: calls, calls }) : "";
   return (
     <p className="text-[12.5px] tabular-nums text-ink-2">
       <span className="text-ink-3">{prefix}</span>

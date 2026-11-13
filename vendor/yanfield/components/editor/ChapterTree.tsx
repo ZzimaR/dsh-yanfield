@@ -29,6 +29,7 @@ import { sameListOrderIndex } from "@/lib/editor/reorder";
 import { volumeWordCount, type NovelTree, type TreeActions, type TreeVolume } from "@/lib/editor/types";
 import { STATUS_DOT_CLASS } from "./StatusMenu";
 import { PromptDialog } from "./PromptDialog";
+import { useT } from "@/lib/i18n";
 
 interface ChapterTreeProps {
   novelId: string;
@@ -95,6 +96,7 @@ export function ChapterTree({
   actions,
   onSelectChapter,
 }: ChapterTreeProps) {
+  const tr = useT();
   const [collapsed, setCollapsed] = useLocalStorageState<Record<string, boolean>>(
     `yanfield:editor:collapsed:${novelId}`,
     {},
@@ -274,37 +276,37 @@ export function ChapterTree({
     if (!prompt) return { title: "", label: "", placeholder: "", initialValue: "" };
     switch (prompt.kind) {
       case "create-volume":
-        return { title: "新建卷", label: "卷名", placeholder: "如：第一卷 · 落雪", initialValue: "" };
+        return { title: tr("新建卷"), label: tr("卷名"), placeholder: tr("如：第一卷 · 落雪"), initialValue: "" };
       case "rename-volume":
-        return { title: "重命名卷", label: "卷名", placeholder: "", initialValue: prompt.volume.title };
+        return { title: tr("重命名卷"), label: tr("卷名"), placeholder: "", initialValue: prompt.volume.title };
       case "create-chapter":
         return {
-          title: prompt.volume ? `在「${prompt.volume.title}」新建章节` : "新建章节",
-          label: "章节名",
-          placeholder: "如：第一章 · 风起",
+          title: prompt.volume ? tr("在“{title}”新建章节", { title: prompt.volume.title }) : tr("新建章节"),
+          label: tr("章节名"),
+          placeholder: tr("如：第一章 · 风起"),
           initialValue: "",
         };
       case "rename-chapter":
-        return { title: "重命名章节", label: "章节名", placeholder: "", initialValue: prompt.chapter.title };
+        return { title: tr("重命名章节"), label: tr("章节名"), placeholder: "", initialValue: prompt.chapter.title };
     }
-  }, [prompt]);
+  }, [prompt, tr]);
 
   /** 章节行下拉菜单 */
   const chapterMenuItems = (chapter: Chapter, siblings: Chapter[], index: number): DropdownItem[] => {
     const items: DropdownItem[] = [
       {
-        label: "重命名",
+        label: tr("重命名"),
         icon: <Pencil className="size-3.5" />,
         onSelect: () => setPrompt({ kind: "rename-chapter", chapter }),
       },
       {
-        label: "上移",
+        label: tr("上移"),
         icon: <ArrowUp className="size-3.5" />,
         disabled: index <= 0,
         onSelect: () => void moveChapter(chapter, -1),
       },
       {
-        label: "下移",
+        label: tr("下移"),
         icon: <ArrowDown className="size-3.5" />,
         disabled: index < 0 || index >= siblings.length - 1,
         onSelect: () => void moveChapter(chapter, 1),
@@ -314,9 +316,9 @@ export function ChapterTree({
     // 跨卷移动：列出其它卷 + 未分卷
     const otherTargets: { label: string; target: TreeVolume | null }[] = [];
     for (const volume of volumes) {
-      if (volume.id !== chapter.volumeId) otherTargets.push({ label: `移入「${volume.title}」`, target: volume });
+      if (volume.id !== chapter.volumeId) otherTargets.push({ label: tr("移入“{title}”", { title: volume.title }), target: volume });
     }
-    if (chapter.volumeId !== null) otherTargets.push({ label: "移出到未分卷", target: null });
+    if (chapter.volumeId !== null) otherTargets.push({ label: tr("移出到未分卷"), target: null });
     if (otherTargets.length > 0) {
       items.push({ separator: true });
       for (const item of otherTargets) {
@@ -326,7 +328,7 @@ export function ChapterTree({
 
     items.push({ separator: true });
     items.push({
-      label: "删除章节",
+      label: tr("删除章节"),
       icon: <Trash2 className="size-3.5" />,
       danger: true,
       onSelect: () => setConfirm({ kind: "delete-chapter", chapter }),
@@ -366,8 +368,8 @@ export function ChapterTree({
       >
         <span
           draggable
-          aria-label="拖动调整章节顺序"
-          title="拖动排序，也可拖到别的卷"
+          aria-label={tr("拖动调整章节顺序")}
+          title={tr("拖动排序，也可拖到别的卷")}
           onDragStart={(event) => beginDrag(event, { kind: "chapter", id: chapter.id, volumeId: chapter.volumeId }, chapter.title)}
           onDragEnd={endDrag}
           {...touchGrip({ kind: "chapter", id: chapter.id, volumeId: chapter.volumeId })}
@@ -381,7 +383,10 @@ export function ChapterTree({
           onClick={() => onSelectChapter(chapter.id)}
           onDoubleClick={() => setPrompt({ kind: "rename-chapter", chapter })}
           className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm px-1 py-[5px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-          title={`${chapter.title || "未命名章节"} · ${CHAPTER_STATUS_LABEL[chapter.status]} · 双击重命名`}
+          title={tr("{title} · {status} · 双击重命名", {
+            title: chapter.title || tr("未命名章节"),
+            status: tr(CHAPTER_STATUS_LABEL[chapter.status]),
+          })}
         >
           <span
             className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT_CLASS[chapter.status])}
@@ -393,7 +398,7 @@ export function ChapterTree({
               active ? "font-medium text-accent" : "text-ink-2",
             )}
           >
-            {chapter.title || "未命名章节"}
+            {chapter.title || tr("未命名章节")}
           </span>
         </button>
         <span className="shrink-0 pl-0.5 pr-1 text-[10.5px] tabular-nums text-ink-4">
@@ -406,7 +411,7 @@ export function ChapterTree({
             width={196}
             items={chapterMenuItems(chapter, siblings, index)}
             trigger={
-              <IconButton label="章节操作" size="sm" className="text-ink-4">
+              <IconButton label={tr("章节操作")} size="sm" className="text-ink-4">
                 <MoreHorizontal className="size-3.5" />
               </IconButton>
             }
@@ -421,31 +426,31 @@ export function ChapterTree({
     const isCurrentVolume = volume.id === currentVolumeId;
     const items: DropdownItem[] = [
       {
-        label: "新建章节",
+        label: tr("新建章节"),
         icon: <FileText className="size-3.5" />,
         onSelect: () => setPrompt({ kind: "create-chapter", volume }),
       },
       {
-        label: "重命名",
+        label: tr("重命名"),
         icon: <Pencil className="size-3.5" />,
         onSelect: () => setPrompt({ kind: "rename-volume", volume }),
       },
       { separator: true },
       {
-        label: "上移",
+        label: tr("上移"),
         icon: <ArrowUp className="size-3.5" />,
         disabled: index <= 0,
         onSelect: () => void moveVolume(volume, -1),
       },
       {
-        label: "下移",
+        label: tr("下移"),
         icon: <ArrowDown className="size-3.5" />,
         disabled: index >= volumes.length - 1,
         onSelect: () => void moveVolume(volume, 1),
       },
       { separator: true },
       {
-        label: "删除卷",
+        label: tr("删除卷"),
         icon: <Trash2 className="size-3.5" />,
         danger: true,
         onSelect: () => setConfirm({ kind: "delete-volume", volume }),
@@ -493,8 +498,8 @@ export function ChapterTree({
         >
           <span
             draggable
-            aria-label="拖动调整卷顺序"
-            title="拖动调整卷的顺序"
+            aria-label={tr("拖动调整卷顺序")}
+            title={tr("拖动调整卷的顺序")}
             onDragStart={(event) => beginDrag(event, { kind: "volume", id: volume.id }, volume.title)}
             onDragEnd={endDrag}
             {...touchGrip({ kind: "volume", id: volume.id })}
@@ -515,7 +520,7 @@ export function ChapterTree({
             aria-expanded={!isCollapsed}
             aria-current={isCurrentVolume ? "true" : undefined}
             className="flex min-w-0 flex-1 items-center gap-1 rounded-sm px-1 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-            title="单击展开，双击重命名"
+            title={tr("单击展开，双击重命名")}
           >
             <span
               className={cn(
@@ -537,7 +542,11 @@ export function ChapterTree({
               {volume.title}
             </span>
             <span className="ml-auto shrink-0 pl-1 text-[10.5px] tabular-nums text-ink-4">
-              {volume.chapters.length} 章 · {volumeWordCount(volume) > 0 ? formatWords(volumeWordCount(volume)) : "—"}
+              {tr("{n} 章 · {words}", {
+                n: volume.chapters.length,
+                words: volumeWordCount(volume) > 0 ? formatWords(volumeWordCount(volume)) : "—",
+                count: volume.chapters.length,
+              })}
             </span>
           </button>
           <div className="shrink-0">
@@ -546,7 +555,7 @@ export function ChapterTree({
               width={188}
               items={items}
               trigger={
-                <IconButton label="卷操作" size="sm" className="text-ink-4">
+                <IconButton label={tr("卷操作")} size="sm" className="text-ink-4">
                   <MoreHorizontal className="size-3.5" />
                 </IconButton>
               }
@@ -575,7 +584,7 @@ export function ChapterTree({
                 data-volume-id={volume.id}
                 className="w-full rounded-sm px-2 py-1 text-left text-[11.5px] text-ink-4 transition-colors hover:bg-surface-2 hover:text-ink-3"
               >
-                拖到这里，或新建第一章
+                {tr("拖到这里，或新建第一章")}
               </button>
             ) : (
               volume.chapters.map((chapter, chapterIndex) => renderChapterRow(chapter, volume.chapters, chapterIndex))
@@ -592,22 +601,24 @@ export function ChapterTree({
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* 目录工具条 */}
-      <div className="flex items-center gap-0.5 border-b border-line px-2 py-1.5">
+      <div className="flex flex-wrap items-center gap-0.5 border-b border-line px-2 py-1.5">
         <Button
           variant="ghost"
           size="sm"
+          className="whitespace-nowrap"
           icon={<FolderPlus className="size-3.5" />}
           onClick={() => setPrompt({ kind: "create-volume" })}
         >
-          新建卷
+          {tr("新建卷")}
         </Button>
         <Button
           variant="ghost"
           size="sm"
+          className="whitespace-nowrap"
           icon={<Plus className="size-3.5" />}
           onClick={() => setPrompt({ kind: "create-chapter", volume: null })}
         >
-          新建章
+          {tr("新建章")}
         </Button>
       </div>
 
@@ -622,8 +633,8 @@ export function ChapterTree({
           <div className="px-2 py-6">
             <EmptyState
               icon={<FolderPlus className="size-5" />}
-              title="还没有章节"
-              description="先建一卷来组织篇幅，或直接写第一章。"
+              title={tr("还没有章节")}
+              description={tr("先建一卷来组织篇幅，或直接写第一章。")}
               action={
                 <div className="flex flex-wrap items-center justify-center gap-2 [&>button]:shrink-0 [&>button]:whitespace-nowrap">
                   <Button
@@ -632,10 +643,10 @@ export function ChapterTree({
                     icon={<Plus className="size-3.5" />}
                     onClick={() => setPrompt({ kind: "create-chapter", volume: null })}
                   >
-                    写第一章
+                    {tr("写第一章")}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setPrompt({ kind: "create-volume" })}>
-                    先建卷
+                    {tr("先建卷")}
                   </Button>
                 </div>
               }
@@ -674,15 +685,15 @@ export function ChapterTree({
                   >
                     <FolderOpen className="size-3 shrink-0 text-ink-4" aria-hidden />
                     <span className="truncate text-[13px] font-semibold tracking-wide text-ink-2">
-                      未分卷
+                      {tr("未分卷")}
                     </span>
                     <span className="ml-auto shrink-0 pl-1 text-[10.5px] tabular-nums text-ink-4">
-                      {looseChapters.length} 章
+                      {tr("{n} 章", { n: looseChapters.length, count: looseChapters.length })}
                     </span>
                   </button>
                   <div className="shrink-0">
                     <IconButton
-                      label="新建章节"
+                      label={tr("新建章节")}
                       size="sm"
                       onClick={() => setPrompt({ kind: "create-chapter", volume: null })}
                     >
@@ -711,7 +722,7 @@ export function ChapterTree({
         label={promptMeta.label}
         placeholder={promptMeta.placeholder}
         initialValue={promptMeta.initialValue}
-        confirmText={prompt?.kind === "rename-chapter" || prompt?.kind === "rename-volume" ? "保存" : "创建"}
+        confirmText={prompt?.kind === "rename-chapter" || prompt?.kind === "rename-volume" ? tr("保存") : tr("创建")}
         onClose={() => setPrompt(null)}
         onSubmit={submitPrompt}
       />
@@ -719,15 +730,15 @@ export function ChapterTree({
       {/* 删除确认 */}
       <ConfirmDialog
         open={confirm !== null}
-        title={confirm?.kind === "delete-volume" ? "删除这一卷？" : "删除这一章？"}
+        title={confirm?.kind === "delete-volume" ? tr("删除这一卷？") : tr("删除这一章？")}
         description={
           confirm?.kind === "delete-volume"
-            ? `卷「${confirm.volume.title}」和它的卷纲会被删除。卷里的章节会移到「未分卷」，正文还在。`
+            ? tr("卷“{title}”和它的卷纲会被删除。卷里的章节会移到“未分卷”，正文还在。", { title: confirm.volume.title })
             : confirm?.kind === "delete-chapter"
-              ? `章节「${confirm.chapter.title}」的正文与章纲将一起删除。`
+              ? tr("章节“{title}”的正文与章纲将一起删除。", { title: confirm.chapter.title })
               : undefined
         }
-        confirmText="删除"
+        confirmText={tr("删除")}
         danger
         loading={busy}
         onConfirm={() => void submitDelete()}

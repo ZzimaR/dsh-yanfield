@@ -9,6 +9,7 @@ import * as React from "react";
 import { LoaderCircle, RefreshCw, Search, Users } from "lucide-react";
 import { apiGet } from "@/lib/client/api";
 import { cn } from "@/lib/ui/cn";
+import { t, useT } from "@/lib/i18n";
 import type { MentionOption } from "./types";
 import { MENTION_TYPE_LABEL, MENTION_TYPE_ORDER } from "./utils";
 
@@ -46,24 +47,24 @@ function toOption(type: MentionOption["type"], row: RawRow): MentionOption | nul
   const id = readString(row, ["id"]);
   if (!id) return null;
   if (type === "chapter") {
-    const title = readString(row, ["title", "name"]) || "未命名章节";
+    const title = readString(row, ["title", "name"]) || t("未命名章节");
     const order = row["order"];
-    const prefix = typeof order === "number" ? `第 ${order} 章 · ` : "";
+    const prefix = typeof order === "number" ? t("第 {order} 章 · ", { order }) : "";
     return { type, id, label: `${prefix}${title}`, description: "" };
   }
   if (type === "character") {
-    const name = readString(row, ["name", "title"]) || "未命名角色";
+    const name = readString(row, ["name", "title"]) || t("未命名角色");
     return { type, id, label: name, description: readString(row, ["role", "identity", "description"]) };
   }
   if (type === "world") {
-    const name = readString(row, ["name", "title"]) || "未命名设定";
+    const name = readString(row, ["name", "title"]) || t("未命名设定");
     return { type, id, label: name, description: readString(row, ["category", "summary", "description"]) };
   }
   if (type === "foreshadow") {
-    const name = readString(row, ["title", "name"]) || "未命名伏笔";
+    const name = readString(row, ["title", "name"]) || t("未命名伏笔");
     return { type, id, label: name, description: readString(row, ["status", "content", "description"]) };
   }
-  const name = readString(row, ["chapterTitle", "title", "name"]) || "未命名档案";
+  const name = readString(row, ["chapterTitle", "title", "name"]) || t("未命名档案");
   return { type, id, label: name, description: readString(row, ["summary", "content"]) };
 }
 
@@ -92,7 +93,7 @@ async function loadMentionOptions(novelId: string): Promise<{ options: MentionOp
     const first = failures[0];
     throw new Error(first?.status === "rejected" && first.reason instanceof Error
       ? first.reason.message
-      : "引用资料加载失败");
+      : t("引用资料加载失败"));
   }
   for (const result of settled) {
     if (result.status !== "fulfilled") continue;
@@ -107,11 +108,12 @@ async function loadMentionOptions(novelId: string): Promise<{ options: MentionOp
   }
   return {
     options,
-    warning: failures.length ? `${failures.length} 类资料加载失败，当前仅显示已成功加载的资料。` : null,
+    warning: failures.length ? t("{count} 类资料加载失败，当前仅显示已成功加载的资料。", { count: failures.length }) : null,
   };
 }
 
 export function MentionPicker({ novelId, query, onPick, onRegisterFirstOption }: MentionPickerProps) {
+  const tr = useT();
   const [options, setOptions] = React.useState<MentionOption[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -124,11 +126,11 @@ export function MentionPicker({ novelId, query, onPick, onRegisterFirstOption }:
       setOptions(result.options);
       setError(result.warning);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "引用资料加载失败");
+      setError(err instanceof Error ? err.message : tr("引用资料加载失败"));
     } finally {
       setLoading(false);
     }
-  }, [novelId]);
+  }, [novelId, tr]);
 
   React.useEffect(() => {
     let alive = true;
@@ -142,7 +144,7 @@ export function MentionPicker({ novelId, query, onPick, onRegisterFirstOption }:
         }
       })
       .catch((err: unknown) => {
-        if (alive) setError(err instanceof Error ? err.message : "引用资料加载失败");
+        if (alive) setError(err instanceof Error ? err.message : tr("引用资料加载失败"));
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -150,7 +152,7 @@ export function MentionPicker({ novelId, query, onPick, onRegisterFirstOption }:
     return () => {
       alive = false;
     };
-  }, [novelId]);
+  }, [novelId, tr]);
 
   const filtered = React.useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -188,7 +190,7 @@ export function MentionPicker({ novelId, query, onPick, onRegisterFirstOption }:
       <div className="flex items-center gap-1.5 border-b border-line px-2.5 py-1.5 text-[11px] text-ink-4">
         <Search className="size-3" />
         <span className="min-w-0 flex-1 truncate">
-          {query ? `引用资料：${query}` : "选择要引用的资料"}
+          {query ? tr("引用资料：{query}", { query }) : tr("选择要引用的资料")}
         </span>
         {loading ? <LoaderCircle className="size-3 animate-spin text-ink-3" /> : null}
       </div>
@@ -202,17 +204,17 @@ export function MentionPicker({ novelId, query, onPick, onRegisterFirstOption }:
               onClick={() => void load()}
               className="inline-flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-[11px] text-ink-2 transition-colors hover:bg-surface-2"
             >
-              <RefreshCw className="size-3" /> 重试
+              <RefreshCw className="size-3" /> {tr("重试")}
             </button>
           </div>
         ) : groups.length === 0 ? (
           <div className="flex flex-col items-center gap-1.5 px-3 py-5 text-center">
             <Users className="size-4 text-ink-4" />
             <p className="text-[12px] text-ink-3">
-              {loading ? "正在加载资料…" : query ? "没有匹配的资料" : "暂无可引用的资料"}
+              {loading ? tr("正在加载资料…") : query ? tr("没有匹配的资料") : tr("暂无可引用的资料")}
             </p>
             {!loading && options.length === 0 ? (
-              <p className="text-[11px] text-ink-4">可先在「大纲 / 设定 / 档案」页创建内容</p>
+              <p className="text-[11px] text-ink-4">{tr("可先在「大纲 / 设定 / 档案」页创建内容")}</p>
             ) : null}
           </div>
         ) : (
@@ -221,7 +223,7 @@ export function MentionPicker({ novelId, query, onPick, onRegisterFirstOption }:
             {groups.map((group) => (
             <div key={group.type} className="mb-1 last:mb-0">
               <div className="px-2 py-1 text-[10.5px] font-medium tracking-wide text-ink-4">
-                {MENTION_TYPE_LABEL[group.type]}
+                {tr(MENTION_TYPE_LABEL[group.type])}
               </div>
               {group.items.map((item) => (
                 <button

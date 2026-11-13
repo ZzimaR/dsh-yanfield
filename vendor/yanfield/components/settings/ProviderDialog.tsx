@@ -4,6 +4,7 @@ import * as React from "react";
 import { ArrowUpRight, Save } from "lucide-react";
 import { Button, Dialog, Input, Switch } from "@/components/ui/kit";
 import { apiPatch, apiPost, notifyDataChanged } from "@/lib/client/api";
+import { useT } from "@/lib/i18n";
 import type { ProviderPreset } from "@/lib/defaults";
 import type { ModelOption, ProviderConfig, ProviderKind } from "@/lib/types";
 import { ProviderModelsField } from "./ProviderModelsField";
@@ -66,6 +67,7 @@ function formFromPreset(preset: ProviderPreset): ProviderForm {
 
 /** 新增 / 编辑模型服务。apiKey 留空表示不修改已保存的密钥。 */
 export function ProviderDialog({ open, provider, preset, onClose, onSaved }: ProviderDialogProps) {
+  const tr = useT();
   const [form, setForm] = React.useState<ProviderForm>(EMPTY_FORM);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -89,11 +91,11 @@ export function ProviderDialog({ open, provider, preset, onClose, onSaved }: Pro
     const name = form.name.trim();
     const isHarness = form.kind === "harness";
     if (!name) {
-      setError("给这个服务起个名字吧，例如「DeepSeek」。");
+      setError(tr("给这个服务起个名字吧，例如「DeepSeek」。"));
       return;
     }
     if (!isHarness && !form.baseUrl.trim()) {
-      setError("请填写 Base URL（DeepSeek 官方地址为 https://api.deepseek.com）。");
+      setError(tr("请填写 Base URL（DeepSeek 官方地址为 https://api.deepseek.com）。"));
       return;
     }
     setSaving(true);
@@ -113,32 +115,32 @@ export function ProviderDialog({ open, provider, preset, onClose, onSaved }: Pro
       notifyDataChanged("providers");
       onSaved(saved);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "保存失败，请稍后再试。");
+      setError(cause instanceof Error ? cause.message : tr("保存失败，请稍后再试。"));
     } finally {
       setSaving(false);
     }
   };
 
   const apiKeyHint = provider
-    ? `当前密钥：${provider.apiKey || "未设置"}；留空表示不修改。`
-    : "密钥只写入本机 SQLite，不会上传到任何服务器。";
+    ? tr("当前密钥：{key}；留空表示不修改。", { key: provider.apiKey || tr("未设置") })
+    : tr("密钥只写入本机 SQLite，不会上传到任何服务器。");
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title={provider ? "编辑模型服务" : "添加模型服务"}
+      title={provider ? tr("编辑模型服务") : tr("添加模型服务")}
       description={form.kind === "harness"
-        ? "这一项走 DeepSeek Harness 里已经配置好的模型，不需要再填 API Key。"
-        : "本构建专精 DeepSeek：填写官方 API Key，即可对话、写作，并查询账户余额。"}
+        ? tr("这一项走 DeepSeek Harness 里已经配置好的模型，不需要再填 API Key。")
+        : tr("本构建专精 DeepSeek：填写官方 API Key，即可对话、写作，并查询账户余额。")}
       width={620}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving}>
-            取消
+            {tr("取消")}
           </Button>
           <Button variant="primary" icon={<Save className="size-4" />} onClick={submit} loading={saving}>
-            保存
+            {tr("保存")}
           </Button>
         </>
       }
@@ -161,7 +163,7 @@ export function ProviderDialog({ open, provider, preset, onClose, onSaved }: Pro
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-accent hover:underline"
                 >
-                  去 DeepSeek 控制台申请 API Key
+                  {tr("去 DeepSeek 控制台申请 API Key")}
                   <ArrowUpRight className="size-3" aria-hidden />
                 </a>
               ) : null}
@@ -170,41 +172,43 @@ export function ProviderDialog({ open, provider, preset, onClose, onSaved }: Pro
           </div>
         ) : form.kind === "harness" ? (
           <p className="rounded-md border border-line bg-surface-2/70 px-3 py-2.5 text-[11.5px] leading-5 text-ink-3">
-            模型由 DeepSeek Harness 提供。写作、审阅和资料整理都走当前 profile 里的模型，书稿仍保存在本机。
+            {tr("模型由 DeepSeek Harness 提供。写作、审阅和资料整理都走当前 profile 里的模型，书稿仍保存在本机。")}
           </p>
         ) : (
           <p className="rounded-md border border-line bg-surface-2/70 px-3 py-2.5 text-[11.5px] leading-5 text-ink-3">
-            接入类型固定为 <span className="font-medium text-ink-2">DeepSeek 官方接口</span>；其他服务商适配已移除。
+            {tr("接入类型固定为")}{" "}
+            <span className="font-medium text-ink-2">{tr("DeepSeek 官方接口")}</span>
+            {tr("；其他服务商适配已移除。")}
           </p>
         )}
         <div className="grid gap-3.5 sm:grid-cols-2">
           <Input
-            label="名称"
+            label={tr("名称")}
             autoFocus
             maxLength={40}
             value={form.name}
             onChange={(event) => update("name", event.target.value)}
-            placeholder="例如：DeepSeek"
+            placeholder={tr("例如：DeepSeek")}
             error={error}
           />
           {form.kind === "harness" ? null : (
           <Input
-            label="Base URL"
+            label={tr("Base URL")}
             value={form.baseUrl}
             onChange={(event) => update("baseUrl", event.target.value)}
             placeholder={DEEPSEEK_BASE_URL}
-            hint="使用官方地址 https://api.deepseek.com 才能查询账户余额。"
+            hint={tr("使用官方地址 https://api.deepseek.com 才能查询账户余额。")}
           />
           )}
         </div>
         {form.kind === "harness" ? null : (
         <Input
-          label={provider ? "API Key（可选）" : "API Key"}
+          label={provider ? tr("API Key（可选）") : tr("API Key")}
           type="password"
           autoComplete="off"
           value={form.apiKey}
           onChange={(event) => update("apiKey", event.target.value)}
-          placeholder={provider ? "留空表示不修改" : "sk-…"}
+          placeholder={provider ? tr("留空表示不修改") : "sk-…"}
           hint={apiKeyHint}
         />
         )}
@@ -220,8 +224,8 @@ export function ProviderDialog({ open, provider, preset, onClose, onSaved }: Pro
           <Switch
             checked={form.enabled}
             onChange={(checked) => update("enabled", checked)}
-            label="启用这个服务"
-            hint="停用后不会出现在默认模型选择里"
+            label={tr("启用这个服务")}
+            hint={tr("停用后不会出现在默认模型选择里")}
           />
         </div>
       </form>

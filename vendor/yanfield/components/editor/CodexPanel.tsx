@@ -15,6 +15,7 @@ import {
 } from "@/lib/types";
 import { worldRows } from "@/lib/editor/world-tree";
 import { cn } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import { reindexChaptersByVolume, sortChaptersByVolume } from "@/components/outline/form-kit";
 import { CharacterEditor } from "@/components/cards/CharacterEditor";
 import { WorldEditor } from "@/components/cards/WorldEditor";
@@ -75,6 +76,7 @@ function entryMatches(entry: CodexEntry, keyword: string): boolean {
  * 点击条目直接打开编辑器，写作时不用先离开章节。
  */
 export function CodexPanel({ novelId }: CodexPanelProps) {
+  const tr = useT();
   const charactersApi = useApi<unknown>(`/api/characters?novelId=${encodeURIComponent(novelId)}`);
   const worldApi = useApi<unknown>(`/api/world?novelId=${encodeURIComponent(novelId)}`);
   const foreshadowsApi = useApi<unknown>(`/api/foreshadows?novelId=${encodeURIComponent(novelId)}`);
@@ -137,10 +139,10 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
   const matched = (inGroup("characters") ? filtered.characters.length : 0) + (inGroup("world") ? filtered.world.length : 0) + (inGroup("items") ? filtered.items.length : 0) + (inGroup("foreshadows") ? filtered.foreshadows.length : 0);
 
   const groups: { key: string; title: string; icon: React.ReactNode; entries: CodexEntry[]; total: number }[] = [
-    { key: "characters", title: "角色", icon: <User className="size-3.5" />, entries: filtered.characters, total: characters.length },
-    { key: "world", title: "世界观", icon: <MapPin className="size-3.5" />, entries: filtered.world, total: world.length - itemTotal },
-    { key: "items", title: "物品", icon: <Package className="size-3.5" />, entries: filtered.items, total: itemTotal },
-    { key: "foreshadows", title: "伏笔", icon: <ScrollText className="size-3.5" />, entries: filtered.foreshadows, total: foreshadows.length },
+    { key: "characters", title: tr("角色"), icon: <User className="size-3.5" />, entries: filtered.characters, total: characters.length },
+    { key: "world", title: tr("世界观"), icon: <MapPin className="size-3.5" />, entries: filtered.world, total: world.length - itemTotal },
+    { key: "items", title: tr("物品"), icon: <Package className="size-3.5" />, entries: filtered.items, total: itemTotal },
+    { key: "foreshadows", title: tr("伏笔"), icon: <ScrollText className="size-3.5" />, entries: filtered.foreshadows, total: foreshadows.length },
   ];
 
   const openCreate = (kind: CodexEntry["kind"]) => {
@@ -257,7 +259,7 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
       <div className="shrink-0 space-y-2 border-b border-line px-2.5 py-2">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] tabular-nums text-ink-3">
-            {keyword ? `${matched} / ${total} 条` : `${total} 条设定`}
+            {keyword ? tr("{matched} / {total} 条", { matched, total }) : tr("{n} 条设定", { n: total, count: total })}
           </span>
           <div className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-1">
             <Button
@@ -266,7 +268,7 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
               className="h-6 px-1.5 text-[11.5px]"
               onClick={() => openCreate("character")}
             >
-              新角色
+              {tr("新角色")}
             </Button>
             <Button
               variant="ghost"
@@ -274,7 +276,7 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
               className="h-6 px-1.5 text-[11.5px]"
               onClick={() => openCreate("foreshadow")}
             >
-              新伏笔
+              {tr("新伏笔")}
             </Button>
             <button
               type="button"
@@ -282,19 +284,19 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
               className="inline-flex items-center gap-1 rounded-sm text-[11.5px] text-ink-2 transition-colors hover:text-ink"
             >
               <Plus className="size-3" aria-hidden />
-              {activeGroup === "items" ? "新建物品" : "新建设定"}
+              {activeGroup === "items" ? tr("新建物品") : tr("新建设定")}
             </button>
           </div>
         </div>
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索角色 / 世界观 / 物品 / 伏笔"
-          aria-label="搜索设定"
+          placeholder={tr("搜索角色 / 世界观 / 物品 / 伏笔")}
+          aria-label={tr("搜索设定")}
           className="h-8 text-[12px]"
         />
-        <div className="flex gap-1 rounded-md bg-surface-2 p-1" role="group" aria-label="资料分类">
-          {[{key:"all",title:"全部",total},...groups].map(group=>(
+        <div className="flex gap-1 rounded-md bg-surface-2 p-1" role="group" aria-label={tr("资料分类")}>
+          {[{key:"all",title:tr("全部"),total},...groups].map(group=>(
             <button key={group.key} type="button" aria-pressed={activeGroup===group.key}
               onClick={()=>setActiveGroup(group.key)}
               className={cn("flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded px-1 py-1.5 text-[11px] transition-colors",activeGroup===group.key?"bg-surface text-ink shadow-sm":"text-ink-3 hover:text-ink")}>
@@ -315,12 +317,12 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
           <div className="px-2 py-6">
             <EmptyState
               icon={<ScrollText className="size-5" />}
-              title="还没有设定"
-              description="点「新建设定」，在正文上打开一张卡。整段材料用「交给助手」交给右侧输入框。"
+              title={tr("还没有设定")}
+              description={tr("点“新建设定”，在正文上打开一张卡。整段材料用“交给助手”交给右侧输入框。")}
             />
           </div>
         ) : matched === 0 ? (
-          <p className="px-2 py-6 text-center text-[12px] text-ink-3">{query.trim() ? `没有匹配「${query.trim()}」的资料` : "此分类还没有资料"}</p>
+          <p className="px-2 py-6 text-center text-[12px] text-ink-3">{query.trim() ? tr("没有匹配“{query}”的资料", { query: query.trim() }) : tr("此分类还没有资料")}</p>
         ) : (
           <div className="space-y-3">
             {groups.filter(group=>activeGroup==="all" || group.key===activeGroup).map((group) => {
@@ -334,8 +336,8 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
                     <span>{group.title}</span>
                     <span className="tabular-nums">{group.entries.length}</span>
                     {tree && parentIds.size>0 ? <span className="ml-auto flex gap-2 font-normal tracking-normal">
-                      <button type="button" onClick={()=>setCollapsed(prev=>{const next=new Set(prev);parentIds.forEach(id=>next.delete(id));return next;})} className="hover:text-accent">全部展开</button>
-                      <button type="button" onClick={()=>setCollapsed(prev=>new Set([...prev,...parentIds]))} className="hover:text-accent">全部收起</button>
+                      <button type="button" onClick={()=>setCollapsed(prev=>{const next=new Set(prev);parentIds.forEach(id=>next.delete(id));return next;})} className="hover:text-accent">{tr("全部展开")}</button>
+                      <button type="button" onClick={()=>setCollapsed(prev=>new Set([...prev,...parentIds]))} className="hover:text-accent">{tr("全部收起")}</button>
                     </span> : null}
                   </div>
                   <div className="space-y-1">
@@ -353,7 +355,7 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
                       return (
                         <div key={`${entry.kind}:${entry.data.id}`} className="flex min-w-0 items-start"
                           style={{ marginLeft: Math.min(depth, 6) * 10, width: `calc(100% - ${Math.min(depth, 6) * 10}px)` }}>
-                          {branch?<button type="button" aria-label={`${folded?"展开":"收起"}${title}`} aria-expanded={!folded}
+                          {branch?<button type="button" aria-label={folded ? tr("展开{title}", { title }) : tr("收起{title}", { title })} aria-expanded={!folded}
                             className="mt-2 flex size-5 shrink-0 items-center justify-center rounded text-ink-3 hover:bg-surface-2 hover:text-ink focus-visible:outline-accent"
                             onClick={()=>setCollapsed(prev=>{const next=new Set(prev);if(next.has(entry.data.id))next.delete(entry.data.id);else next.add(entry.data.id);return next;})}>
                             <ChevronRight className={cn("size-3.5 transition-transform",!folded&&"rotate-90")}/>
@@ -366,7 +368,7 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
                           <span className="flex min-w-0 items-center gap-2">
                             <span className="shrink-0 text-ink-3">{branch?(folded?<Folder className="size-3.5"/>:<FolderOpen className="size-3.5"/>):group.icon}</span>
                             <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{entry.kind==="character"?entry.data.name:entry.data.title}</span>
-                            {importance?<span title={`重要程度：${WORLD_IMPORTANCE_LABEL[importance]}`} className={cn("shrink-0 rounded px-1 text-[10px] leading-4",importance==="high"?"bg-accent/10 text-accent":importance==="low"?"bg-surface-2 text-ink-4":"bg-jade/10 text-jade")}>{`重要·${WORLD_IMPORTANCE_LABEL[importance]}`}</span>:null}
+                            {importance?<span title={tr("重要程度：{level}", { level: tr(WORLD_IMPORTANCE_LABEL[importance]) })} className={cn("shrink-0 rounded px-1 text-[10px] leading-4",importance==="high"?"bg-accent/10 text-accent":importance==="low"?"bg-surface-2 text-ink-4":"bg-jade/10 text-jade")}>{tr("重要 · {level}", { level: tr(WORLD_IMPORTANCE_LABEL[importance]) })}</span>:null}
                           </span>
                           <span className="mt-0.5 block truncate pl-[22px] text-[11px] leading-5 text-ink-3">
                             {entry.kind==="character"?entry.data.identity:entry.kind==="world"?entry.data.summary:entry.data.description}

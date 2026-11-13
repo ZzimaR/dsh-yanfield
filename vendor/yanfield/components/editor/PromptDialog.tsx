@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button, Dialog, Input } from "@/components/ui/kit";
+import { useT } from "@/lib/i18n";
 
 interface PromptDialogProps {
   open: boolean;
@@ -24,10 +25,11 @@ export function PromptDialog({
   label,
   placeholder,
   initialValue = "",
-  confirmText = "确定",
+  confirmText,
   onClose,
   onSubmit,
 }: PromptDialogProps) {
+  const tr = useT();
   const [value, setValue] = React.useState(initialValue);
   const [busy, setBusy] = React.useState(false);
 
@@ -61,10 +63,10 @@ export function PromptDialog({
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={busy}>
-            取消
+            {tr("取消")}
           </Button>
           <Button variant="primary" onClick={() => void submit()} loading={busy} disabled={!value.trim()}>
-            {confirmText}
+            {confirmText ?? tr("确定")}
           </Button>
         </>
       }

@@ -9,6 +9,7 @@ import {
   type EditorLayoutSettings,
 } from "@/lib/editor/settings";
 import { DEFAULT_APP_SETTINGS, type AppSettings } from "@/lib/types";
+import { useT } from "@/lib/i18n";
 import { applySurfaceDataset } from "@/lib/ui/theme";
 import { EditorPreview } from "@/components/settings/EditorPreview";
 
@@ -103,6 +104,7 @@ function patchEditorFields(update: EditorSectionProps["update"], patch: EditorPa
 }
 
 export function EditorSection({ settings, update }: EditorSectionProps) {
+  const tr = useT();
   const { toast } = useToast();
   if (!settings) return null;
 
@@ -122,20 +124,20 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
       ...DEFAULT_EDITOR_LAYOUT,
     });
     applySurfaceDataset("proseFont", DEFAULT_APP_SETTINGS.proseFont);
-    toast({ title: "已恢复默认排版", description: "字号、行高、间距与边距均回到默认值", tone: "success" });
+    toast({ title: tr("已恢复默认排版"), description: tr("字号、行高、间距与边距均回到默认值"), tone: "success" });
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="font-serif text-lg text-ink">编辑器</h2>
+          <h2 className="font-serif text-lg text-ink">{tr("编辑器")}</h2>
           <p className="mt-1 max-w-[62ch] text-[12px] leading-6 text-ink-3">
-            调整写作页的字体、行距与页面留白。所有改动即时生效并自动保存。
+            {tr("调整写作页的字体、行距与页面留白。所有改动即时生效并自动保存。")}
           </p>
         </div>
         <Button variant="secondary" size="sm" className="shrink-0" icon={<RotateCcw className="size-3.5" aria-hidden />} onClick={resetAll}>
-          恢复默认
+          {tr("恢复默认")}
         </Button>
       </div>
 
@@ -144,28 +146,28 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
           <Card className="p-4">
             <h3 className="flex items-center gap-1.5 text-[13px] font-medium text-ink">
               <Eye className="size-3.5 text-ink-3" aria-hidden />
-              编辑显示
+              {tr("编辑显示")}
             </h3>
-            <p className="mt-1 text-[11px] leading-5 text-ink-3">编辑器里显示哪些辅助信息，只影响写作界面。</p>
+            <p className="mt-1 text-[11px] leading-5 text-ink-3">{tr("编辑器里显示哪些辅助信息，只影响写作界面。")}</p>
             <div className="mt-3 space-y-3">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-sm text-ink">显示状态栏</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-ink-3">底部字数、保存状态与章节进度</p>
+                  <p className="text-sm text-ink">{tr("显示状态栏")}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-ink-3">{tr("底部字数、保存状态与章节进度")}</p>
                 </div>
                 <Switch checked={showStatusBar} onChange={(checked) => patch({ showStatusBar: checked })} />
               </div>
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-sm text-ink">显示正文标注</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-ink-3">AI 建议、选中块与批注提示</p>
+                  <p className="text-sm text-ink">{tr("显示正文标注")}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-ink-3">{tr("AI 建议、选中块与批注提示")}</p>
                 </div>
                 <Switch checked={showInlineHints} onChange={(checked) => patch({ showInlineHints: checked })} />
               </div>
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-sm text-ink">界面动效</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-ink-3">面板滑入与按钮过渡动画</p>
+                  <p className="text-sm text-ink">{tr("界面动效")}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-ink-3">{tr("面板滑入与按钮过渡动画")}</p>
                 </div>
                 <Switch checked={motionEnabled} onChange={(checked) => patch({ motionEnabled: checked })} />
               </div>
@@ -175,14 +177,14 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
           <Card className="p-4">
             <h3 className="flex items-center gap-1.5 text-[13px] font-medium text-ink">
               <Type className="size-3.5 text-ink-3" aria-hidden />
-              字体
+              {tr("字体")}
             </h3>
             <div className="mt-3 grid gap-x-6 gap-y-4 sm:grid-cols-2">
               <div className="min-w-0">
-                <p className="mb-1.5 whitespace-nowrap text-[13px] font-medium text-ink-2">正文字体</p>
+                <p className="mb-1.5 whitespace-nowrap text-[13px] font-medium text-ink-2">{tr("正文字体")}</p>
                 <Select
-                  aria-label="正文字体"
-                  options={FONT_OPTIONS}
+                  aria-label={tr("正文字体")}
+                  options={FONT_OPTIONS.map((option) => ({ ...option, label: tr(option.label) }))}
                   value={settings.proseFont}
                   onChange={(event) => {
                     const next = event.target.value === "sans" ? "sans" : "serif";
@@ -192,21 +194,21 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
                 />
               </div>
               <div className="min-w-0">
-                <p className="mb-1.5 whitespace-nowrap text-[13px] font-medium text-ink-2">字重</p>
+                <p className="mb-1.5 whitespace-nowrap text-[13px] font-medium text-ink-2">{tr("字重")}</p>
                 <Select
-                  aria-label="字重"
-                  options={FONT_WEIGHT_OPTIONS}
+                  aria-label={tr("字重")}
+                  options={FONT_WEIGHT_OPTIONS.map((option) => ({ ...option, label: tr(option.label) }))}
                   value={String(fontWeight)}
                   onChange={(event) => patch({ editorFontWeight: Number(event.target.value) })}
                 />
               </div>
             </div>
             <p className="mt-2 text-[11px] leading-5 text-ink-3">
-              衬线更接近纸书阅读感，黑体在暗色与高分屏下更清晰；正文常用常规 400。
+              {tr("衬线更接近纸书阅读感，黑体在暗色与高分屏下更清晰；正文常用常规 400。")}
             </p>
             <div className="mt-4 space-y-4">
               <Slider
-                label="字号"
+                label={tr("字号")}
                 min={14}
                 max={32}
                 step={1}
@@ -215,7 +217,7 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
                 onChange={(value) => update({ editorFontSize: value })}
               />
               <Slider
-                label="行高"
+                label={tr("行高")}
                 min={1.2}
                 max={3}
                 step={0.05}
@@ -224,7 +226,7 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
                 onChange={(value) => update({ editorLineHeight: value })}
               />
               <Slider
-                label="字间距"
+                label={tr("字间距")}
                 min={0}
                 max={0.1}
                 step={0.005}
@@ -238,17 +240,17 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
           <Card className="p-4">
             <h3 className="flex items-center gap-1.5 text-[13px] font-medium text-ink">
               <LayoutTemplate className="size-3.5 text-ink-3" aria-hidden />
-              布局
+              {tr("布局")}
             </h3>
             <div className="mt-3 space-y-4">
               <Switch
                 checked={settings.firstLineIndent}
                 onChange={(checked) => update({ firstLineIndent: checked })}
-                label="段首缩进两字"
-                hint="中文小说习惯"
+                label={tr("段首缩进两字")}
+                hint={tr("中文小说习惯")}
               />
               <Slider
-                label="段落间距"
+                label={tr("段落间距")}
                 min={0}
                 max={40}
                 step={2}
@@ -257,7 +259,7 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
                 onChange={(value) => patch({ paragraphSpacing: value })}
               />
               <Slider
-                label="左右页边距"
+                label={tr("左右页边距")}
                 min={16}
                 max={160}
                 step={4}
@@ -266,7 +268,7 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
                 onChange={(value) => patch({ pagePaddingX: value })}
               />
               <Slider
-                label="上下页边距"
+                label={tr("上下页边距")}
                 min={16}
                 max={160}
                 step={4}
@@ -276,7 +278,7 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
               />
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-[13px] font-medium text-ink-2">最大行宽</p>
+                  <p className="text-[13px] font-medium text-ink-2">{tr("最大行宽")}</p>
                   <label className="flex items-center gap-1.5 text-[11.5px] text-ink-3">
                     <input
                       type="checkbox"
@@ -284,7 +286,7 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
                       checked={maxContentWidth === 0}
                       onChange={(event) => patch({ maxContentWidth: event.target.checked ? 0 : 720 })}
                     />
-                    自适应（不限）
+                    {tr("自适应（不限）")}
                   </label>
                 </div>
                 <Slider
@@ -293,13 +295,13 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
                   step={10}
                   value={maxContentWidth === 0 ? 720 : maxContentWidth}
                   disabled={maxContentWidth === 0}
-                  hint={maxContentWidth === 0 ? "自适应" : `${maxContentWidth}px`}
+                  hint={maxContentWidth === 0 ? tr("自适应") : `${maxContentWidth}px`}
                   onChange={(value) => patch({ maxContentWidth: value })}
                 />
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3.5">
-              <span className="text-[11.5px] text-ink-3">快速预设</span>
+              <span className="text-[11.5px] text-ink-3">{tr("快速预设")}</span>
               {PRESETS.map((preset) => (
                 <Button
                   key={preset.key}
@@ -308,10 +310,10 @@ export function EditorSection({ settings, update }: EditorSectionProps) {
                   icon={<Wand2 className="size-3.5" aria-hidden />}
                   onClick={() => {
                     patch(preset.patch);
-                    toast({ title: `已套用「${preset.label}」`, description: preset.hint, tone: "success" });
+                    toast({ title: tr("已套用「{name}」", { name: tr(preset.label) }), description: tr(preset.hint), tone: "success" });
                   }}
                 >
-                  {preset.label}
+                  {tr(preset.label)}
                 </Button>
               ))}
             </div>

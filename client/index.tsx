@@ -3,9 +3,15 @@ import { createRoot, type Root } from "react-dom/client"
 import css from "./styles.generated.css"
 import { setThemeRoots, syncSurfaceTheme } from "@/lib/ui/theme"
 import { setYanfieldPortal } from "@/lib/ui/portal"
+import {
+  installLocaleBridge,
+  normalizeLocale,
+  t,
+  useT,
+} from "@/lib/i18n"
 import { YanfieldApp } from "./app"
 
-export const inject = ["slots"]
+export const inject = ["slots", "locale"]
 
 /** 侧栏只给 16px。用线条画田字格，跟宿主其他入口一样吃 currentColor。 */
 function PanelIcon({ size = 16 }: { size?: number }) {
@@ -19,15 +25,17 @@ function PanelIcon({ size = 16 }: { size?: number }) {
 }
 
 function RightTabTitle() {
-  return <span>砚田</span>
+  const tr = useT()
+  return <span>{tr("砚田")}</span>
 }
 
 function RightTabBody({ openWorkbench }: { openWorkbench?: () => void }) {
+  const tr = useT()
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 12, font: "inherit" }}>
-      <strong style={{ fontSize: 13 }}>砚田</strong>
+      <strong style={{ fontSize: 13 }}>{tr("砚田")}</strong>
       <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, opacity: 0.75 }}>
-        长篇正文、大纲和资料在这里。AI 改动先给你看，确认后才写入。
+        {tr("长篇正文、大纲和资料在这里。AI 改动先给你看，确认后才写入。")}
       </p>
       <button
         type="button"
@@ -43,7 +51,7 @@ function RightTabBody({ openWorkbench }: { openWorkbench?: () => void }) {
           fontSize: 12,
         }}
       >
-        打开写作台
+        {tr("打开写作台")}
       </button>
     </div>
   )
@@ -120,7 +128,7 @@ function Desk() {
       root = createRoot(mount)
       root.render(<YanfieldApp />)
     } catch (error) {
-      mount.textContent = error instanceof Error ? error.message : "砚田界面没有挂上"
+      mount.textContent = error instanceof Error ? error.message : t("砚田界面没有挂上")
     }
     return () => {
       themeObserver.disconnect()
@@ -139,13 +147,26 @@ export function apply(ctx: {
     inject: (key: string, register: () => unknown) => unknown
     register: (options: Record<string, unknown>, component: unknown) => unknown
   }
+  locale?: {
+    getSnapshot: () => { active: string }
+    subscribe: (listener: () => void) => () => void
+  }
   effect?: (fn: () => void, label?: string) => void
   inject?: (deps: string[], fn: (scoped: { get?: (name: string) => unknown }) => (() => void) | void) => unknown
   get?: (name: string) => unknown
 }) {
   const slots = ctx.slots
-  if (!slots || typeof slots.inject !== "function" || typeof slots.register !== "function") return () => {}
-  const disposers: Array<() => void> = []
+  const locale = ctx.locale ?? (ctx.get?.("locale") as typeof ctx.locale)
+  const detachLocale = locale && typeof locale.getSnapshot === "function" && typeof locale.subscribe === "function"
+    ? installLocaleBridge({
+        getLocale: () => normalizeLocale(locale.getSnapshot().active),
+        subscribe: (listener) => locale.subscribe(listener),
+      })
+    : null
+  if (!slots || typeof slots.inject !== "function" || typeof slots.register !== "function") {
+    return () => detachLocale?.()
+  }
+  const disposers: Array<() => void> = detachLocale ? [detachLocale] : []
   const injectSlot = (key: string, register: () => unknown) => {
     try {
       const value = slots.inject(key, register)
@@ -159,7 +180,7 @@ export function apply(ctx: {
     name: "sidebar.panellist",
     id: "yanfield",
     order: 8,
-    label: () => "砚田",
+    label: () => t("砚田"),
   }, PanelIcon))
   // 聊天页头不再放入口：砚田只保留左侧导航栏（sidebar.panellist）一个入口。
   try {
@@ -173,7 +194,7 @@ export function apply(ctx: {
             kind: "yanfield",
             keepMounted: true,
             priority: "extension",
-            title: () => "砚田",
+            title: () => t("砚田"),
           })
           if (typeof dispose === "function") cleanups.push(dispose)
         } catch {

@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Button, ConfirmDialog, EmptyState, useToast } from "@/components/ui/kit";
 import { apiDelete, apiGet, apiPost, notifyDataChanged, useApi, useDataChanged } from "@/lib/client/api";
 import { formatWords } from "@/lib/ui/cn";
+import { t, useT } from "@/lib/i18n";
 import type { Novel } from "@/lib/types";
 import { LibraryToolbar } from "@/components/library/LibraryToolbar";
 import { NovelGrid, NovelGridSkeleton } from "@/components/library/NovelGrid";
@@ -31,12 +32,13 @@ function extractNovel(response: Novel | { novel: Novel }): Novel {
 }
 
 function errorMessage(cause: unknown): string {
-  return cause instanceof Error ? cause.message : "操作失败，请稍后再试。";
+  return cause instanceof Error ? cause.message : t("操作失败，请稍后再试。");
 }
 
 export default function LibraryPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const tr = useT();
   const { data, error, loading, refresh } = useApi<NovelListResponse>("/api/novels");
 
   const [search, setSearch] = React.useState("");
@@ -122,9 +124,9 @@ export default function LibraryPage() {
       const created = extractNovel(await apiPost<Novel | { novel: Novel }>("/api/demo"));
       notifyDataChanged("novels");
       await refresh();
-      toast({ title: "示例作品已创建", description: `《${created.title}》已放进书架`, tone: "success" });
+      toast({ title: tr("示例作品已创建"), description: tr("《{title}》已放进书架", { title: created.title }), tone: "success" });
     } catch (cause) {
-      toast({ title: "创建示例作品失败", description: errorMessage(cause), tone: "error" });
+      toast({ title: tr("创建示例作品失败"), description: errorMessage(cause), tone: "error" });
     } finally {
       setDemoLoading(false);
     }
@@ -136,11 +138,11 @@ export default function LibraryPage() {
     try {
       await apiDelete(`/api/novels/${deleting.id}`);
       notifyDataChanged("novels");
-      toast({ title: "作品已删除", description: `《${deleting.title}》已移除`, tone: "success" });
+      toast({ title: tr("作品已删除"), description: tr("《{title}》已移除", { title: deleting.title }), tone: "success" });
       setDeleting(null);
       await refresh();
     } catch (cause) {
-      toast({ title: "删除失败", description: errorMessage(cause), tone: "error" });
+      toast({ title: tr("删除失败"), description: errorMessage(cause), tone: "error" });
     } finally {
       setDeleteLoading(false);
     }
@@ -148,7 +150,7 @@ export default function LibraryPage() {
 
   const handleCreated = (novel: Novel) => {
     setCreateOpen(false);
-    toast({ title: "作品已创建", description: `《${novel.title}》可以开始写了`, tone: "success" });
+    toast({ title: tr("作品已创建"), description: tr("《{title}》可以开始写了", { title: novel.title }), tone: "success" });
     router.push(`/novel/${novel.id}`);
   };
 
@@ -160,15 +162,15 @@ export default function LibraryPage() {
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-3">Library</p>
-            <h1 className="mt-1.5 font-serif text-[26px] leading-tight text-ink sm:text-[30px]">我的书架</h1>
+            <h1 className="mt-1.5 font-serif text-[26px] leading-tight text-ink sm:text-[30px]">{tr("我的书架")}</h1>
             <p className="mt-2 text-[12.5px] text-ink-3">
               {loading && !data ? (
-                "正在打开书架…"
+                tr("正在打开书架…")
               ) : (
                 <>
-                  共 <span className="font-mono text-ink-2">{novels.length}</span> 部作品 ·{" "}
-                  <span className="font-mono text-ink-2">{formatWords(totals.words)}</span> 字 ·{" "}
-                  <span className="font-mono text-ink-2">{totals.chapters}</span> 章
+                  {tr("共 {count} 部作品", { count: novels.length })} ·{" "}
+                  {tr("{words} 字", { words: formatWords(totals.words) })} ·{" "}
+                  {tr("{count} 章", { count: totals.chapters })}
                 </>
               )}
             </p>
@@ -181,14 +183,14 @@ export default function LibraryPage() {
               loading={demoLoading}
               className="hidden sm:inline-flex"
             >
-              示例作品
+              {tr("示例作品")}
             </Button>
             <Button
               variant="primary"
               icon={<Plus className="size-4" />}
               onClick={() => setCreateOpen(true)}
             >
-              新建作品
+              {tr("新建作品")}
             </Button>
           </div>
         </header>
@@ -214,26 +216,26 @@ export default function LibraryPage() {
                 <TriangleAlert className="size-5" aria-hidden />
               </span>
               <div>
-                <p className="text-[14px] font-medium text-ink">书架没能打开</p>
+                <p className="text-[14px] font-medium text-ink">{tr("书架没能打开")}</p>
                 <p className="mt-1 text-[12px] text-ink-3">{error}</p>
               </div>
               <Button variant="secondary" icon={<RotateCcw className="size-4" />} onClick={refreshList}>
-                重试
+                {tr("重试")}
               </Button>
             </div>
           ) : !hasAnyNovel ? (
             <div className="rounded-lg border border-line bg-surface shadow-xs">
               <EmptyState
                 icon={<BookOpenText className="size-7" />}
-                title="书架还是空的"
-                description="写一本自己的书，或者先创建示例作品《潮信》，看看长篇在砚田里长什么样。"
+                title={tr("书架还是空的")}
+                description={tr("写一本自己的书，或者先创建示例作品《潮信》，看看长篇在砚田里长什么样。")}
                 action={
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setCreateOpen(true)}>
-                      新建作品
+                      {tr("新建作品")}
                     </Button>
                     <Button variant="secondary" icon={<Sparkles className="size-4" />} onClick={createDemo} loading={demoLoading}>
-                      创建示例作品
+                      {tr("创建示例作品")}
                     </Button>
                   </div>
                 }
@@ -243,8 +245,8 @@ export default function LibraryPage() {
             <div className="rounded-lg border border-line bg-surface shadow-xs">
               <EmptyState
                 icon={<BookOpenText className="size-7" />}
-                title="没有匹配的作品"
-                description="换个关键词，或者清空筛选条件。"
+                title={tr("没有匹配的作品")}
+                description={tr("换个关键词，或者清空筛选条件。")}
                 action={
                   <Button
                     variant="secondary"
@@ -253,7 +255,7 @@ export default function LibraryPage() {
                       setGenre(GENRE_ALL);
                     }}
                   >
-                    清空筛选
+                    {tr("清空筛选")}
                   </Button>
                 }
               />
@@ -271,19 +273,19 @@ export default function LibraryPage() {
         onClose={() => setEditing(null)}
         onSaved={(novel) => {
           setEditing(null);
-          toast({ title: "作品信息已更新", description: novel.title, tone: "success" });
+          toast({ title: tr("作品信息已更新"), description: novel.title, tone: "success" });
         }}
       />
 
       <ConfirmDialog
         open={deleting !== null}
-        title={deleting ? `删除《${deleting.title}》？` : "删除作品？"}
+        title={deleting ? tr("删除《{title}》？", { title: deleting.title }) : tr("删除作品？")}
         description={
           deleting
-            ? "这部作品的所有卷、章节、大纲、设定与故事档案都会被一并删除，无法恢复。"
+            ? tr("这部作品的所有卷、章节、大纲、设定与故事档案都会被一并删除，无法恢复。")
             : undefined
         }
-        confirmText="删除作品"
+        confirmText={tr("删除作品")}
         danger
         loading={deleteLoading}
         onConfirm={() => {

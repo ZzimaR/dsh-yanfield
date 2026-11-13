@@ -4,6 +4,7 @@ import {ChevronDown,Compass,Eraser,Gauge,Layers,ListTree,PenLine,Sparkles} from 
 import {Button,Dropdown,useToast} from "@/components/ui/kit";
 import {useEditorBridge} from "@/lib/editor/bridge";
 import {handToAssistant} from "@/lib/editor/hand-off";
+import {useT} from "@/lib/i18n";
 import type {AiFeature,ContextConfig} from "@/lib/types";
 import {cn} from "@/lib/ui/cn";
 
@@ -85,11 +86,12 @@ export interface AiTaskBarProps {
 /** All shortcuts use the same agent, proposal, and review workflow as the chat panel. */
 export function AiTaskBar({chapterId,selection,className}:AiTaskBarProps) {
   const bridge=useEditorBridge(),{toast}=useToast();
+  const tr=useT();
   const run=(task:TaskDef)=>{
     const selected=(selection??bridge?.getSelectionText()??"").trim();
-    if(task.needsSelection&&!selected){toast({title:"先在正文中选中要处理的段落",tone:"error"});return;}
+    if(task.needsSelection&&!selected){toast({title:tr("先在正文中选中要处理的段落"),tone:"error"});return;}
     const instruction=task.feature==="continue"?"承接当前章末尾续写约600字，追加到本章，不新建下一章。":task.needsSelection?`${task.label}当前选中的段落，保持其余正文和人物事实不变。`:task.instruction||task.hint;
     handToAssistant({reference:chapterId?{type:"chapter",id:chapterId,label:"当前章节"}:null,taskId:`shortcut-${task.key}`,taskLabel:task.label,prompt:instruction,selection:selected||undefined,autoSend:true});
   };
-  return <Dropdown align="start" width={236} trigger={<Button className={cn("h-7 gap-1.5 px-2 text-[11px] text-accent",className)} size="sm" variant="ghost" aria-label="AI 快捷任务" aria-haspopup="menu" disabled={!chapterId} icon={<Sparkles className="size-3.5"/>}>AI 助手<ChevronDown className="size-3"/></Button>} items={TASKS.map(task=>({label:task.label,icon:task.icon,disabled:!chapterId,onSelect:()=>run(task)}))}/>;
+  return <Dropdown align="start" width={236} trigger={<Button className={cn("h-7 gap-1.5 px-2 text-[11px] text-accent",className)} size="sm" variant="ghost" aria-label={tr("AI 快捷任务")} aria-haspopup="menu" disabled={!chapterId} icon={<Sparkles className="size-3.5"/>}>{tr("AI 助手")}<ChevronDown className="size-3"/></Button>} items={TASKS.map(task=>({label:tr(task.label),icon:task.icon,disabled:!chapterId,onSelect:()=>run(task)}))}/>;
 }

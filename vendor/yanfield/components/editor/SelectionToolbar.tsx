@@ -5,6 +5,7 @@ import { Bold, Copy, Highlighter, Italic, Sparkles } from "lucide-react";
 import type { Editor } from "@tiptap/react";
 import { cn } from "@/lib/ui/cn";
 import type { SelectionInfo } from "@/lib/editor/types";
+import { useT } from "@/lib/i18n";
 
 interface SelectionToolbarProps {
   editor: Editor | null;
@@ -27,6 +28,7 @@ const ACTION_CLASS =
  * 用 mousedown + preventDefault 保住选区，避免点击工具条时选区丢失。
  */
 export function SelectionToolbar({ editor, selection, onAskAi }: SelectionToolbarProps) {
+  const tr = useT();
   const [position, setPosition] = React.useState<ToolbarPosition | null>(null);
 
   React.useEffect(() => {
@@ -78,13 +80,13 @@ export function SelectionToolbar({ editor, selection, onAskAi }: SelectionToolba
         transform: position.below ? "translateX(-50%)" : "translate(-50%, -100%)",
       }}
       role="toolbar"
-      aria-label="选区工具条"
+      aria-label={tr("选区工具条")}
     >
       <span className="px-1 text-[10.5px] tabular-nums text-ink-4">{selection.text.length}</span>
       <button
         type="button"
         className={cn(ACTION_CLASS, editor.isActive("bold") && "bg-accent-soft text-accent")}
-        title="加粗 (Ctrl/Cmd+B)"
+        title={tr("加粗 (Ctrl/Cmd+B)")}
         onMouseDown={run(() => editor.chain().focus().toggleBold().run())}
       >
         <Bold className="size-3.5" aria-hidden />
@@ -92,7 +94,7 @@ export function SelectionToolbar({ editor, selection, onAskAi }: SelectionToolba
       <button
         type="button"
         className={cn(ACTION_CLASS, editor.isActive("italic") && "bg-accent-soft text-accent")}
-        title="斜体 (Ctrl/Cmd+I)"
+        title={tr("斜体 (Ctrl/Cmd+I)")}
         onMouseDown={run(() => editor.chain().focus().toggleItalic().run())}
       >
         <Italic className="size-3.5" aria-hidden />
@@ -100,7 +102,7 @@ export function SelectionToolbar({ editor, selection, onAskAi }: SelectionToolba
       <button
         type="button"
         className={cn(ACTION_CLASS, editor.isActive("highlight") && "bg-accent-soft text-accent")}
-        title="高亮"
+        title={tr("高亮")}
         onMouseDown={run(() => editor.chain().focus().toggleHighlight().run())}
       >
         <Highlighter className="size-3.5" aria-hidden />
@@ -109,7 +111,7 @@ export function SelectionToolbar({ editor, selection, onAskAi }: SelectionToolba
       <button
         type="button"
         className={ACTION_CLASS}
-        title="复制选中文本"
+        title={tr("复制选中文本")}
         onMouseDown={run(() => {
           if (!selection.text) return;
           void navigator.clipboard?.writeText(selection.text).catch(() => undefined);
@@ -120,7 +122,7 @@ export function SelectionToolbar({ editor, selection, onAskAi }: SelectionToolba
       <button
         type="button"
         className={cn(ACTION_CLASS, "text-accent")}
-        title="把选中文本交给 AI"
+        title={tr("把选中文本交给 AI")}
         onMouseDown={run(onAskAi)}
       >
         <Sparkles className="size-3.5" aria-hidden />

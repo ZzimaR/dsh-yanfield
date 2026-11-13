@@ -9,6 +9,7 @@ import Highlight from "@tiptap/extension-highlight";
 import { MessagesSquare, Minimize2 } from "lucide-react";
 import { IconButton, Sheet, Skeleton, Tooltip } from "@/components/ui/kit";
 import { cn, countWords, formatDateTime, formatWords } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import { useLocalStorageState } from "@/lib/ui/hooks";
 import type { ChapterStatus } from "@/lib/types";
 import { emitSelection } from "@/lib/editor/events";
@@ -156,6 +157,8 @@ export function EditorCanvas(props: EditorCanvasProps) {
     onCloseReview,
   } = props;
 
+  const tr = useT();
+
   const pendingReview = Boolean(review?.run.changes.some(c => c.id === review.changeId && c.state === "pending"));
 
   // 最新 props 放 ref，供编辑器事件回调读取，避免 useEditor 闭包过期
@@ -183,11 +186,11 @@ export function EditorCanvas(props: EditorCanvasProps) {
   const extensions = React.useMemo(
     () => [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Placeholder.configure({ placeholder: "在这里落笔……写成段落，别写成 PPT。" }),
+      Placeholder.configure({ placeholder: tr("在这里落笔……写成段落，别写成 PPT。") }),
       Highlight.configure({ multicolor: false }),
       CharacterCount,
     ],
-    [],
+    [tr],
   );
 
   const editor = useEditor({
@@ -198,7 +201,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
       attributes: {
         class: "prose-paper min-h-[56vh] max-w-none outline-none",
         spellcheck: "false",
-        "aria-label": "章节正文",
+        "aria-label": tr("章节正文"),
       },
     },
     onUpdate: ({ editor: instance }) => {
@@ -369,14 +372,14 @@ export function EditorCanvas(props: EditorCanvasProps) {
       {immersive ? (
         <div className="absolute right-3 top-3 z-20 flex items-center gap-2">
           <SaveButton onSave={onSave} saving={saveState === "saving"} />
-          <Tooltip label="打开 AI 助手（Alt+J）" side="left">
-            <IconButton label="打开 AI 助手" onClick={onAskAi} className="border-line bg-surface/90 text-accent shadow-xs backdrop-blur hover:bg-surface">
+          <Tooltip label={tr("打开 AI 助手（Alt+J）")} side="left">
+            <IconButton label={tr("打开 AI 助手")} onClick={onAskAi} className="border-line bg-surface/90 text-accent shadow-xs backdrop-blur hover:bg-surface">
               <MessagesSquare className="size-4" />
             </IconButton>
           </Tooltip>
-          <Tooltip label="退出沉浸" side="left">
+          <Tooltip label={tr("退出沉浸")} side="left">
             <IconButton
-              label="退出沉浸"
+              label={tr("退出沉浸")}
               onClick={onExitImmersive}
               className="border-line bg-surface/90 text-ink shadow-xs backdrop-blur hover:bg-surface"
             >
@@ -395,8 +398,8 @@ export function EditorCanvas(props: EditorCanvasProps) {
             value={title}
             disabled={pendingReview}
             onChange={(event) => onTitleChange(event.target.value)}
-            placeholder="未命名章节"
-            aria-label="章节标题"
+            placeholder={tr("未命名章节")}
+            aria-label={tr("章节标题")}
             className={cn(
               "w-full border-0 bg-transparent font-serif text-[26px] font-semibold leading-tight tracking-wide text-ink sm:text-[30px]",
               "outline-none placeholder:text-ink-4",
@@ -406,16 +409,16 @@ export function EditorCanvas(props: EditorCanvasProps) {
 
           {immersive ? (
             <div className="mb-8 mt-3 flex items-center justify-center gap-3 text-[11.5px] text-ink-4">
-              <span className="tabular-nums">{formatWords(wordCount)} 字</span>
+              <span className="tabular-nums">{tr("{words} 字", { words: formatWords(wordCount) })}</span>
               <span className="size-1 rounded-full bg-line" aria-hidden />
               <SaveIndicator state={saveState} lastSavedAt={lastSavedAt} showIdle={false} />
             </div>
           ) : (
             <div className="mb-7 mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line/70 pb-3">
               <StatusMenu status={status} onChange={onStatusChange} />
-              <span className="text-[11.5px] tabular-nums text-ink-4">{formatWords(wordCount)} 字</span>
+              <span className="text-[11.5px] tabular-nums text-ink-4">{tr("{words} 字", { words: formatWords(wordCount) })}</span>
               {updatedAt ? (
-                <span className="text-[11.5px] text-ink-4">更新于 {formatDateTime(updatedAt)}</span>
+                <span className="text-[11.5px] text-ink-4">{tr("更新于 {date}", { date: formatDateTime(updatedAt) })}</span>
               ) : null}
             </div>
           )}
@@ -427,7 +430,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
             <>
               {review && pendingReview?<AgentReview key={`${review.run.id}:${review.changeId}`} initial={review.run} changeId={review.changeId} onClose={onCloseReview||(()=>{})}/>:null}
               <div className={pendingReview?"hidden":""}><EditorContent editor={editor} /></div>
-              <Sheet open={Boolean(review && !pendingReview)} onClose={onCloseReview || (()=>{})} title="历史改动对比" width={760}>
+              <Sheet open={Boolean(review && !pendingReview)} onClose={onCloseReview || (()=>{})} title={tr("历史改动对比")} width={760}>
                 {review && !pendingReview?<div className="p-5"><AgentReview key={`${review.run.id}:${review.changeId}`} initial={review.run} changeId={review.changeId} onClose={onCloseReview||(()=>{})}/></div>:null}
               </Sheet>
             </>
@@ -445,7 +448,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
       {immersive ? (
         <div className="pointer-events-none absolute bottom-4 right-4 flex items-center gap-2">
           <span className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-line bg-surface/85 px-3 py-1.5 text-[11px] text-ink-3 shadow-xs backdrop-blur">
-            <span className="tabular-nums">{formatWords(wordCount)} 字</span>
+            <span className="tabular-nums">{tr("{words} 字", { words: formatWords(wordCount) })}</span>
             <span className="size-1 rounded-full bg-line" aria-hidden />
             <SaveIndicator state={saveState} lastSavedAt={lastSavedAt} showIdle={false} />
             <span className="size-1 rounded-full bg-line" aria-hidden />
@@ -455,7 +458,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
               className="inline-flex items-center gap-1 text-accent transition-opacity hover:opacity-80"
             >
               <Minimize2 className="size-3.5" />
-              退出沉浸
+              {tr("退出沉浸")}
             </button>
           </span>
         </div>
