@@ -5,6 +5,7 @@ import { BookPlus } from "lucide-react";
 import { Button, Dialog, Input, Select, Textarea } from "@/components/ui/kit";
 import { apiPost, notifyDataChanged } from "@/lib/client/api";
 import { GENRES, type Novel } from "@/lib/types";
+import { useT } from "@/lib/i18n";
 import { CoverPicker } from "./CoverPicker";
 
 export interface CreateNovelDialogProps {
@@ -24,6 +25,7 @@ const EMPTY_FORM = {
 
 /** 新建作品 Dialog：基本信息 + 可选的初始卷。 */
 export function CreateNovelDialog({ open, onClose, onCreated }: CreateNovelDialogProps) {
+  const tr = useT();
   const [form, setForm] = React.useState(EMPTY_FORM);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -42,7 +44,7 @@ export function CreateNovelDialog({ open, onClose, onCreated }: CreateNovelDialo
   const submit = async () => {
     const title = form.title.trim();
     if (!title) {
-      setError("先给作品起个名字吧。");
+      setError(tr("先给作品起个名字吧。"));
       return;
     }
     setSaving(true);
@@ -62,7 +64,7 @@ export function CreateNovelDialog({ open, onClose, onCreated }: CreateNovelDialo
       notifyDataChanged("novels");
       onCreated(novel);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "创建失败，请稍后再试。");
+      setError(cause instanceof Error ? cause.message : tr("创建失败，请稍后再试。"));
     } finally {
       setSaving(false);
     }
@@ -72,16 +74,16 @@ export function CreateNovelDialog({ open, onClose, onCreated }: CreateNovelDialo
     <Dialog
       open={open}
       onClose={onClose}
-      title="新建作品"
-      description="先建一个容器，之后可以随时补大纲、设定与角色。"
+      title={tr("新建作品")}
+      description={tr("先建一个容器，之后可以随时补大纲、设定与角色。")}
       width={560}
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving}>
-            取消
+            {tr("取消")}
           </Button>
           <Button variant="primary" icon={<BookPlus className="size-4" />} onClick={submit} loading={saving}>
-            创建作品
+            {tr("创建作品")}
           </Button>
         </>
       }
@@ -94,44 +96,44 @@ export function CreateNovelDialog({ open, onClose, onCreated }: CreateNovelDialo
         }}
       >
         <Input
-          label="书名"
+          label={tr("书名")}
           autoFocus
           maxLength={80}
           value={form.title}
           onChange={(event) => update("title", event.target.value)}
-          placeholder="例如：潮信"
+          placeholder={tr("例如：潮信")}
           error={error}
         />
         <div className="grid gap-3.5 sm:grid-cols-2">
           <Select
-            label="类型"
+            label={tr("类型")}
             value={form.genre}
             onChange={(event) => update("genre", event.target.value)}
-            options={GENRES.map((item) => ({ value: item, label: item }))}
+            options={GENRES.map((item) => ({ value: item, label: tr(item) }))}
           />
           <Input
-            label="一句话简介"
+            label={tr("一句话简介")}
             maxLength={120}
             value={form.subtitle}
             onChange={(event) => update("subtitle", event.target.value)}
-            placeholder="出现在封面与书架上"
+            placeholder={tr("出现在封面与书架上")}
           />
         </div>
         <CoverPicker value={form.coverKey} onChange={(coverKey) => update("coverKey", coverKey)} />
         <Textarea
-          label="作品简介"
+          label={tr("作品简介")}
           rows={4}
           value={form.synopsis}
           onChange={(event) => update("synopsis", event.target.value)}
-          placeholder="这本书讲什么？主角是谁？想写出什么感觉？"
+          placeholder={tr("这本书讲什么？主角是谁？想写出什么感觉？")}
         />
         <Input
-          label="初始卷（可选）"
+          label={tr("初始卷（可选）")}
           maxLength={60}
           value={form.volumeTitle}
           onChange={(event) => update("volumeTitle", event.target.value)}
-          placeholder="例如：第一卷 · 退潮"
-          hint="留空则稍后在大纲里创建"
+          placeholder={tr("例如：第一卷 · 退潮")}
+          hint={tr("留空则稍后在大纲里创建")}
         />
       </form>
     </Dialog>

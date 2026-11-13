@@ -5,6 +5,7 @@ import AppShell from "@/components/layout/AppShell";
 import { Skeleton } from "@/components/ui/kit";
 import { Button } from "@/components/ui/kit";
 import { useApi } from "@/lib/client/api";
+import { useT } from "@/lib/i18n";
 import type { AppSettings } from "@/lib/types";
 import { applySurfaceDataset } from "@/lib/ui/theme";
 import { cn } from "@/lib/ui/cn";
@@ -17,6 +18,7 @@ import {
 import { useSettingsEditor } from "@/components/settings/useSettingsEditor";
 
 export default function SettingsPage() {
+  const tr = useT();
   const settingsApi = useApi<AppSettings>("/api/settings");
   const editor = useSettingsEditor(settingsApi.data, (value) => settingsApi.setData(value));
   const [active, setActive] = React.useState<SettingsSectionKey>("providers");
@@ -44,9 +46,9 @@ export default function SettingsPage() {
       <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-serif text-[24px] leading-tight text-ink sm:text-[28px]">设置</h1>
+            <h1 className="font-serif text-[24px] leading-tight text-ink sm:text-[28px]">{tr("设置")}</h1>
             <p className="mt-1 text-[12px] leading-6 text-ink-3">
-              模型、提示词与写作偏好都只保存在本机。{activeMeta.description}。
+              {tr("模型、提示词与写作偏好都只保存在本机。{description}。", { description: tr(activeMeta.description) })}
             </p>
           </div>
           <div className="pb-0.5">
@@ -57,7 +59,7 @@ export default function SettingsPage() {
         <div className="mt-5 grid gap-6 lg:grid-cols-[196px_minmax(0,1fr)]">
           {/* 桌面端左侧竖向导航 */}
           <aside className="hidden lg:block">
-            <nav className="sticky top-6 space-y-0.5" aria-label="设置分区">
+            <nav className="sticky top-6 space-y-0.5" aria-label={tr("设置分区")}>
               {SETTINGS_SECTIONS.map((section) => (
                 <button
                   key={section.key}
@@ -72,12 +74,12 @@ export default function SettingsPage() {
                   aria-current={active === section.key ? "page" : undefined}
                 >
                   {section.icon}
-                  {section.label}
+                  {tr(section.label)}
                 </button>
               ))}
             </nav>
             <p className="mt-5 px-3 text-[10.5px] leading-5 text-ink-3">
-              提示：设置是全局的；作品内的提示词与上下文可以在编辑器里单独覆盖。
+              {tr("提示：设置是全局的；作品内的提示词与上下文可以在编辑器里单独覆盖。")}
             </p>
           </aside>
 
@@ -98,7 +100,7 @@ export default function SettingsPage() {
                   aria-current={active === section.key ? "page" : undefined}
                 >
                   {section.icon}
-                  {section.label}
+                  {tr(section.label)}
                 </button>
               ))}
             </div>
@@ -113,9 +115,9 @@ export default function SettingsPage() {
               </div>
             ) : settingsApi.error ? (
               <div className="rounded-lg border border-danger/30 bg-danger/5 p-5 text-center">
-                <p className="text-[12.5px] text-danger">设置加载失败：{settingsApi.error}</p>
+                <p className="text-[12.5px] text-danger">{tr("设置加载失败：{error}", { error: settingsApi.error })}</p>
                 <Button variant="secondary" size="sm" className="mt-3" onClick={() => void settingsApi.refresh()}>
-                  重试
+                  {tr("重试")}
                 </Button>
               </div>
             ) : (

@@ -25,6 +25,7 @@ import {
   StringListEditor,
   unwrapEntity,
 } from "./form-kit";
+import { useT } from "@/lib/i18n";
 
 interface VolumeDraft {
   summary: string;
@@ -70,6 +71,7 @@ export function VolumePanel({
   onDirtyChange,
   loading = false,
 }: VolumePanelProps) {
+  const tr = useT();
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = React.useState(false);
   const [newTitle, setNewTitle] = React.useState("");
@@ -107,9 +109,9 @@ export function VolumePanel({
       onVolumesChanged();
       onSelectVolume(created.id);
       notifyDataChanged("volumes");
-      toast({ title: "已新建分卷", description: `《${title}》`, tone: "success" });
+      toast({ title: tr("已新建分卷"), description: `《${title}》`, tone: "success" });
     } catch (err) {
-      toast({ title: "新建分卷失败", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      toast({ title: tr("新建分卷失败"), description: err instanceof Error ? err.message : String(err), tone: "error" });
     } finally {
       setCreating(false);
     }
@@ -132,9 +134,9 @@ export function VolumePanel({
       setRename(null);
       onVolumesChanged();
       notifyDataChanged("volumes");
-      toast({ title: "卷已重命名", description: title, tone: "success" });
+      toast({ title: tr("卷已重命名"), description: title, tone: "success" });
     } catch (err) {
-      toast({ title: "重命名失败", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      toast({ title: tr("重命名失败"), description: err instanceof Error ? err.message : String(err), tone: "error" });
     } finally {
       setRenaming(false);
     }
@@ -146,7 +148,7 @@ export function VolumePanel({
       onVolumesChanged();
       notifyDataChanged("volumes");
     } catch (err) {
-      toast({ title: "调整分卷顺序失败", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      toast({ title: tr("调整分卷顺序失败"), description: err instanceof Error ? err.message : String(err), tone: "error" });
     }
   };
 
@@ -160,9 +162,9 @@ export function VolumePanel({
       setRemoving(null);
       onVolumesChanged();
       notifyDataChanged("volumes");
-      toast({ title: "已删除分卷", description: "卷内章节已移到未分卷", tone: "success" });
+      toast({ title: tr("已删除分卷"), description: tr("卷内章节已移到未分卷"), tone: "success" });
     } catch (err) {
-      toast({ title: "删除分卷失败", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      toast({ title: tr("删除分卷失败"), description: err instanceof Error ? err.message : String(err), tone: "error" });
     } finally {
       setRemoveBusy(false);
     }
@@ -170,9 +172,9 @@ export function VolumePanel({
 
   return (
     <PanelCard
-      title="卷纲"
+      title={tr("卷纲")}
       icon={<Layers className="size-4" />}
-      description="分卷目标、关键事件与伏笔计划"
+      description={tr("分卷目标、关键事件与伏笔计划")}
       actions={
         <Button
           variant="ghost"
@@ -181,7 +183,7 @@ export function VolumePanel({
           icon={<Plus className="size-3.5" />}
           onClick={() => setCreateOpen(true)}
         >
-          新建卷
+          {tr("新建卷")}
         </Button>
       }
     >
@@ -191,11 +193,11 @@ export function VolumePanel({
         ) : (
           <EmptyState
             icon={<Layers className="size-5" />}
-            title="还没有分卷"
-            description="长篇建议先分卷：一卷一个阶段目标，节奏更稳。"
+            title={tr("还没有分卷")}
+            description={tr("长篇建议先分卷：一卷一个阶段目标，节奏更稳。")}
             action={
               <Button variant="primary" size="sm" icon={<Plus className="size-3.5" />} onClick={() => setCreateOpen(true)}>
-                新建第一卷
+                {tr("新建第一卷")}
               </Button>
             }
             className="border-0 bg-transparent px-2 py-8"
@@ -238,8 +240,8 @@ export function VolumePanel({
                 >
                   <span
                     draggable
-                    aria-label="拖动调整分卷顺序"
-                    title="拖动排序"
+                    aria-label={tr("拖动调整分卷顺序")}
+                    title={tr("拖动排序")}
                     onDragStart={(event) => {
                       event.dataTransfer.effectAllowed = "move";
                       event.dataTransfer.setData("text/plain", volume.title);
@@ -286,14 +288,14 @@ export function VolumePanel({
                     onClick={() => onSelectVolume(volume.id)}
                     onDoubleClick={() => openRename(volume)}
                     className="min-w-0 flex-1 px-1 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                    title="单击编辑卷纲，双击重命名"
+                    title={tr("单击编辑卷纲，双击重命名")}
                   >
                     <div className="flex items-center gap-2">
                       <span className={cn("shrink-0 text-[12px] tabular-nums", active ? "text-accent" : "text-ink-3")}>
-                        第 {index + 1} 卷
+                        {tr("第 {index} 卷", { index: index + 1 })}
                       </span>
                       <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-ink">{volume.title}</span>
-                      <span className="shrink-0 text-[12px] text-ink-3">{chapterCount(volume.id)} 章</span>
+                      <span className="shrink-0 text-[12px] text-ink-3">{tr("{count} 章", { count: chapterCount(volume.id) })}</span>
                     </div>
                     {volume.summary ? (
                       <p className="mt-0.5 truncate text-[12px] text-ink-3">{volume.summary}</p>
@@ -304,29 +306,29 @@ export function VolumePanel({
                       align="end"
                       width={168}
                       items={[
-                        { label: "重命名", icon: <Pencil className="size-3.5" />, onSelect: () => openRename(volume) },
+                        { label: tr("重命名"), icon: <Pencil className="size-3.5" />, onSelect: () => openRename(volume) },
                         {
-                          label: "上移",
+                          label: tr("上移"),
                           icon: <ArrowUp className="size-3.5" />,
                           disabled: index <= 0,
                           onSelect: () => void moveVolume(volume, index - 1),
                         },
                         {
-                          label: "下移",
+                          label: tr("下移"),
                           icon: <ArrowDown className="size-3.5" />,
                           disabled: index >= volumes.length - 1,
                           onSelect: () => void moveVolume(volume, index + 1),
                         },
                         { separator: true },
                         {
-                          label: "删除卷",
+                          label: tr("删除卷"),
                           icon: <Trash2 className="size-3.5" />,
                           danger: true,
                           onSelect: () => setRemoving(volume),
                         },
                       ]}
                       trigger={
-                        <IconButton label="分卷设置" size="sm" className="text-ink-3">
+                        <IconButton label={tr("分卷设置")} size="sm" className="text-ink-3">
                           <MoreHorizontal className="size-3.5" />
                         </IconButton>
                       }
@@ -349,7 +351,7 @@ export function VolumePanel({
             />
           ) : (
             <p className="rounded-md border border-dashed border-line px-3 py-6 text-center text-[12.5px] text-ink-3">
-              选择左上方的一卷开始编辑卷纲。
+              {tr("选择左上方的一卷开始编辑卷纲。")}
             </p>
           )}
         </div>
@@ -358,24 +360,24 @@ export function VolumePanel({
       <Dialog
         open={createOpen}
         onClose={() => !creating && setCreateOpen(false)}
-        title="新建分卷"
-        description="分卷是长篇的节奏单位：一卷一个阶段目标，章数按实际需要写。"
+        title={tr("新建分卷")}
+        description={tr("分卷是长篇的节奏单位：一卷一个阶段目标，章数按实际需要写。")}
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" size="sm" disabled={creating} onClick={() => setCreateOpen(false)}>
-              取消
+              {tr("取消")}
             </Button>
             <Button variant="primary" size="sm" loading={creating} disabled={!newTitle.trim()} onClick={createVolume}>
-              创建
+              {tr("创建")}
             </Button>
           </div>
         }
       >
         <Input
           autoFocus
-          label="卷名"
+          label={tr("卷名")}
           value={newTitle}
-          placeholder="例如：第一卷 · 退潮"
+          placeholder={tr("例如：第一卷 · 退潮")}
           onChange={(event) => setNewTitle(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") void createVolume();
@@ -386,23 +388,23 @@ export function VolumePanel({
       <Dialog
         open={rename !== null}
         onClose={() => !renaming && setRename(null)}
-        title="重命名分卷"
+        title={tr("重命名分卷")}
         footer={
           <div className="flex items-center justify-end gap-2">
             <Button variant="ghost" size="sm" disabled={renaming} onClick={() => setRename(null)}>
-              取消
+              {tr("取消")}
             </Button>
             <Button variant="primary" size="sm" loading={renaming} disabled={!renameTitle.trim()} onClick={() => void submitRename()}>
-              保存
+              {tr("保存")}
             </Button>
           </div>
         }
       >
         <Input
           autoFocus
-          label="卷名"
+          label={tr("卷名")}
           value={renameTitle}
-          placeholder="例如：第一卷 · 退潮"
+          placeholder={tr("例如：第一卷 · 退潮")}
           onChange={(event) => setRenameTitle(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") void submitRename();
@@ -412,13 +414,13 @@ export function VolumePanel({
 
       <ConfirmDialog
         open={removing !== null}
-        title="删除这一卷？"
+        title={tr("删除这一卷？")}
         description={
           removing
-            ? `卷「${removing.title}」和卷纲会被删除。卷里的章节会移到未分卷，正文还在。`
+            ? tr("卷「{title}」和卷纲会被删除。卷里的章节会移到未分卷，正文还在。", { title: removing.title })
             : undefined
         }
-        confirmText="删除"
+        confirmText={tr("删除")}
         danger
         loading={removeBusy}
         onConfirm={() => void submitRemove()}
@@ -443,6 +445,7 @@ function VolumeOutlineEditor({
   onSaved: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
+  const tr = useT();
   const { toast } = useToast();
   const { data, loading, error, refresh } = useApi<VolumeOutline>(`/api/outlines/volume/${volume.id}`);
   const [draft, setDraft] = React.useState<VolumeDraft | null>(null);
@@ -491,9 +494,9 @@ function VolumeOutlineEditor({
       setTitle(nextTitle);
       onSaved();
       notifyDataChanged("outline");
-      toast({ title: "卷纲已保存", tone: "success" });
+      toast({ title: tr("卷纲已保存"), tone: "success" });
     } catch (err) {
-      toast({ title: "保存卷纲失败", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      toast({ title: tr("保存卷纲失败"), description: err instanceof Error ? err.message : String(err), tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -508,8 +511,8 @@ function VolumeOutlineEditor({
     <div className="space-y-3 border-t border-line pt-3.5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Badge tone="accent">第 {volume.orderIndex + 1} 卷</Badge>
-          <span className="text-[11px] text-ink-3">{chapterCount} 章</span>
+          <Badge tone="accent">{tr("第 {index} 卷", { index: volume.orderIndex + 1 })}</Badge>
+          <span className="text-[11px] text-ink-3">{tr("{count} 章", { count: chapterCount })}</span>
         </div>
         <Button
           variant="ghost"
@@ -519,7 +522,7 @@ function VolumeOutlineEditor({
           disabled={!draft}
           onClick={() => setAiOpen(true)}
         >
-          AI 生成
+          {tr("AI 生成")}
         </Button>
       </div>
 
@@ -529,11 +532,11 @@ function VolumeOutlineEditor({
         loading ? (
           <PanelSkeleton rows={3} />
         ) : (
-          <p className="text-[12.5px] text-ink-3">卷纲加载中…</p>
+          <p className="text-[12.5px] text-ink-3">{tr("卷纲加载中…")}</p>
         )
       ) : (
         <>
-          <Input label="卷名" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="第一卷 · …" />
+          <Input label={tr("卷名")} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={tr("第一卷 · …")} />
           <AiTextField
             label="本卷目标"
             field="本卷目标"
@@ -542,7 +545,7 @@ function VolumeOutlineEditor({
             value={draft.arcGoal}
             onChange={(value) => update("arcGoal", value)}
             rows={2}
-            placeholder="这一卷结束时，故事必须发生什么变化。"
+            placeholder={tr("这一卷结束时，故事必须发生什么变化。")}
           />
           <AiTextField
             label="本卷简介与核心冲突"
@@ -552,26 +555,26 @@ function VolumeOutlineEditor({
             value={draft.summary}
             onChange={(value) => update("summary", value)}
             rows={3}
-            placeholder="核心冲突是什么？情绪怎么走（起—压—扬）？"
-            hint="本卷简介、核心冲突与情绪曲线写在一起；关键事件和伏笔计划在下方单独维护。"
+            placeholder={tr("核心冲突是什么？情绪怎么走（起—压—扬）？")}
+            hint={tr("本卷简介、核心冲突与情绪曲线写在一起；关键事件和伏笔计划在下方单独维护。")}
           />
           <div>
-            <div className="mb-1.5 text-[14px] font-medium text-ink-2">关键事件</div>
+            <div className="mb-1.5 text-[14px] font-medium text-ink-2">{tr("关键事件")}</div>
             <StringListEditor
               items={draft.keyEvents}
               onChange={(items) => update("keyEvents", items)}
-              placeholder="按发生顺序写"
-              emptyHint="列出本卷 3–6 个关键事件。"
+              placeholder={tr("按发生顺序写")}
+              emptyHint={tr("列出本卷 3–6 个关键事件。")}
               ai={{ feature: "outline-volume", novelId, field: "本卷关键事件" }}
             />
           </div>
           <div>
-            <div className="mb-1.5 text-[14px] font-medium text-ink-2">伏笔计划</div>
+            <div className="mb-1.5 text-[14px] font-medium text-ink-2">{tr("伏笔计划")}</div>
             <StringListEditor
               items={draft.foreshadowPlan}
               onChange={(items) => update("foreshadowPlan", items)}
-              placeholder="埋什么、何时收"
-              emptyHint="本卷打算埋设 / 回收哪些伏笔。"
+              placeholder={tr("埋什么、何时收")}
+              emptyHint={tr("本卷打算埋设 / 回收哪些伏笔。")}
               ai={{ feature: "outline-volume", novelId, field: "本卷伏笔计划" }}
             />
           </div>
@@ -579,17 +582,17 @@ function VolumeOutlineEditor({
       )}
 
       <div className={cn("pt-0.5", busy && "border-t border-line pt-2.5")}>
-        <SaveBar dirty={effectiveDirty} saving={saving} onSave={save} hint="卷纲会随正文写作进入 AI 上下文" />
+        <SaveBar dirty={effectiveDirty} saving={saving} onSave={save} hint={tr("卷纲会随正文写作进入 AI 上下文")} />
       </div>
 
       <AiAssistSheet
         open={aiOpen}
         onClose={() => setAiOpen(false)}
-        title="AI 生成 · 卷纲"
+        title={tr("AI 生成 · 卷纲")}
         feature="outline-volume"
         novelId={novelId}
         instruction="请根据本书总纲与已有章节，为下面选中的卷纲字段写一段可直接使用的成稿，约 120–200 字；具体到事件与人物选择，避免空话。"
-        targets={AI_TARGETS}
+        targets={AI_TARGETS.map((item) => ({ ...item, label: tr(item.label) }))}
         onAdopt={handleAiAdopt}
       />
     </div>

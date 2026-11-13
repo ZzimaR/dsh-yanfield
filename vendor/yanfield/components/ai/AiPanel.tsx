@@ -15,6 +15,7 @@ import { copyText } from "@/lib/ui/clipboard";
  * 独立渲染约定：只依赖 lib 层与 components/ui/kit，不 import components/editor。
  */
 import * as React from "react";
+import { localizedAgentName } from "@/lib/ai/agent-display";
 import Link from "next/link";
 import { Check, CircleAlert, Cpu, MessagesSquare, Plus, Settings2, X } from "lucide-react";
 import { DiffReview } from "@/components/diff/DiffReview";
@@ -37,6 +38,7 @@ import type {
 } from "@/lib/types";
 import { useMediaQuery } from "@/lib/ui/hooks";
 import { cn, stripHtml, truncate } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import { ActionReview } from "./ActionReview";
 import { AgentPicker } from "./AgentPicker";
 import { ChatComposer } from "./ChatComposer";
@@ -163,6 +165,7 @@ export function AiPanel({
 }: AiPanelProps) {
   const bridge = useEditorBridge();
   const { toast } = useToast();
+  const tr = useT();
   const isMobile = useMediaQuery("(max-width: 767px)");
 
   const chat = useAiChat({ novelId, chapterId: chapterId ?? null, defaultAgentId });
@@ -238,8 +241,8 @@ export function AiPanel({
         // 后端若尚未合并 contextBudget 会静默忽略：明确提示「仅本次会话生效」，避免误以为已保存
         if (Number(updated?.defaultContext?.contextBudget) !== next) {
           toast({
-            title: "预算已在本会话生效",
-            description: "默认预算暂未写入设置，刷新后会恢复原值。",
+            title: tr("预算已在本会话生效"),
+            description: tr("默认预算暂未写入设置，刷新后会恢复原值。"),
             tone: "default",
           });
         }
@@ -249,10 +252,10 @@ export function AiPanel({
         const info = humanizeAiError(error, {
           status: error instanceof ApiError ? error.status : undefined,
         });
-        toast({ title: "默认预算保存失败", description: info.title, tone: "error" });
+        toast({ title: tr("默认预算保存失败"), description: info.title, tone: "error" });
       }
     },
-    [setSettingsData, toast],
+    [setSettingsData, toast, tr],
   );
 
   /* ---------------- 文风偏好（写入 ContextConfig.customInstruction） ---------------- */
@@ -269,12 +272,12 @@ export function AiPanel({
         customInstruction: applyStyleToInstruction(prev.customInstruction, next),
       }));
       toast({
-        title: next ? `文风：${next}` : "已清除文风",
-        description: next ? "会随之后每次对话请求一起发送给模型。" : "之后的对话不再携带文风偏好。",
+        title: next ? tr("文风：{style}", { style: tr(next) }) : tr("已清除文风"),
+        description: next ? tr("会随之后每次对话请求一起发送给模型。") : tr("之后的对话不再携带文风偏好。"),
         tone: "default",
       });
     },
-    [toast],
+    [toast, tr],
   );
 
   // 每个会话 Tab 独立的草稿与引用
@@ -496,19 +499,19 @@ export function AiPanel({
           }
           if(event.type==="agent") {
             currentRun=event.run;
-            chat.patchExchange(assistantId,{agentRun:event.run,content:event.run.summary||"正在处理任务",status:event.run.status==="running"?"streaming":event.run.status==="error"?"error":event.run.status==="aborted"?"aborted":"complete",error:event.run.error,usage:event.run.usage});
+            chat.patchExchange(assistantId,{agentRun:event.run,content:event.run.summary||tr("正在处理任务"),status:event.run.status==="running"?"streaming":event.run.status==="error"?"error":event.run.status==="aborted"?"aborted":"complete",error:event.run.error,usage:event.run.usage});
           }
           if(event.type==="agent-preview" && currentRun) {
             currentRun={...currentRun,preview:currentRun.preview+event.text};
             chat.patchExchange(assistantId,{agentRun:currentRun});
           }
-          if(event.type==="error") chat.patchExchange(assistantId,{status:"error",error:event.message,content:currentRun?.summary||"任务未完成"});
+          if(event.type==="error") chat.patchExchange(assistantId,{status:"error",error:event.message,content:currentRun?.summary||tr("任务未完成")});
           if(event.type==="done") chat.patchExchange(assistantId,{usage:event.usage});
         },
       });
     } catch(e) {
       if (runId === agentRunIdRef.current) {
-        chat.patchExchange(assistantId,{status:controller.signal.aborted?"aborted":"error",content:currentRun?.summary||"任务未完成",error:controller.signal.aborted?"已停止，完成的候选已保留":e instanceof Error?e.message:"任务失败"});
+        chat.patchExchange(assistantId,{status:controller.signal.aborted?"aborted":"error",content:currentRun?.summary||tr("任务未完成"),error:controller.signal.aborted?tr("已停止，完成的候选已保留"):e instanceof Error?e.message:tr("任务失败")});
       }
       if(action && runId === agentRunIdRef.current) {
         const savedRunId=(action.payload as {runId:string}).runId;
@@ -525,7 +528,7 @@ export function AiPanel({
         await chat.endExchange({persist:!sessionId});
       }
     }
-  },[bridge,chat,novelId,chapterId,mentions,contextConfig,task,referenceSnapshots,setDraft,setMentions]);
+  },[bridge,chat,novelId,chapterId,mentions,contextConfig,task,referenceSnapshots,setDraft,setMentions,tr]);
   React.useEffect(()=>{
     const text=pendingAutoSendRef.current;
     if(!text||chat.streaming)return;
@@ -547,12 +550,12 @@ export function AiPanel({
       await chatRef.current.removeMessage(message.id);
     } catch (error) {
       toast({
-        title: "消息删除失败",
-        description: error instanceof Error ? error.message : "请稍后重试。",
+        title: tr("消息删除失败"),
+        description: error instanceof Error ? error.message : tr("请稍后重试。"),
         tone: "error",
       });
     }
-  }, [toast]);
+  }, [toast, tr]);
 
   const handleCloseTab = React.useCallback((key: string) => {
     if (agentRunTabKeyRef.current === key) editAbortRef.current?.abort();
@@ -574,12 +577,12 @@ export function AiPanel({
     async (message: UIMessage) => {
       try {
         await copyText([message.content, message.error].filter(Boolean).join("\n\n"));
-        toast({ title: "已复制", tone: "success" });
+        toast({ title: tr("已复制"), tone: "success" });
       } catch {
-        toast({ title: "复制失败", description: "请手动选中内容复制。", tone: "error" });
+        toast({ title: tr("复制失败"), description: tr("请手动选中内容复制。"), tone: "error" });
       }
     },
-    [toast],
+    [toast, tr],
   );
 
   /* ---------------- 会话 ---------------- */
@@ -587,12 +590,12 @@ export function AiPanel({
   const handleNewTab = React.useCallback(() => {
     if (!chat.newTab()) {
       toast({
-        title: "最多同时打开 3 个会话",
-        description: "请先关闭一个会话，再新建。",
+        title: tr("最多同时打开 3 个会话"),
+        description: tr("请先关闭一个会话，再新建。"),
         tone: "error",
       });
     }
-  }, [chat, toast]);
+  }, [chat, toast, tr]);
 
   const handleOpenSession = React.useCallback(
     (session: ChatSession) => {
@@ -600,10 +603,10 @@ export function AiPanel({
         if (!result.ok) {
           if (result.reason === "context-changed") return;
           toast({
-            title: result.reason === "max-tabs" ? "最多同时打开 3 个会话" : "历史消息加载失败",
+            title: result.reason === "max-tabs" ? tr("最多同时打开 3 个会话") : tr("历史消息加载失败"),
             description: result.reason === "max-tabs"
-              ? "请先关闭一个会话，再打开历史会话。"
-              : "未打开该会话，请检查连接后重试。",
+              ? tr("请先关闭一个会话，再打开历史会话。")
+              : tr("未打开该会话，请检查连接后重试。"),
             tone: "error",
           });
           return;
@@ -611,7 +614,7 @@ export function AiPanel({
         setHistoryOpen(false);
       });
     },
-    [chat, toast],
+    [chat, toast, tr],
   );
 
   const handleCreateSession = React.useCallback(
@@ -629,15 +632,15 @@ export function AiPanel({
     (action: AiAction) => {
       if (!isBodyAction(action)) {
         toast({
-          title: ACTION_LABEL[action.type] ?? action.label,
-          description: "这是保存类操作，请到对应页面确认。",
+          title: tr(ACTION_LABEL[action.type] ?? action.label),
+          description: tr("这是保存类操作，请到对应页面确认。"),
           tone: "default",
         });
         return;
       }
       const payload = extractActionText(action);
       if (!payload.trim()) {
-        toast({ title: "该操作没有可应用的正文内容", tone: "error" });
+        toast({ title: tr("该操作没有可应用的正文内容"), tone: "error" });
         return;
       }
       if (action.type === "replace-chapter") {
@@ -650,13 +653,13 @@ export function AiPanel({
         setPendingAction({ action, text: payload });
       }
     },
-    [bridge, toast],
+    [bridge, toast, tr],
   );
 
   const applyPendingAction = React.useCallback(() => {
     if (!pendingAction) return;
     if (!bridge) {
-      toast({ title: "当前页面没有编辑器桥，无法应用", tone: "error" });
+      toast({ title: tr("当前页面没有编辑器桥，无法应用"), tone: "error" });
       return;
     }
     const { action, text } = pendingAction;
@@ -670,23 +673,23 @@ export function AiPanel({
     }
     bridge.focus();
     notifyDataChanged();
-    toast({ title: `已应用：${ACTION_LABEL[action.type] ?? action.label}`, tone: "success" });
+    toast({ title: tr("已应用：{label}", { label: tr(ACTION_LABEL[action.type] ?? action.label) }), tone: "success" });
     setPendingAction(null);
-  }, [bridge, pendingAction, toast]);
+  }, [bridge, pendingAction, toast, tr]);
 
   const applyDiff = React.useCallback(
     (html: string, acceptedIds: string[]) => {
       if (!bridge?.setHtml) {
-        toast({ title: "当前编辑器不支持整章写回", description: "可先复制内容手动粘贴。", tone: "error" });
+        toast({ title: tr("当前编辑器不支持整章写回"), description: tr("可先复制内容手动粘贴。"), tone: "error" });
         return;
       }
       bridge.setHtml(html);
       bridge.focus();
       notifyDataChanged();
-      toast({ title: `已应用 ${acceptedIds.length} 处改动`, tone: "success" });
+      toast({ title: tr("已应用 {count} 处改动", { count: acceptedIds.length }), tone: "success" });
       setDiffState(null);
     },
-    [bridge, toast],
+    [bridge, toast, tr],
   );
 
   /* ---------------- 渲染 ---------------- */
@@ -699,7 +702,7 @@ export function AiPanel({
   );
 
   return (
-    <section className={cn(rootClass,"ai-surface")} aria-label="AI 助手面板">
+    <section className={cn(rootClass,"ai-surface")} aria-label={tr("AI 助手面板")}>
       <header className="shrink-0 border-b border-line">
         <div className="flex items-center gap-2 px-4 py-3">
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -707,7 +710,7 @@ export function AiPanel({
               <Cpu className="size-3.5" />
             </span>
             {/* 标题保持完整，仅章节名按剩余空间截断，避免 384px 窄面板下被徽标挤断 */}
-            <span className="shrink-0 whitespace-nowrap font-serif text-[14px] text-ink">写作助手</span>
+            <span className="shrink-0 whitespace-nowrap font-serif text-[14px] text-ink">{tr("写作助手")}</span>
             {chapterTitle ? (
               <span className="min-w-0 flex-1 truncate text-[11px] text-ink-4 dark:text-ink-3">
                 · {chapterTitle}
@@ -722,28 +725,28 @@ export function AiPanel({
                   event.preventDefault();
                   openSettingsDialog("providers");
                 }}
-                title="还没有可用的 AI 模型，去设置添加 Provider 或启用离线演示"
+                title={tr("还没有可用的 AI 模型，去设置添加 Provider 或启用离线演示")}
                 className="inline-flex shrink-0 items-center gap-1 rounded-full border border-gold/30 bg-gold-soft px-2 py-0.5 text-[10.5px] text-gold transition-opacity duration-150 hover:opacity-80"
               >
                 <CircleAlert className="size-3" />
-                未配置模型
+                {tr("未配置模型")}
               </Link>
             ) : null}
-            <Tooltip label="历史会话" side="bottom" align="end">
-              <IconButton label="历史会话" onClick={() => setHistoryOpen(true)}>
+            <Tooltip label={tr("历史会话")} side="bottom" align="end">
+              <IconButton label={tr("历史会话")} onClick={() => setHistoryOpen(true)}>
                 <MessagesSquare className="size-4" />
               </IconButton>
             </Tooltip>
-            <Tooltip label="模型与 API Key 设置" side="bottom" align="end">
+            <Tooltip label={tr("模型与 API Key 设置")} side="bottom" align="end">
               <IconButton
-                label="模型与 API Key 设置"
+                label={tr("模型与 API Key 设置")}
                 onClick={() => openSettingsDialog("providers")}
               >
                 <Settings2 className="size-4" />
               </IconButton>
             </Tooltip>
             {onClose ? (
-              <IconButton label="关闭 AI 面板" onClick={onClose}>
+              <IconButton label={tr("关闭 AI 面板")} onClick={onClose}>
                 <X className="size-4" />
               </IconButton>
             ) : null}
@@ -755,7 +758,7 @@ export function AiPanel({
           <div className="flex items-start gap-1.5 border-t border-gold/20 bg-gold-soft/60 px-3 py-1.5 text-[11px] leading-relaxed text-gold dark:bg-gold-soft/40">
             <CircleAlert className="mt-0.5 size-3 shrink-0" />
             <span className="min-w-0 flex-1">
-              还没有可用的 AI 模型，发送会失败；请到设置添加 Provider，或启用离线演示模式。
+              {tr("还没有可用的 AI 模型，发送会失败；请到设置添加 Provider，或启用离线演示模式。")}
             </span>
             <Link
               href="/settings"
@@ -765,7 +768,7 @@ export function AiPanel({
               }}
               className="shrink-0 underline underline-offset-2 transition-opacity duration-150 hover:opacity-80"
             >
-              去设置
+              {tr("去设置")}
             </Link>
           </div>
         ) : null}
@@ -773,7 +776,9 @@ export function AiPanel({
           <div className="scroll-hide flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
             {chat.tabs.map((tab) => {
               const active = tab.key === chat.activeKey;
-              const label = tab.title.trim() || resolveAgent(tab.agentId, settings).name;
+              const tabAgent = resolveAgent(tab.agentId, settings);
+              const rawLabel = tab.title.trim();
+              const label = rawLabel && rawLabel !== tabAgent.name ? rawLabel : localizedAgentName(tabAgent);
               return (
                 <div
                   key={tab.key}
@@ -798,7 +803,7 @@ export function AiPanel({
                   {chat.tabs.length > 1 ? (
                     <button
                       type="button"
-                      aria-label="关闭会话"
+                      aria-label={tr("关闭会话")}
                       onClick={(event) => {
                         event.stopPropagation();
                         handleCloseTab(tab.key);
@@ -811,9 +816,9 @@ export function AiPanel({
                 </div>
               );
             })}
-            <Tooltip label={chat.tabs.length >= MAX_SESSION_TABS ? "最多同时打开 3 个会话" : "新建会话"}>
+            <Tooltip label={chat.tabs.length >= MAX_SESSION_TABS ? tr("最多同时打开 3 个会话") : tr("新建会话")}>
               <IconButton
-                label="新建会话"
+                label={tr("新建会话")}
                 size="sm"
                 onClick={handleNewTab}
                 disabled={chat.tabs.length >= MAX_SESSION_TABS}
@@ -870,14 +875,14 @@ export function AiPanel({
                     });
                   }).catch((error: unknown) => {
                     toast({
-                      title: "更早消息加载失败",
-                      description: error instanceof Error ? error.message : "请稍后重试。",
+                      title: tr("更早消息加载失败"),
+                      description: error instanceof Error ? error.message : tr("请稍后重试。"),
                       tone: "error",
                     });
                   });
                 }}
               >
-                加载更早消息
+                {tr("加载更早消息")}
               </Button>
             ) : null}
             {chat.activeTab.messages.map((message, index) => (
@@ -912,7 +917,7 @@ export function AiPanel({
         )}
       </div>
 
-      {hasNewProgress?<div className="flex shrink-0 justify-center pb-2" aria-live="polite"><button type="button" className="rounded-full border border-accent/20 bg-accent-soft px-3 py-1 text-[11px] text-accent" onClick={followLatest}>有新进展 · 回到底部 ↓</button></div>:null}
+      {hasNewProgress?<div className="flex shrink-0 justify-center pb-2" aria-live="polite"><button type="button" className="rounded-full border border-accent/20 bg-accent-soft px-3 py-1 text-[11px] text-accent" onClick={followLatest}>{tr("有新进展 · 回到底部 ↓")}</button></div>:null}
       {/* 上下文用量 + 输入区 */}
       <div className="shrink-0">
         <ChatComposer
@@ -934,12 +939,12 @@ export function AiPanel({
           chapterId={chapterId}
           placeholder={
             activeAgentId === "setting"
-              ? "新建设定、修改角色或整理资料，生成后审阅改动…"
-              : "输入要求，/ 选技能，@ 引用资料…"
+              ? tr("新建设定、修改角色或整理资料，生成后审阅改动…")
+              : tr("输入要求，/ 选技能，@ 引用资料…")
           }
           onOpenContext={openContextPreview}
           includeSelection={contextConfig.includeSelection}
-          agentName={activeAgent.name}
+          agentName={localizedAgentName(activeAgent)}
           onOpenAgent={hasAgentChoice ? () => setAgentSheetOpen(true) : undefined}
           style={style}
           onStyleChange={handleStyleChange}
@@ -958,7 +963,7 @@ export function AiPanel({
           focusSignal={focusSignal}
         />
         <div className="flex h-7 items-center gap-2 border-t border-line/60 px-3">
-          {statsApi.data?<UsageIndicator label="今日" cachedInputTokens={statsApi.data.todayCachedInputTokens} cacheReportedInputTokens={statsApi.data.todayCacheReportedInputTokens} promptTokens={statsApi.data.todayPromptTokens} completionTokens={statsApi.data.todayCompletionTokens} calls={statsApi.data.todayAiCalls} price={statsApi.data.aiPricing??settings?.aiPricing??{inputPerMillion:0,outputPerMillion:0}}/>:<span className="text-[10px] text-ink-4">用量加载中</span>}
+          {statsApi.data?<UsageIndicator label="今日" cachedInputTokens={statsApi.data.todayCachedInputTokens} cacheReportedInputTokens={statsApi.data.todayCacheReportedInputTokens} promptTokens={statsApi.data.todayPromptTokens} completionTokens={statsApi.data.todayCompletionTokens} calls={statsApi.data.todayAiCalls} price={statsApi.data.aiPricing??settings?.aiPricing??{inputPerMillion:0,outputPerMillion:0}}/>:<span className="text-[10px] text-ink-4">{tr("用量加载中")}</span>}
           <BalanceIndicator provider={activeProvider} />
           <ContextStatus tokens={preview.data?.totalTokens??0} budget={budget} loading={preview.loading} error={preview.error} onClick={openContextPreview}/>
         </div>
@@ -968,7 +973,7 @@ export function AiPanel({
       <Sheet
         open={agentSheetOpen}
         onClose={() => setAgentSheetOpen(false)}
-        title="选择智能体"
+        title={tr("选择智能体")}
         width={380}
       >
         <div className="flex flex-col gap-1 px-3 py-3">
@@ -1001,17 +1006,17 @@ export function AiPanel({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
-                    <span className="truncate text-[13px] text-ink">{agent.name}</span>
+                    <span className="truncate text-[13px] text-ink">{localizedAgentName(agent)}</span>
                     {agent.id === "custom" ? (
                       <span className="shrink-0 rounded-full border border-line px-1 text-[9.5px] text-ink-4">
-                        可配置
+                        {tr("可配置")}
                       </span>
                     ) : null}
                     {active ? <Check className="ml-auto size-3.5 shrink-0 text-accent" /> : null}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-ink-4">{agent.role}</span>
+                  <span className="mt-0.5 block truncate text-[11px] text-ink-4">{tr(agent.role)}</span>
                   <span className="mt-0.5 line-clamp-2 block text-[10.5px] leading-snug text-ink-4">
-                    {agent.description}
+                    {tr(agent.description)}
                   </span>
                 </span>
               </button>
@@ -1025,10 +1030,10 @@ export function AiPanel({
               onClick={handleOpenAgentSettings}
               className="w-full justify-start"
             >
-              编辑人设
+              {tr("编辑人设")}
             </Button>
             <p className="mt-0.5 px-1 text-[10.5px] leading-snug text-ink-4">
-              智能体的名字、职责、人设与额外要求都在「设置 · 智能体」里配置。
+              {tr("智能体的名字、职责、人设与额外要求都在「设置 · 智能体」里配置。")}
             </p>
           </div>
         </div>
@@ -1067,7 +1072,7 @@ export function AiPanel({
         onClose={() => setPendingAction(null)}
         onApply={applyPendingAction}
         canApply={Boolean(bridge)}
-        applyDisabledHint="当前页面没有编辑器桥，无法写入正文；可先复制内容手动粘贴。"
+        applyDisabledHint={tr("当前页面没有编辑器桥，无法写入正文；可先复制内容手动粘贴。")}
       />
 
       <DiffReview
@@ -1076,12 +1081,12 @@ export function AiPanel({
         afterHtml={diffState?.afterHtml ?? ""}
         title={
           diffState
-            ? `${ACTION_LABEL[diffState.action.type] ?? diffState.action.label} · 逐块审阅`
+            ? tr("{label} · 逐块审阅", { label: tr(ACTION_LABEL[diffState.action.type] ?? diffState.action.label) })
             : undefined
         }
-        description="AI 修改了整章正文。请逐块确认要写入的内容，未勾选的块会保留当前正文。"
+        description={tr("AI 修改了整章正文。请逐块确认要写入的内容，未勾选的块会保留当前正文。")}
         canApply={Boolean(bridge?.setHtml)}
-        applyDisabledHint="当前编辑器未暴露整章替换能力（bridge.setHtml），请改用插入/替换选区或手动复制。"
+        applyDisabledHint={tr("当前编辑器未暴露整章替换能力（bridge.setHtml），请改用插入/替换选区或手动复制。")}
         onClose={() => setDiffState(null)}
         onApply={applyDiff}
       />

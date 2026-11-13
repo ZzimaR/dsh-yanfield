@@ -27,6 +27,7 @@ import {
 import { apiPatch, notifyDataChanged, useApi } from "@/lib/client/api";
 import type { Chapter, ChapterBlueprint, Foreshadow, ScenePlan } from "@/lib/types";
 import { formatWords, uid } from "@/lib/ui/cn";
+import { useLocale, useT } from "@/lib/i18n";
 import { AiAssistSheet } from "./ai-assist";
 import {
   AiTextField,
@@ -98,6 +99,8 @@ export function BlueprintEditor({
   onSaved?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
+  const tr = useT();
+  const locale = useLocale();
   const { toast } = useToast();
   const { data, loading, error, refresh } = useApi<ChapterBlueprint>(`/api/chapters/${chapter.id}/blueprint`);
   const [draft, setDraft] = React.useState<BlueprintDraft | null>(null);
@@ -134,9 +137,9 @@ export function BlueprintEditor({
       setDraft(toDraft(saved));
       onSaved?.();
       notifyDataChanged("blueprint");
-      toast({ title: "章纲已保存", description: stripChapterNumber(chapter.title), tone: "success" });
+      toast({ title: tr("章纲已保存"), description: stripChapterNumber(chapter.title, tr), tone: "success" });
     } catch (err) {
-      toast({ title: "保存章纲失败", description: err instanceof Error ? err.message : String(err), tone: "error" });
+      toast({ title: tr("保存章纲失败"), description: err instanceof Error ? err.message : String(err), tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -153,7 +156,7 @@ export function BlueprintEditor({
   const relatedForeshadows = foreshadows.filter(
     (item) => item.plantedChapterId === chapter.id || item.payoffChapterId === chapter.id,
   );
-  const chapterTitle = (id: string | null) => chapters.find((item) => item.id === id)?.title ?? "未知章节";
+  const chapterTitle = (id: string | null) => chapters.find((item) => item.id === id)?.title ?? tr("未知章节");
   const status = CHAPTER_STATUS[chapter.status];
 
   return (
@@ -161,19 +164,19 @@ export function BlueprintEditor({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] tabular-nums text-ink-3">第 {chapter.orderIndex + 1} 章</span>
-            <h3 className="truncate text-[14px] font-semibold text-ink">{stripChapterNumber(chapter.title)}</h3>
-            <Badge tone={status.tone}>{status.label}</Badge>
+            <span className="text-[11px] tabular-nums text-ink-3">{tr("第 {order} 章", { order: chapter.orderIndex + 1 })}</span>
+            <h3 className="truncate text-[14px] font-semibold text-ink">{stripChapterNumber(chapter.title, tr)}</h3>
+            <Badge tone={status.tone}>{tr(status.label)}</Badge>
           </div>
           <div className="mt-0.5 flex items-center gap-2 text-[11px] text-ink-3">
-            <span>正文 {formatWords(chapter.wordCount)}</span>
+            <span>{tr("正文 {words}", { words: formatWords(chapter.wordCount) })}</span>
             <span aria-hidden>·</span>
-            <span>目标 {formatWords(draft?.targetWords ?? 0)}</span>
+            <span>{tr("目标 {words}", { words: formatWords(draft?.targetWords ?? 0) })}</span>
             <a
               className="inline-flex items-center gap-0.5 text-accent hover:underline"
               href={`/editor/${novelId}?chapter=${chapter.id}`}
             >
-              去写作
+              {tr("去写作")}
               <ExternalLink className="size-3" />
             </a>
           </div>
@@ -186,7 +189,7 @@ export function BlueprintEditor({
           disabled={!draft}
           onClick={() => setAiOpen(true)}
         >
-          AI 生成章纲
+          {tr("AI 生成章纲")}
         </Button>
       </div>
 
@@ -196,7 +199,7 @@ export function BlueprintEditor({
         loading ? (
           <PanelSkeleton rows={4} />
         ) : (
-          <p className="text-[12.5px] text-ink-3">章纲加载中…</p>
+          <p className="text-[12.5px] text-ink-3">{tr("章纲加载中…")}</p>
         )
       ) : (
         <div className="space-y-4">
@@ -209,16 +212,16 @@ export function BlueprintEditor({
             value={draft.goal}
             onChange={(value) => update("goal", value)}
             rows={2}
-            placeholder="这一章结束时，读者必须知道 / 感觉到什么。"
+            placeholder={tr("这一章结束时，读者必须知道 / 感觉到什么。")}
           />
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <div className="mb-1.5 text-[13px] font-medium text-ink-2">视角 POV</div>
-              <Input value={draft.pov} onChange={(event) => update("pov", event.target.value)} placeholder="例如：周晚 / 第三人称限知" />
+              <div className="mb-1.5 text-[13px] font-medium text-ink-2">{tr("视角 POV")}</div>
+              <Input value={draft.pov} onChange={(event) => update("pov", event.target.value)} placeholder={tr("例如：周晚 / 第三人称限知")} />
             </div>
             <div>
-              <div className="mb-1.5 text-[13px] font-medium text-ink-2">预估字数</div>
+              <div className="mb-1.5 text-[13px] font-medium text-ink-2">{tr("预估字数")}</div>
               <Input
                 type="number"
                 min={0}
@@ -238,7 +241,7 @@ export function BlueprintEditor({
             value={draft.conflict}
             onChange={(value) => update("conflict", value)}
             rows={2}
-            placeholder="谁和谁 / 什么和什么冲突，代价是什么。"
+            placeholder={tr("谁和谁 / 什么和什么冲突，代价是什么。")}
           />
 
           <AiTextField
@@ -250,37 +253,37 @@ export function BlueprintEditor({
             value={draft.emotionalArc}
             onChange={(value) => update("emotionalArc", value)}
             rows={2}
-            placeholder="从…到…：紧张 → 松弛 → 更紧。"
+            placeholder={tr("从…到…：紧张 → 松弛 → 更紧。")}
           />
 
           <div>
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <span className="flex items-center gap-1.5 text-[13px] font-medium text-ink-2">
                 <Clapperboard className="size-3.5 text-ink-3" />
-                场景列表
+                {tr("场景列表")}
               </span>
               <Button variant="subtle" size="sm" icon={<Plus className="size-3.5" />} onClick={() => update("scenes", [...draft.scenes, emptyScene()])}>
-                添加场景
+                {tr("添加场景")}
               </Button>
             </div>
             {draft.scenes.length === 0 ? (
               <p className="rounded-md border border-dashed border-line px-3 py-2.5 text-[12px] leading-relaxed text-ink-3">
-                还没有场景。建议把本章拆成 2–5 个场景：地点、人物、发生了什么、为什么留这一场。
+                {tr("还没有场景。建议把本章拆成 2–5 个场景：地点、人物、发生了什么、为什么留这一场。")}
               </p>
             ) : (
               <div className="space-y-2">
                 {draft.scenes.map((scene, index) => (
                   <div key={scene.id} className="rounded-md border border-line bg-surface-2 p-2.5">
                     <div className="flex items-center gap-1">
-                      <span className="shrink-0 text-[11px] tabular-nums text-ink-3">场景 {index + 1}</span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-ink-3">{tr("场景 {index}", { index: index + 1 })}</span>
                       <Input
                         value={scene.title}
-                        placeholder="场景标题：地点 + 事件"
+                        placeholder={tr("场景标题：地点 + 事件")}
                         className="h-8 flex-1 text-[13px]"
                         onChange={(event) => updateScene(draft, update, scene.id, { title: event.target.value })}
                       />
                       <IconButton
-                        label="上移"
+                        label={tr("上移")}
                         size="sm"
                         disabled={index === 0}
                         onClick={() => {
@@ -292,7 +295,7 @@ export function BlueprintEditor({
                         <ArrowUp className="size-3.5" />
                       </IconButton>
                       <IconButton
-                        label="下移"
+                        label={tr("下移")}
                         size="sm"
                         disabled={index === draft.scenes.length - 1}
                         onClick={() => {
@@ -303,40 +306,40 @@ export function BlueprintEditor({
                       >
                         <ArrowDown className="size-3.5" />
                       </IconButton>
-                      <IconButton label="删除场景" size="sm" onClick={() => update("scenes", draft.scenes.filter((item) => item.id !== scene.id))}>
+                      <IconButton label={tr("删除场景")} size="sm" onClick={() => update("scenes", draft.scenes.filter((item) => item.id !== scene.id))}>
                         <Trash2 className="size-3.5" />
                       </IconButton>
                     </div>
                     <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                       <Input
                         value={scene.location}
-                        placeholder="地点"
+                        placeholder={tr("地点")}
                         className="h-8 text-[13px]"
                         onChange={(event) => updateScene(draft, update, scene.id, { location: event.target.value })}
                       />
                       <Input
                         value={scene.emotion}
-                        placeholder="情绪"
+                        placeholder={tr("情绪")}
                         className="h-8 text-[13px]"
                         onChange={(event) => updateScene(draft, update, scene.id, { emotion: event.target.value })}
                       />
                     </div>
                     <Input
                       value={scene.purpose}
-                      placeholder="场景目的：为什么保留这一场"
+                      placeholder={tr("场景目的：为什么保留这一场")}
                       className="mt-1.5 h-8 text-[13px]"
                       onChange={(event) => updateScene(draft, update, scene.id, { purpose: event.target.value })}
                     />
                     <Textarea
                       value={scene.summary}
-                      placeholder="场景里发生了什么"
+                      placeholder={tr("场景里发生了什么")}
                       rows={2}
                       className="mt-1.5 min-h-0 text-[13px]"
                       onChange={(event) => updateScene(draft, update, scene.id, { summary: event.target.value })}
                     />
                     <Input
-                      value={scene.characters.join("、")}
-                      placeholder="出场角色（逗号分隔）"
+                      value={scene.characters.join(locale === "en" ? ", " : "、")}
+                      placeholder={tr("出场角色（逗号分隔）")}
                       className="mt-1.5 h-8 text-[13px]"
                       onChange={(event) => updateScene(draft, update, scene.id, { characters: parseTags(event.target.value) })}
                     />
@@ -347,23 +350,23 @@ export function BlueprintEditor({
           </div>
 
           <div>
-            <div className="mb-1.5 text-[13px] font-medium text-ink-2">情节要点</div>
+            <div className="mb-1.5 text-[13px] font-medium text-ink-2">{tr("情节要点")}</div>
             <StringListEditor
               items={draft.plotPoints}
               onChange={(items) => update("plotPoints", items)}
-              placeholder="这一章推进了哪几件事"
-              emptyHint="按顺序列出本章推进的情节。"
+              placeholder={tr("这一章推进了哪几件事")}
+              emptyHint={tr("按顺序列出本章推进的情节。")}
               ai={{ feature: "outline-chapter", novelId, chapterId: chapter.id, field: "本章情节要点" }}
             />
           </div>
 
           <div>
-            <div className="mb-1.5 text-[13px] font-medium text-ink-2">结尾钩子</div>
+            <div className="mb-1.5 text-[13px] font-medium text-ink-2">{tr("结尾钩子")}</div>
             <StringListEditor
               items={draft.hooks}
               onChange={(items) => update("hooks", items)}
-              placeholder="读者为什么会翻下一章"
-              emptyHint="至少准备一个结尾钩子。"
+              placeholder={tr("读者为什么会翻下一章")}
+              emptyHint={tr("至少准备一个结尾钩子。")}
               ai={{ feature: "outline-chapter", novelId, chapterId: chapter.id, field: "本章结尾钩子" }}
             />
           </div>
@@ -377,32 +380,32 @@ export function BlueprintEditor({
             value={draft.notes}
             onChange={(value) => update("notes", value)}
             rows={2}
-            placeholder="给写作时的自己留提示（可不填）"
+            placeholder={tr("给写作时的自己留提示（可不填）")}
           />
 
           <div className="rounded-md border border-line bg-surface-2 px-3 py-2.5">
             <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className="text-[12px] font-medium text-ink-2">本章伏笔</span>
+              <span className="text-[12px] font-medium text-ink-2">{tr("本章伏笔")}</span>
               <a
                 className="inline-flex items-center gap-0.5 text-[11.5px] text-accent hover:underline"
                 href={`/editor/${novelId}?tab=codex`}
               >
-                在写作台「设定」里管理
+                {tr("在写作台「设定」里管理")}
                 <ExternalLink className="size-3" />
               </a>
             </div>
             {relatedForeshadows.length === 0 ? (
-              <p className="text-[12px] text-ink-3">本章没有关联伏笔。</p>
+              <p className="text-[12px] text-ink-3">{tr("本章没有关联伏笔。")}</p>
             ) : (
               <ul className="space-y-1">
                 {relatedForeshadows.map((item) => (
                   <li key={item.id} className="flex items-center gap-1.5 text-[12.5px]">
-                    {item.plantedChapterId === chapter.id ? <Badge tone="gold">埋</Badge> : <Badge tone="jade">收</Badge>}
+                    {item.plantedChapterId === chapter.id ? <Badge tone="gold">{tr("埋")}</Badge> : <Badge tone="jade">{tr("收")}</Badge>}
                     <span className="min-w-0 flex-1 truncate text-ink-2">{item.title}</span>
                     <span className="shrink-0 text-[11px] text-ink-3">
                       {item.plantedChapterId === chapter.id
-                        ? `回收于 ${chapterTitle(item.payoffChapterId)}`
-                        : `埋设于 ${chapterTitle(item.plantedChapterId)}`}
+                        ? tr("回收于 {ref}", { ref: chapterTitle(item.payoffChapterId) })
+                        : tr("埋设于 {ref}", { ref: chapterTitle(item.plantedChapterId) })}
                     </span>
                   </li>
                 ))}
@@ -413,18 +416,18 @@ export function BlueprintEditor({
       )}
 
       <div className="border-t border-line pt-2.5">
-        <SaveBar dirty={dirty} saving={saving} onSave={save} hint="章纲保存后会进入写作上下文" />
+        <SaveBar dirty={dirty} saving={saving} onSave={save} hint={tr("章纲保存后会进入写作上下文")} />
       </div>
 
       <AiAssistSheet
         open={aiOpen}
         onClose={() => setAiOpen(false)}
-        title="AI 生成 · 章纲"
+        title={tr("AI 生成 · 章纲")}
         feature="outline-chapter"
         novelId={novelId}
         chapterId={chapter.id}
         instruction="请根据本书总纲、卷纲与本章已有正文，为下面选中的章纲字段写一段可直接使用的成稿；具体到事件、人物与场景，避免空话。"
-        targets={AI_TARGETS}
+        targets={AI_TARGETS.map((item) => ({ ...item, label: tr(item.label) }))}
         onAdopt={handleAiAdopt}
       />
     </div>

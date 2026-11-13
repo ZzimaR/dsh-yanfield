@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "@/lib/i18n";
+
 /**
  * AI 错误可读化：把 Provider / 网络 / 配额等原始错误翻译成作者能看懂、能操作的中文提示。
  *
@@ -58,86 +60,87 @@ export function humanizeAiError(raw: unknown, options?: { status?: number; code?
           ? ""
           : String(raw).trim();
   if(message.includes("模型输出因长度限制被截断")) return {
-    title:"输出达到长度限制，内容未完成",
-    hint:"已收到的内容仍保留。请在聊天上下文或设置中提高单次输出上限，并检查模型容量；也可分章生成。",
+    title:t("输出达到长度限制，内容未完成"),
+    hint:t("已收到的内容仍保留。请在聊天上下文或设置中提高单次输出上限，并检查模型容量；也可分章生成。"),
   };
   const status = options?.status ?? extractStatus(message);
   const settingsAction = { action: "settings-models" as const };
+  const settings = t(SETTINGS_LABEL);
 
   if (NO_PROVIDER_RE.test(message)) {
     return {
-      title: "还没有可用的 AI 模型",
-      hint: `请到「${SETTINGS_LABEL}」添加一个 Provider（或启用离线演示模式），保存后即可对话。`,
+      title: t("还没有可用的 AI 模型"),
+      hint: t("请到「{settings}」添加一个 Provider（或启用离线演示模式），保存后即可对话。", { settings }),
       ...settingsAction,
     };
   }
 
   if (status === 401 || AUTH_RE.test(message)) {
     return {
-      title: "API Key 无效或已过期",
-      hint: `请到「${SETTINGS_LABEL}」检查该 Provider 的 API Key 是否填写正确、是否需要重新生成。`,
+      title: t("API Key 无效或已过期"),
+      hint: t("请到「{settings}」检查该 Provider 的 API Key 是否填写正确、是否需要重新生成。", { settings }),
       ...settingsAction,
     };
   }
 
   if (status === 403 || FORBIDDEN_RE.test(message)) {
     return {
-      title: "该 API Key 没有访问权限（403）",
-      hint: `当前 Key 无权使用所选模型，请在「${SETTINGS_LABEL}」更换 Key 或模型后重试。`,
+      title: t("该 API Key 没有访问权限（403）"),
+      hint: t("当前 Key 无权使用所选模型，请在「{settings}」更换 Key 或模型后重试。", { settings }),
       ...settingsAction,
     };
   }
 
   if (status === 404 || NOT_FOUND_RE.test(message)) {
     return {
-      title: "接口或模型不存在（404）",
-      hint: `请检查「${SETTINGS_LABEL}」里的 Base URL（官方地址为 https://api.deepseek.com）与模型名；也可以先拉取账户可用的模型列表。`,
+      title: t("接口或模型不存在（404）"),
+      hint: t("请检查「{settings}」里的 Base URL（官方地址为 https://api.deepseek.com）与模型名；也可以先拉取账户可用的模型列表。", { settings }),
       ...settingsAction,
     };
   }
 
   if (status === 429 || RATE_RE.test(message)) {
     return {
-      title: "请求过于频繁或配额不足（429）",
-      hint: `已触发服务商限流或额度限制：请稍后重试，或到「${SETTINGS_LABEL}」更换模型 / Key。`,
+      title: t("请求过于频繁或配额不足（429）"),
+      hint: t("已触发服务商限流或额度限制：请稍后重试，或到「{settings}」更换模型 / Key。", { settings }),
       ...settingsAction,
     };
   }
 
   if (CONTEXT_RE.test(message)) {
     return {
-      title: "请求超出模型上下文长度",
-      hint: "请打开上下文抽屉调低「上下文预算」、关掉暂时用不到的分节后重试。",
+      title: t("请求超出模型上下文长度"),
+      hint: t("请打开上下文抽屉调低「上下文预算」、关掉暂时用不到的分节后重试。"),
     };
   }
 
   if (TIMEOUT_RE.test(message)) {
     return {
-      title: "请求超时",
-      hint: `网络或代理不稳定，请稍后重试；若持续超时，请检查「${SETTINGS_LABEL}」的 Base URL 是否可访问。`,
+      title: t("请求超时"),
+      hint: t("网络或代理不稳定，请稍后重试；若持续超时，请检查「{settings}」的 Base URL 是否可访问。", { settings }),
       ...settingsAction,
     };
   }
 
   if (CONNECT_RE.test(message)) {
     return {
-      title: "无法连接到模型服务",
-      hint: `请检查网络 / 代理与「${SETTINGS_LABEL}」的 Base URL（官方地址为 https://api.deepseek.com）及 API Key 是否有效。`,
+      title: t("无法连接到模型服务"),
+      hint: t("请检查网络 / 代理与「{settings}」的 Base URL（官方地址为 https://api.deepseek.com）及 API Key 是否有效。", { settings }),
       ...settingsAction,
     };
   }
 
   if (typeof status === "number" && status >= 500) {
     return {
-      title: `模型服务暂时不可用（${status}）`,
-      hint: "服务商可能正在维护，请稍后重试；若持续失败请检查 Provider 配置。",
+      title: t("模型服务暂时不可用（{status}）", { status }),
+      hint: t("服务商可能正在维护，请稍后重试；若持续失败请检查 Provider 配置。"),
     };
   }
 
   if (!message) {
     return {
-      title: "AI 请求失败",
-      hint: `请稍后重试；若持续失败，请到「${SETTINGS_LABEL}」检查 Provider、API Key 与模型名。`,
+      title: t("AI 请求失败"),
+      hint: t("请稍后重试；若持续失败，请到「{settings}」检查 Provider、API Key 与模型名。", { settings }),
       ...settingsAction,
     };
   }
@@ -146,15 +149,15 @@ export function humanizeAiError(raw: unknown, options?: { status?: number; code?
   if (/[\u4e00-\u9fa5]/.test(message)) {
     return {
       title: message,
-      hint: `可稍后重试；若持续失败，请到「${SETTINGS_LABEL}」检查 Provider、API Key 与模型名。`,
+      hint: t("可稍后重试；若持续失败，请到「{settings}」检查 Provider、API Key 与模型名。", { settings }),
       ...settingsAction,
     };
   }
 
   // 兜底：英文服务商报错不直出给作者
   return {
-    title: "模型服务返回错误",
-    hint: `请稍后重试；若持续失败，请到「${SETTINGS_LABEL}」检查 Provider、API Key、Base URL 与模型名。`,
+    title: t("模型服务返回错误"),
+    hint: t("请稍后重试；若持续失败，请到「{settings}」检查 Provider、API Key、Base URL 与模型名。", { settings }),
     ...settingsAction,
   };
 }

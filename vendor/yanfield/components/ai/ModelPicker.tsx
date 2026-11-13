@@ -29,6 +29,7 @@ import { formatTokens } from "./utils";
 import type { ModelTargetInfo } from "./model-info";
 import { humanizeAiError } from "./errors";
 import { isInsideComposedPath } from "@/lib/ui/composed";
+import { useT } from "@/lib/i18n";
 
 const MENU_WIDTH = 320;
 const OPEN_SETTINGS_EVENT = "yanfield:open-settings";
@@ -62,6 +63,7 @@ export function ModelPicker({
 }: ModelPickerProps) {
   const isHeader = variant === "header";
   const { toast } = useToast();
+  const tr = useT();
   const [open, setOpen] = React.useState(false);
   const [pos, setPos] = React.useState<{ top: number; left: number } | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -89,15 +91,15 @@ export function ModelPicker({
   // 之前会被截成「DeepSeek …」。这里压成「DeepSeek · flash」，完整信息放 title 里。
   const shortModel = (value: string) => value.replace(/^deepseek[-_\s]*/i, "");
   const fullLabel = !target || !target.ready
-    ? "未配置模型"
+    ? tr("未配置模型")
     : target.providerKind === "demo"
-      ? `离线演示模式 · ${target.model}`
+      ? tr("离线演示模式 · {model}", { model: target.model })
       : `${target.providerName} / ${target.model}`;
   const label = !target || !target.ready
-    ? "未配置模型"
+    ? tr("未配置模型")
     : target.providerKind === "demo"
-      ? `离线演示 · ${target.model}`
-      : `DeepSeek · ${shortModel(target.model)}`;
+      ? tr("离线演示 · {model}", { model: target.model })
+      : tr("DeepSeek · {model}", { model: shortModel(target.model) });
 
   /** 当前模型是否仍存在于已启用 Provider 列表中 */
   const currentInList = React.useMemo(() => {
@@ -106,7 +108,7 @@ export function ModelPicker({
     return Boolean(provider && provider.models.some((model) => model.id === currentModel));
   }, [groups, currentProviderId, currentModel]);
   const staleCurrent = fetched && Boolean(currentProviderId) && Boolean(currentModel) && !currentInList;
-  const staleText = `${target?.providerName ?? currentProviderId ?? "未知 Provider"} / ${currentModel}`;
+  const staleText = `${target?.providerName ?? currentProviderId ?? tr("未知 Provider")} / ${currentModel}`;
 
   const openSettings = React.useCallback((section = "providers") => {
     setOpen(false);
@@ -191,7 +193,7 @@ export function ModelPicker({
     try{
       const updated=await apiPatch<AppSettings>("/api/settings",{modelThinking:{[thinkingKey(target.providerId,target.model)]:value}});
       onChanged(updated);notifyDataChanged("settings");
-    }catch(cause){setError(cause instanceof Error?cause.message:"设置失败");}finally{setBusy(null);}
+    }catch(cause){setError(cause instanceof Error?cause.message:tr("设置失败"));}finally{setBusy(null);}
   };
 
   const choose = React.useCallback(
@@ -220,14 +222,14 @@ export function ModelPicker({
         onChanged(updated);
         notifyDataChanged("settings");
         toast({
-          title: "默认模型已切换",
-          description: `${provider.name} / ${model.label || model.id}`,
+          title: tr("默认模型已切换"),
+          description: `${tr(provider.name)} / ${tr(model.label) || model.id}`,
           tone: "success",
         });
         setOpen(false);
       } catch (cause) {
         const info = humanizeAiError(cause);
-        setError(`${info.title}${info.hint ? `：${info.hint}` : ""}`);
+        setError(info.hint ? tr("{title}：{hint}", { title: info.title, hint: info.hint }) : info.title);
       } finally {
         setBusy(null);
       }
@@ -240,6 +242,7 @@ export function ModelPicker({
       currentProseProviderId,
       onChanged,
       toast,
+      tr,
     ],
   );
 
@@ -247,17 +250,18 @@ export function ModelPicker({
     <span ref={anchorRef} className="inline-flex min-w-0 max-w-full">
       <button
         type="button"
-        aria-label="选择默认模型"
+        aria-label={tr("选择默认模型")}
         aria-haspopup="dialog"
         aria-expanded={open}
         title={
           target?.ready
-            ? `默认模型：${label}${
-                target.contextWindow
-                  ? ` · 上下文 ${formatTokens(target.contextWindow)}`
-                  : ""
-              }（点击切换）`
-            : "还没有可用的模型，点击选择或去设置"
+            ? tr("默认模型：{label}{context}（点击切换）", {
+                label,
+                context: target.contextWindow
+                  ? tr(" · 上下文 {size}", { size: formatTokens(target.contextWindow) })
+                  : "",
+              })
+            : tr("还没有可用的模型，点击选择或去设置")
         }
         disabled={disabled}
         onClick={() => {
@@ -280,7 +284,7 @@ export function ModelPicker({
           aria-hidden
         />
         <span className="truncate" title={fullLabel}>{label}</span>
-        {thinkingSupported?<span className="shrink-0 text-[9px] text-ink-4">思考·{THINKING_OPTIONS.find(o=>o.value===(thinking||"default"))?.label}</span>:null}
+        {thinkingSupported?<span className="shrink-0 text-[9px] text-ink-4">{tr("思考·{level}", { level: tr(THINKING_OPTIONS.find(o=>o.value===(thinking||"default"))?.label ?? "") })}</span>:null}
         <ChevronDown className="size-2.5 shrink-0 opacity-70" />
       </button>
 
@@ -289,29 +293,29 @@ export function ModelPicker({
             <div
               ref={menuRef}
               role="dialog"
-              aria-label="选择默认模型"
+              aria-label={tr("选择默认模型")}
               className="fixed z-[90] max-h-[calc(100dvh-16px)] overflow-y-auto rounded-md border border-line bg-surface text-ink shadow-float rise-in"
               style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: MENU_WIDTH }}
             >
               <div className="flex items-baseline justify-between gap-2 border-b border-line px-3 py-2">
-                <span className="text-[12.5px] font-medium text-ink">选择默认模型</span>
+                <span className="text-[12.5px] font-medium text-ink">{tr("选择默认模型")}</span>
                 <span className="text-[10.5px] text-ink-4">
-                  {realProviders.length > 0 ? `${realProviders.length} 个 DeepSeek 服务` : "仅离线演示"}
+                  {realProviders.length > 0 ? tr("{count} 个 DeepSeek 服务", { count: realProviders.length }) : tr("仅离线演示")}
                 </span>
               </div>
 
-              {!thinkingSupported && thinkingProvider?<p className="border-b border-line px-3 py-2 text-[10px] leading-relaxed text-ink-4">{profile?.capability?.supported===false?"接口声明此模型不支持思考。":profile?.capability?.supported?"模型支持思考，但接口未声明可用档位或当前参数协议尚未适配，使用服务商默认。":"思考能力未知；可在模型设置中重新拉取。未确认能力时使用服务商默认。"}</p>:null}
+              {!thinkingSupported && thinkingProvider?<p className="border-b border-line px-3 py-2 text-[10px] leading-relaxed text-ink-4">{profile?.capability?.supported===false?tr("接口声明此模型不支持思考。"):profile?.capability?.supported?tr("模型支持思考，但接口未声明可用档位或当前参数协议尚未适配，使用服务商默认。"):tr("思考能力未知；可在模型设置中重新拉取。未确认能力时使用服务商默认。")}</p>:null}
               {thinkingSupported?<div className="border-b border-line px-3 py-3">
-                <div className="mb-2 flex items-center justify-between text-[11px]"><span className="text-ink-3">当前模型 · 思考程度</span><span className="text-ink-4">按模型记忆</span></div>
-                <div className="grid grid-cols-3 gap-1" role="group" aria-label="思考程度">{profile?.options.map(option=><button key={option.value} type="button" aria-pressed={(thinking||"default")===option.value} disabled={busy!==null} onClick={()=>void chooseThinking(option.value)} className={cn("flex-1 rounded-md px-2 py-1.5 text-[11px]",(thinking||"default")===option.value?"bg-accent/10 text-accent":"bg-surface-2 text-ink-3 hover:text-ink")}>{option.label}</button>)}</div>
-                <p className="mt-2 text-[10px] leading-relaxed text-ink-4">仅显示当前接口已适配的档位。默认不额外指定参数；提高强度可能增加等待与 token 消耗。</p>
+                <div className="mb-2 flex items-center justify-between text-[11px]"><span className="text-ink-3">{tr("当前模型 · 思考程度")}</span><span className="text-ink-4">{tr("按模型记忆")}</span></div>
+                <div className="grid grid-cols-3 gap-1" role="group" aria-label={tr("思考程度")}>{profile?.options.map(option=><button key={option.value} type="button" aria-pressed={(thinking||"default")===option.value} disabled={busy!==null} onClick={()=>void chooseThinking(option.value)} className={cn("flex-1 rounded-md px-2 py-1.5 text-[11px]",(thinking||"default")===option.value?"bg-accent/10 text-accent":"bg-surface-2 text-ink-3 hover:text-ink")}>{tr(option.label)}</button>)}</div>
+                <p className="mt-2 text-[10px] leading-relaxed text-ink-4">{tr("仅显示当前接口已适配的档位。默认不额外指定参数；提高强度可能增加等待与 token 消耗。")}</p>
               </div>:null}
               <div className="scroll-thin max-h-[min(380px,55vh)] overflow-y-auto p-1.5">
                 {realProviders.length === 0 ? (
                   <div className="mx-1 mb-1.5 rounded-sm border border-gold/25 bg-gold-soft/70 px-2.5 py-2 text-[11px] leading-relaxed text-ink-2 dark:bg-gold-soft/30">
-                    <p className="font-medium text-ink">正在使用离线演示模式（无需 Key）</p>
+                    <p className="font-medium text-ink">{tr("正在使用离线演示模式（无需 Key）")}</p>
                     <p className="mt-0.5 text-ink-3">
-                      演示模式不会调用外部服务，适合先体验流程；填入 DeepSeek API Key 即可接入真实模型。
+                      {tr("演示模式不会调用外部服务，适合先体验流程；填入 DeepSeek API Key 即可接入真实模型。")}
                     </p>
                   </div>
                 ) : null}
@@ -320,17 +324,17 @@ export function ModelPicker({
                   <div className="mx-1 mb-1.5 rounded-sm border border-line bg-surface-2 px-2.5 py-2 text-[11px] leading-relaxed text-ink-3">
                     <p className="flex items-center gap-1 font-medium text-ink-2">
                       <CircleAlert className="size-3 shrink-0" />
-                      当前默认模型 未找到（去设置检查）
+                      {tr("当前默认模型 未找到（去设置检查）")}
                     </p>
                     <p className="mt-0.5 break-all text-ink-4">
-                      {staleText} 可能已被删除、停用或改名。
+                      {tr("{model} 可能已被删除、停用或改名。", { model: staleText })}
                     </p>
                     <button
                       type="button"
                       onClick={() => openSettings()}
                       className="mt-1 text-[11px] text-accent underline underline-offset-2 transition-opacity duration-150 hover:opacity-80"
                     >
-                      打开模型服务设置
+                      {tr("打开模型服务设置")}
                     </button>
                   </div>
                 ) : null}
@@ -343,7 +347,7 @@ export function ModelPicker({
 
                 {groups.length === 0 ? (
                   <p className="px-2.5 py-4 text-center text-[11.5px] text-ink-4">
-                    还没有已启用的 Provider，去设置里添加一个吧。
+                     {tr("还没有已启用的 Provider，去设置里添加一个吧。")}
                   </p>
                 ) : null}
 
@@ -353,17 +357,17 @@ export function ModelPicker({
                     <div key={provider.id} className="mb-1 last:mb-0">
                       <div className="flex items-center gap-1.5 px-2 py-1">
                         <span className="truncate text-[10.5px] font-medium uppercase tracking-wide text-ink-4">
-                          {provider.name}
+                          {tr(provider.name)}
                         </span>
                         <span className="shrink-0 rounded-full border border-line px-1.5 text-[9.5px] text-ink-4">
-                          {KIND_LABEL[provider.kind]}
+                          {tr(KIND_LABEL[provider.kind])}
                         </span>
                         {provider.kind === "demo" ? (
-                          <span className="shrink-0 text-[9.5px] text-ink-4">无需 Key</span>
+                          <span className="shrink-0 text-[9.5px] text-ink-4">{tr("无需 Key")}</span>
                         ) : null}
                       </div>
                       {provider.models.length === 0 ? (
-                        <p className="px-2 pb-1 text-[10.5px] text-ink-4">该 Provider 还没有配置模型。</p>
+                        <p className="px-2 pb-1 text-[10.5px] text-ink-4">{tr("该 Provider 还没有配置模型。")}</p>
                       ) : (
                         provider.models.map((model) => {
                           const selected = selectedProvider && currentModel === model.id;
@@ -388,13 +392,13 @@ export function ModelPicker({
                               </span>
                               <span className="min-w-0 flex-1">
                                 <span className="block truncate text-[12.5px]">
-                                  {model.label || model.id}
+                                  {tr(model.label) || model.id}
                                 </span>
                                 <span className="block truncate text-[10.5px] text-ink-4">
                                   {model.id}
                                   {typeof model.contextWindow === "number" &&
                                   model.contextWindow > 0
-                                    ? ` · 上下文 ${formatTokens(model.contextWindow)}`
+                                    ? tr(" · 上下文 {size}", { size: formatTokens(model.contextWindow) })
                                     : ""}
                                 </span>
                               </span>
@@ -416,9 +420,9 @@ export function ModelPicker({
                 >
                   <Settings2 className="size-3.5 shrink-0 text-ink-3" />
                   <span className="min-w-0 flex-1">
-                    <span className="block">管理模型服务</span>
+                    <span className="block">{tr("管理模型服务")}</span>
                     <span className="block text-[10.5px] text-ink-4">
-                      添加 / 启用 DeepSeek 服务，配置默认模型
+                      {tr("添加 / 启用 DeepSeek 服务，配置默认模型")}
                     </span>
                   </span>
                 </button>
@@ -429,9 +433,9 @@ export function ModelPicker({
                 >
                   <RefreshCw className="size-3.5 shrink-0 text-ink-3" />
                   <span className="min-w-0 flex-1">
-                    <span className="block">拉取模型列表</span>
+                    <span className="block">{tr("拉取模型列表")}</span>
                     <span className="block text-[10.5px] text-ink-4">
-                      打开「设置 → 模型服务」，重新拉取或手动添加模型
+                      {tr("打开「设置 → 模型服务」，重新拉取或手动添加模型")}
                     </span>
                   </span>
                 </button>

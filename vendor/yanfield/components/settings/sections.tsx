@@ -19,6 +19,7 @@ import {
   Type,
 } from "lucide-react";
 import { Button, Spinner } from "@/components/ui/kit";
+import { useT } from "@/lib/i18n";
 import type { AppSettings } from "@/lib/types";
 import { AboutSection } from "./AboutSection";
 import { AgentSection } from "./AgentSection";
@@ -141,13 +142,14 @@ function formatSavedClock(value: number): string {
 
 /** 自动保存状态：保存失败 / 保存中 / 有未保存改动 / 已保存时间 / 默认提示。 */
 export function SettingsSaveStatus({ editor }: { editor: SettingsEditor }) {
+  const tr = useT();
   if (editor.saveError) {
     return (
       <span className="flex items-center gap-1.5 text-[11.5px] text-danger">
         <TriangleAlert className="size-3.5" aria-hidden />
-        保存失败
+        {tr("保存失败")}
         <Button variant="ghost" size="sm" icon={<RefreshCw className="size-3" />} onClick={() => void editor.saveNow()}>
-          重试
+          {tr("重试")}
         </Button>
       </span>
     );
@@ -156,7 +158,7 @@ export function SettingsSaveStatus({ editor }: { editor: SettingsEditor }) {
     return (
       <span className="flex items-center gap-1.5 text-[11.5px] text-ink-3">
         <Spinner size="sm" />
-        保存中…
+        {tr("保存中…")}
       </span>
     );
   }
@@ -164,12 +166,12 @@ export function SettingsSaveStatus({ editor }: { editor: SettingsEditor }) {
     return (
       <span className="flex items-center gap-1.5 text-[11.5px] text-gold">
         <span className="size-1.5 rounded-full bg-gold" aria-hidden />
-        有未保存的改动
+        {tr("有未保存的改动")}
       </span>
     );
   }
   if (editor.lastSavedAt) {
-    return <span className="text-[11.5px] text-ink-3">已保存 · {formatSavedClock(editor.lastSavedAt)}</span>;
+    return <span className="text-[11.5px] text-ink-3">{tr("已保存 · {clock}", { clock: formatSavedClock(editor.lastSavedAt) })}</span>;
   }
-  return <span className="text-[11.5px] text-ink-3">改动会自动保存</span>;
+  return <span className="text-[11.5px] text-ink-3">{tr("改动会自动保存")}</span>;
 }

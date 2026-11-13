@@ -5,6 +5,7 @@
  * 相同 / 新增（绿底）/ 删除（红底+删除线）片段。
  * 颜色统一由 globals.css 的 .diff-add / .diff-del 提供。
  */
+import { useT } from "@/lib/i18n";
 import type { InlineDiff } from "@/lib/diff/blocks";
 import { cn } from "@/lib/ui/cn";
 
@@ -14,8 +15,9 @@ export interface InlineDiffTextProps {
 }
 
 export function InlineDiffText({ parts, className }: InlineDiffTextProps) {
+  const tr = useT();
   if (parts.length === 0) {
-    return <span className={cn("text-ink-4", className)}>（无内容）</span>;
+    return <span className={cn("text-ink-4", className)}>{tr("（无内容）")}</span>;
   }
   return (
     <span className={cn("whitespace-pre-wrap break-words", className)}>

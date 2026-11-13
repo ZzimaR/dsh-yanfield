@@ -278,7 +278,7 @@ export async function* runChatStream(params: ChatRunParams): AsyncGenerator<AiSt
     });
     const novel = getNovel(params.novelId);
 
-    const preset = resolvePreset(feature, listPresets(params.novelId), params.presetId);
+    const preset = resolvePreset(feature, listPresets(params.novelId), params.presetId, params.locale);
     const chatTarget = resolveTarget("chat");
     target = chatTarget;
 
@@ -600,7 +600,7 @@ export async function* runTaskStream(params: TaskRunParams): AsyncGenerator<AiSt
       config,
       selection: params.selection,
     });
-    const preset = resolvePreset(feature, listPresets(params.novelId), params.presetId);
+    const preset = resolvePreset(feature, listPresets(params.novelId), params.presetId, params.locale);
     const role: "chat" | "prose" = preset.modelRole;
     target = resolveTarget(role);
 

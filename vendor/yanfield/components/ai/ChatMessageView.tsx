@@ -7,6 +7,7 @@
  *   + 可折叠「思考过程」+ 流式打字光标 + 正文类 action 审阅入口 + 操作工具条
  */
 import * as React from "react";
+import { localizedAgentName } from "@/lib/ai/agent-display";
 import Link from "next/link";
 import {
   Brain,
@@ -21,6 +22,7 @@ import type { AgentDef, AiAction, AiPricing } from "@/lib/types";
 import { Badge, Button, IconButton, Markdown } from "@/components/ui/kit";
 import { openSettingsDialog } from "@/components/settings/open";
 import { cn, formatRelativeTime } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import type { UIMessage } from "./types";
 import { ACTION_LABEL, AGENT_TINT_CLASS, agentInitial, formatTokens, isBodyAction } from "./utils";
 import { AgentRunCard } from "./AgentRunCard";
@@ -61,6 +63,7 @@ export const ChatMessageView = React.memo(function ChatMessageView({
   className,
 }: ChatMessageViewProps) {
   const [showReasoning, setShowReasoning] = React.useState(false);
+  const tr = useT();
   const tint = AGENT_TINT_CLASS[agent.tint] ?? AGENT_TINT_CLASS.accent;
 
   /* ---------------- 用户消息 ---------------- */
@@ -72,10 +75,10 @@ export const ChatMessageView = React.memo(function ChatMessageView({
             {message.content}
           </div>
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/msg:opacity-100">
-            <IconButton label="复制提问" size="sm" onClick={() => onCopy?.(message)}>
+            <IconButton label={tr("复制提问")} size="sm" onClick={() => onCopy?.(message)}>
               <Copy className="size-3" />
             </IconButton>
-            <IconButton label="删除这条提问" size="sm" disabled={disableActions} onClick={() => onDelete?.(message)}>
+            <IconButton label={tr("删除这条提问")} size="sm" disabled={disableActions} onClick={() => onDelete?.(message)}>
               <Trash className="size-3" />
             </IconButton>
           </div>
@@ -93,7 +96,7 @@ export const ChatMessageView = React.memo(function ChatMessageView({
       <div className="min-w-0">
         <div className="mb-2.5 flex items-center gap-2.5">
           <span className="flex size-6 shrink-0 items-center justify-center rounded-lg border border-accent/15 bg-accent/6 font-serif text-[12px] text-accent" aria-hidden>{agentInitial(agent)}</span>
-          <span className="font-serif text-[13px] font-medium tracking-wide text-ink">{agent.name}</span>
+          <span className="font-serif text-[13px] font-medium tracking-wide text-ink">{localizedAgentName(agent)}</span>
           {message.model?<span className="ml-auto max-w-[58%] truncate text-[10px] text-ink-3" title={message.provider?`${message.provider} / ${message.model}`:message.model}>{message.model}</span>:null}
         </div>
 
@@ -106,7 +109,7 @@ export const ChatMessageView = React.memo(function ChatMessageView({
               className="inline-flex items-center gap-1 rounded-sm text-[11px] text-ink-3 transition-colors duration-150 hover:text-ink-2 dark:text-ink-2 dark:hover:text-ink"
             >
               <Brain className="size-3" />
-              {isStreaming ? "思考中…" : `思考过程 · ${formatTokens(reasoningLength)} 字`}
+              {isStreaming ? tr("思考中…") : tr("思考过程 · {count} 字", { count: formatTokens(reasoningLength) })}
               <ChevronDown
                 className={cn("size-3 transition-transform duration-150", showReasoning && "rotate-180")}
               />
@@ -122,11 +125,11 @@ export const ChatMessageView = React.memo(function ChatMessageView({
         {message.content && !message.actions.some(a=>a.type==="agent-run") ? (
           <Markdown text={message.content} className={cn("mt-1 text-[13px] leading-[1.9]", isStreaming && "ai-caret")} />
         ) : isStreaming && !message.actions.some(a=>a.type==="agent-run") ? (
-          <div className="ai-caret mt-1 h-5" aria-label="正在生成" />
+          <div className="ai-caret mt-1 h-5" aria-label={tr("正在生成")} />
         ) : null}
 
         {!message.content && !isStreaming && message.status === "aborted" ? (
-          <p className="mt-1 text-[12px] text-ink-4 dark:text-ink-3">已停止生成</p>
+          <p className="mt-1 text-[12px] text-ink-4 dark:text-ink-3">{tr("已停止生成")}</p>
         ) : null}
 
         {message.status === "error" && (message.errorTitle || message.error) ? (
@@ -142,7 +145,7 @@ export const ChatMessageView = React.memo(function ChatMessageView({
                   onClick={() => onRetry?.(message)}
                   className="shrink-0 underline decoration-danger/40 underline-offset-2 transition-colors hover:decoration-danger"
                 >
-                  重试
+                  {tr("重试")}
                 </button>
               ) : null}
             </div>
@@ -160,7 +163,7 @@ export const ChatMessageView = React.memo(function ChatMessageView({
                 }}
                 className="ml-[22px] mt-1.5 inline-flex items-center gap-1 text-[11.5px] font-medium text-accent transition-opacity duration-150 hover:opacity-80"
               >
-                去「设置 → 模型服务」检查
+                {tr("去「设置 → 模型服务」检查")}
                 <span aria-hidden>→</span>
               </Link>
             ) : null}
@@ -182,12 +185,12 @@ export const ChatMessageView = React.memo(function ChatMessageView({
                   icon={<Lightbulb className="size-3" />}
                   onClick={() => onApplyAction?.(action)}
                 >
-                  {ACTION_LABEL[action.type] ?? action.label}
-                  <span className="ml-1 text-[10.5px] text-ink-4 dark:text-ink-3">审阅</span>
+                  {tr(ACTION_LABEL[action.type] ?? action.label)}
+                  <span className="ml-1 text-[10.5px] text-ink-4 dark:text-ink-3">{tr("审阅")}</span>
                 </Button>
               ) : (
                 <Badge key={action.id} tone="jade">
-                  {ACTION_LABEL[action.type] ?? action.label ?? "待保存"}
+                  {tr(ACTION_LABEL[action.type] ?? action.label ?? "待保存")}
                 </Badge>
               ),
             )}
@@ -197,7 +200,7 @@ export const ChatMessageView = React.memo(function ChatMessageView({
         <div className="mt-2 flex flex-wrap items-center gap-0.5">
           {message.usage&&message.usage.totalTokens>0?<div className="mr-auto"><UsageIndicator iconOnly cachedInputTokens={message.usage.cachedInputTokens} cacheReportedInputTokens={message.usage.cacheReportedInputTokens} reportedCost={message.usage.reportedCost} estimatedTokens={message.usage.estimatedTokens} promptTokens={message.usage.promptTokens} completionTokens={message.usage.completionTokens} latencyMs={message.usage.latencyMs} price={pricing??{inputPerMillion:0,outputPerMillion:0}}/></div>:<span className="mr-auto text-[10px] text-ink-3">{formatRelativeTime(message.createdAt)}</span>}
           <IconButton
-            label="复制回复"
+            label={tr("复制回复")}
             size="sm"
             disabled={!message.content}
             onClick={() => onCopy?.(message)}
@@ -205,11 +208,11 @@ export const ChatMessageView = React.memo(function ChatMessageView({
             <Copy className="size-3.5" />
           </IconButton>
           {canRetry && !isStreaming ? (
-            <IconButton label="重新生成" size="sm" onClick={() => onRetry?.(message)}>
+            <IconButton label={tr("重新生成")} size="sm" onClick={() => onRetry?.(message)}>
               <RotateCcw className="size-3.5" />
             </IconButton>
           ) : null}
-          <IconButton label="删除这条回复" size="sm" disabled={disableActions} onClick={() => onDelete?.(message)}>
+          <IconButton label={tr("删除这条回复")} size="sm" disabled={disableActions} onClick={() => onDelete?.(message)}>
             <Trash className="size-3.5" />
           </IconButton>
         </div>

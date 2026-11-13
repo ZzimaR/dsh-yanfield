@@ -8,6 +8,7 @@ import { ArchiveInlinePanel } from "./ArchiveInlinePanel";
 import { ChapterTree } from "./ChapterTree";
 import { CodexPanel } from "./CodexPanel";
 import { OutlineInlinePanel } from "./OutlineInlinePanel";
+import { useT } from "@/lib/i18n";
 
 /** 左栏四个标签页：目录 / 章纲 / 设定 / 档案 */
 export type EditorLeftTab = EditorTab | "codex";
@@ -40,6 +41,7 @@ export const LeftPanel = React.memo(function LeftPanel({
   actions,
   onSelectChapter,
 }: LeftPanelProps) {
+  const tr = useT();
   const chapterCount =
     (tree?.volumes.reduce((sum, volume) => sum + volume.chapters.length, 0) ?? 0) +
     (tree?.looseChapters.length ?? 0);
@@ -52,16 +54,16 @@ export const LeftPanel = React.memo(function LeftPanel({
   }, [tab]);
 
   const tabs: TabItem[] = [
-    { value: "toc", label: "目录", icon: <ListTree className="size-3.5" />, count: chapterCount || undefined },
-    { value: "outline", label: "章纲", icon: <ScrollText className="size-3.5" /> },
-    { value: "codex", label: "设定", icon: <BookOpen className="size-3.5" /> },
-    { value: "archives", label: "档案", icon: <Archive className="size-3.5" /> },
+    { value: "toc", label: tr("目录"), icon: <ListTree className="size-3.5" />, count: chapterCount || undefined },
+    { value: "outline", label: tr("章纲"), icon: <ScrollText className="size-3.5" /> },
+    { value: "codex", label: tr("设定"), icon: <BookOpen className="size-3.5" /> },
+    { value: "archives", label: tr("档案"), icon: <Archive className="size-3.5" /> },
   ];
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-surface">
       <Tabs
-        className="shrink-0 gap-0 px-1 [&>button]:shrink-0 [&>button]:whitespace-nowrap [&>button]:gap-1 [&>button]:px-2 [&>button]:text-[12.5px] [&>button>svg]:hidden"
+        className="scroll-thin shrink-0 gap-0 overflow-x-auto px-1 [&>button]:shrink-0 [&>button]:whitespace-nowrap [&>button]:gap-1 [&>button]:px-1 [&>button]:text-[11px] [&>button>svg]:hidden"
         tabs={tabs}
         value={tab}
         onChange={(value) => {

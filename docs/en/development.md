@@ -3,7 +3,7 @@
 ## 1. Requirements
 
 - Node.js ≥ 22.19 (for building and checks; the runtime comes from Harness).
-- A working DeepSeek Harness install (`>=0.2.1-rc.5 <0.3.0`), ideally with two profiles:
+- A working DeepSeek Harness install (`>=0.2.1-rc.5`), ideally with two profiles:
   - a production one (e.g. `desktop`) with a released build;
   - a development one (e.g. `yanfield-dev`) linked to this checkout through the DSH CLI.
 

@@ -12,6 +12,7 @@ import { cn } from "@/lib/ui/cn";
 import { yanfieldPanelBounds, yanfieldPortal } from "@/lib/ui/portal";
 import { useOnClickOutside } from "@/lib/ui/hooks";
 import { isInsideComposedPath } from "@/lib/ui/composed";
+import { useT } from "@/lib/i18n";
 
 /* ============================== Button ============================== */
 
@@ -201,6 +202,7 @@ export function Select({
   required,
   "aria-label": ariaLabel,
 }: SelectProps) {
+  const tr = useT();
   const selectId = id ?? name;
   const [open, setOpen] = React.useState(false);
   const [active, setActive] = React.useState(0);
@@ -209,7 +211,7 @@ export function Select({
   const [box, setBox] = React.useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
   const current = options.find((opt) => opt.value === String(value ?? ""));
   const muted = !current;
-  const shown = current?.label ?? placeholder ?? "请选择";
+  const shown = current?.label ?? placeholder ?? tr("请选择");
 
   const emit = (next: string) => {
     setOpen(false);
@@ -515,10 +517,11 @@ export function Kbd({ children }: { children: React.ReactNode }) {
 }
 
 export function Spinner({ size = "md", className }: { size?: "sm" | "md" | "lg"; className?: string }) {
+  const tr = useT();
   return (
     <Loader2
       className={cn("animate-spin text-ink-3", size === "sm" && "size-3.5", size === "md" && "size-4", size === "lg" && "size-6", className)}
-      aria-label="加载中"
+      aria-label={tr("加载中")}
     />
   );
 }
@@ -731,6 +734,7 @@ export interface DialogProps {
 }
 
 export function Dialog({ open, onClose, title, description, footer, width = 560, children }: DialogProps) {
+  const tr = useT();
   const mounted = useMounted();
   if (!open || !mounted) return null;
   return (
@@ -746,7 +750,7 @@ export function Dialog({ open, onClose, title, description, footer, width = 560,
             {title ? <h2 className="text-[15px] font-semibold text-ink">{title}</h2> : null}
             {description ? <p className="mt-1 text-[13px] leading-relaxed text-ink-3">{description}</p> : null}
           </div>
-          <IconButton label="关闭" onClick={onClose} size="sm">
+          <IconButton label={tr("关闭")} onClick={onClose} size="sm">
             <X className="size-4" />
           </IconButton>
         </div>
@@ -770,6 +774,7 @@ export interface ConfirmDialogProps {
 }
 
 export function ConfirmDialog({ open, title, description, confirmText = "确认", cancelText = "取消", danger, loading, onConfirm, onClose }: ConfirmDialogProps) {
+  const tr = useT();
   return (
     <Dialog
       open={open}
@@ -779,22 +784,23 @@ export function ConfirmDialog({ open, title, description, confirmText = "确认"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
-            {cancelText}
+            {tr(cancelText)}
           </Button>
           <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} loading={loading}>
-            {confirmText}
+            {tr(confirmText)}
           </Button>
         </>
       }
     >
       <div className="text-[13px] leading-relaxed text-ink-2">
-        {description ?? "此操作不可撤销，请确认。"}
+        {description ?? tr("此操作不可撤销，请确认。")}
       </div>
     </Dialog>
   );
 }
 
 export function Sheet({ open, onClose, title, children, width = 420, footer }: { open: boolean; onClose: () => void; title?: React.ReactNode; children: React.ReactNode; width?: number | string; footer?: React.ReactNode }) {
+  const tr = useT();
   const mounted = useMounted();
   if (!open || !mounted) return null;
   return (
@@ -807,7 +813,7 @@ export function Sheet({ open, onClose, title, children, width = 420, footer }: {
       >
         <div className="flex items-center justify-between gap-4 border-b border-line px-4 py-3">
           <h2 className="text-[14px] font-semibold text-ink">{title}</h2>
-          <IconButton label="关闭" onClick={onClose} size="sm">
+          <IconButton label={tr("关闭")} onClick={onClose} size="sm">
             <X className="size-4" />
           </IconButton>
         </div>
@@ -944,6 +950,7 @@ export function useToast(): ToastContextValue {
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const tr = useT();
   const [items, setItems] = React.useState<ToastItem[]>([]);
   const counter = React.useRef(0);
 
@@ -983,7 +990,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             </div>
             <button
               type="button"
-              aria-label="关闭提示"
+              aria-label={tr("关闭提示")}
               className="mt-0.5 text-ink-4 transition-colors hover:text-ink-2"
               onClick={() => setItems((prev) => prev.filter((t) => t.id !== item.id))}
             >

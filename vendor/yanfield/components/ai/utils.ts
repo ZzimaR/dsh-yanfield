@@ -5,6 +5,7 @@
  * action 文本提取 / 请求体辅助 / token 格式化。
  * 注意：颜色一律使用 globals.css 的 token 类名，禁止硬编码 hex。
  */
+import { localizedAgentName } from "@/lib/ai/agent-display";
 import {
   AGENTS,
   CUSTOM_AGENT,
@@ -68,7 +69,7 @@ export const AGENT_TINT_CLASS: Record<AgentDef["tint"], AgentTintStyle> = {
 
 /** 头像文字：中文取首字，英文取首字母（大写） */
 export function agentInitial(agent: AgentDef): string {
-  const name = agent.name.trim();
+  const name = localizedAgentName(agent).trim();
   if (!name) return "AI";
   const first = name.slice(0, 1);
   return /[a-z]/.test(first) ? first.toUpperCase() : first;

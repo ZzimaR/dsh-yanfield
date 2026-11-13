@@ -10,6 +10,7 @@ import { ChevronUp, Gauge } from "lucide-react";
 import { apiPost } from "@/lib/client/api";
 import type { ContextConfig } from "@/lib/types";
 import { Skeleton } from "@/components/ui/kit";
+import { t, useT } from "@/lib/i18n";
 import { cn } from "@/lib/ui/cn";
 import type { ContextPreview, MentionRef } from "./types";
 import { formatTokens, normalizeContextPreview } from "./utils";
@@ -67,7 +68,7 @@ export function useContextPreview({
       .catch((err: unknown) => {
         if (alive) {
           setData(null);
-          setError(err instanceof Error ? err.message : "上下文预览不可用");
+          setError(err instanceof Error ? err.message : t("上下文预览不可用"));
         }
       })
       .finally(() => {
@@ -95,6 +96,7 @@ export interface ContextMeterProps {
 }
 
 export function ContextMeter({ data, loading = false, error, onOpen, budget, className }: ContextMeterProps) {
+  const tr = useT();
   const total = data?.totalTokens ?? 0;
   const activeBudget = typeof budget === "number" ? budget : (data?.budget ?? 0);
   const percent = activeBudget > 0 ? Math.min(100, Math.round((total / activeBudget) * 100)) : 0;
@@ -104,20 +106,20 @@ export function ContextMeter({ data, loading = false, error, onOpen, budget, cla
     <button
       type="button"
       onClick={onOpen}
-      title="查看上下文分节明细"
+      title={tr("查看上下文分节明细")}
       className={cn(
         "group flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors duration-150 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none",
         className,
       )}
     >
       <Gauge className="size-3.5 shrink-0 text-ink-3 dark:text-ink-2" />
-      <span className="shrink-0 text-[11px] text-ink-3 dark:text-ink-2">上下文</span>
+      <span className="shrink-0 text-[11px] text-ink-3 dark:text-ink-2">{tr("上下文")}</span>
 
       {loading && !data ? (
         <Skeleton className="h-1.5 flex-1" />
       ) : error && !data ? (
         <span className="min-w-0 flex-1 truncate text-[11px] text-ink-4 dark:text-ink-3" title={error}>
-          预览不可用（点击查看）
+          {tr("预览不可用（点击查看）")}
         </span>
       ) : data ? (
         <>
@@ -129,12 +131,12 @@ export function ContextMeter({ data, loading = false, error, onOpen, budget, cla
           </span>
           <span className="shrink-0 text-[11px] tabular-nums text-ink-3 dark:text-ink-2">
             {activeBudget > 0
-              ? `已用 ${formatTokens(total)} / ${budgetLabel(activeBudget)} tokens · ${percent}%`
-              : `已用 ${formatTokens(total)} tokens · 不限制`}
+              ? tr("已用 {used} / {budget} tokens · {percent}%", { used: formatTokens(total), budget: tr(budgetLabel(activeBudget)), percent })
+              : tr("已用 {used} tokens · 不限制", { used: formatTokens(total) })}
           </span>
         </>
       ) : (
-        <span className="min-w-0 flex-1 truncate text-[11px] text-ink-4 dark:text-ink-3">点击预览上下文</span>
+        <span className="min-w-0 flex-1 truncate text-[11px] text-ink-4 dark:text-ink-3">{tr("点击预览上下文")}</span>
       )}
 
       <ChevronUp className="size-3 shrink-0 text-ink-4 transition-transform duration-150 group-hover:-translate-y-0.5 dark:text-ink-3" />

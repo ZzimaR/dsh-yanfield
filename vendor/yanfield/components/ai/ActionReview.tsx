@@ -9,6 +9,7 @@ import * as React from "react";
 import { CircleAlert, Copy, Info } from "lucide-react";
 import { Badge, Button, Dialog, useToast } from "@/components/ui/kit";
 import { cn, stripHtml } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import type { PendingAction } from "./types";
 import { ACTION_LABEL } from "./utils";
 
@@ -42,24 +43,26 @@ export function ActionReview({
   onClose,
   onApply,
   canApply,
-  applyDisabledHint = "当前页面没有可用的编辑器，无法写入正文。可先复制内容，回到编辑器后手动粘贴。",
+  applyDisabledHint,
   applying = false,
 }: ActionReviewProps) {
+  const tr = useT();
   const { toast } = useToast();
   const [copying, setCopying] = React.useState(false);
 
   if (!pending) return null;
   const { action, text } = pending;
   const preview = stripHtml(text);
-  const hint = TARGET_HINT[action.type] ?? "该操作需要人工确认";
+  const hint = tr(TARGET_HINT[action.type] ?? "该操作需要人工确认");
+  const disabledHint = applyDisabledHint ?? tr("当前页面没有可用的编辑器，无法写入正文。可先复制内容，回到编辑器后手动粘贴。");
 
   const copy = async () => {
     setCopying(true);
     try {
       await navigator.clipboard.writeText(preview);
-      toast({ title: "已复制到剪贴板", tone: "success" });
+      toast({ title: tr("已复制到剪贴板"), tone: "success" });
     } catch {
-      toast({ title: "复制失败", description: "浏览器未授予剪贴板权限", tone: "error" });
+      toast({ title: tr("复制失败"), description: tr("浏览器未授予剪贴板权限"), tone: "error" });
     } finally {
       setCopying(false);
     }
@@ -69,7 +72,7 @@ export function ActionReview({
     <Dialog
       open
       onClose={onClose}
-      title={`确认应用：${ACTION_LABEL[action.type] ?? action.label}`}
+      title={tr("确认应用：{label}", { label: tr(ACTION_LABEL[action.type] ?? action.label) })}
       description={hint}
       width={620}
       footer={
@@ -81,21 +84,21 @@ export function ActionReview({
             loading={copying}
             onClick={() => void copy()}
           >
-            复制内容
+            {tr("复制内容")}
           </Button>
           <div className="ml-auto flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={onClose}>
-              取消
+              {tr("取消")}
             </Button>
             <Button
               variant="primary"
               size="sm"
               loading={applying}
               disabled={!canApply}
-              title={canApply ? undefined : applyDisabledHint}
+              title={canApply ? undefined : disabledHint}
               onClick={onApply}
             >
-              应用到正文
+              {tr("应用到正文")}
             </Button>
           </div>
         </div>
@@ -103,25 +106,25 @@ export function ActionReview({
     >
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge tone="accent">{ACTION_LABEL[action.type] ?? action.type}</Badge>
+          <Badge tone="accent">{tr(ACTION_LABEL[action.type] ?? action.type)}</Badge>
           {action.label && action.label !== ACTION_LABEL[action.type] ? (
-            <span className="text-[11px] text-ink-4">{action.label}</span>
+            <span className="text-[11px] text-ink-4">{tr(action.label)}</span>
           ) : null}
           <span className="ml-auto text-[11px] tabular-nums text-ink-4">
-            {preview.length} 字
+            {tr("{count} 字", { count: preview.length })}
           </span>
         </div>
 
         {!canApply ? (
           <div className="flex items-start gap-1.5 rounded-md border border-gold/30 bg-gold-soft px-2.5 py-2 text-[12px] leading-relaxed text-ink-2">
             <CircleAlert className="mt-0.5 size-3.5 shrink-0 text-gold" />
-            <span className="min-w-0 flex-1">{applyDisabledHint}</span>
+            <span className="min-w-0 flex-1">{disabledHint}</span>
           </div>
         ) : (
           <div className="flex items-start gap-1.5 rounded-md border border-line bg-surface-2 px-2.5 py-2 text-[11px] leading-relaxed text-ink-3">
             <Info className="mt-0.5 size-3.5 shrink-0 text-ink-4" />
             <span className="min-w-0 flex-1">
-              AI 生成内容将写入正文，请先通读确认；应用后仍可使用编辑器的撤销操作。
+              {tr("AI 生成内容将写入正文，请先通读确认；应用后仍可使用编辑器的撤销操作。")}
             </span>
           </div>
         )}
@@ -132,7 +135,7 @@ export function ActionReview({
             "font-serif text-[14px] leading-[1.95] text-ink-2",
           )}
         >
-          {preview || "（内容为空）"}
+          {preview || tr("（内容为空）")}
         </div>
       </div>
     </Dialog>

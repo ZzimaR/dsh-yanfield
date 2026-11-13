@@ -1,46 +1,46 @@
 # Pull Request
 
-## 这个 PR 做了什么
+## What does this PR do?
 
-<!-- 一段话说明目的；关联的 Issue 请写 `Closes #123`。 -->
+<!-- One paragraph on the purpose; link issues with `Closes #123`. 中文说明也可以。 -->
 
 Closes #
 
-## 改动清单
+## Changes
 
-<!-- 按文件/模块列出主要改动，方便 review。 -->
+<!-- List the main changes by file/module to make review easier. -->
 
 -
 -
 
-## 类型
+## Type
 
-- [ ] 🐛 Bug 修复
-- [ ] ✨ 新功能
-- [ ] 🎨 界面 / 样式 / 文案
-- [ ] ♻️ 重构（不改变行为）
-- [ ] 📝 文档 / 截图
-- [ ] 🔧 构建 / 依赖
-- [ ] 💥 会破坏已有数据或接口的变更（必填说明）
+- [ ] 🐛 Bug fix
+- [ ] ✨ New feature
+- [ ] 🎨 UI / styling / copy
+- [ ] ♻️ Refactor (no behavior change)
+- [ ] 📝 Docs / screenshots
+- [ ] 🔧 Build / dependencies
+- [ ] 💥 Breaking data or API change (explain below)
 
-## 自测
+## Self-test
 
-- [ ] `node scripts/build.mjs` 通过
-- [ ] `node scripts/check.mjs` 通过
-- [ ] `node scripts/smoke.mjs` 通过
-- [ ] 用 DSH CLI 装进测试 profile，启动后手动验过相关页面
-- [ ] 改的是宿主端（`src/host.ts`、`vendor/yanfield/lib`、API 路由）→ 确认已重启而非只刷新
-- [ ] AI 相关改动在**隔离库**（`yanfield-dev` + `config.dataDir`）里跑过，没有写用户真实书库
+- [ ] `node scripts/build.mjs` passes
+- [ ] `node scripts/check.mjs` passes
+- [ ] `node scripts/smoke.mjs` passes
+- [ ] Installed with the DSH CLI into a test profile and manually checked the affected pages
+- [ ] Changed host-side code (`src/host.ts`, `vendor/yanfield/lib`, API routes) → restarted DSH, not just refreshed
+- [ ] AI changes were tested in an isolated library (`yanfield-dev` + `config.dataDir`), not the real one
 
-<!-- 贴关键输出（构建日志、探针 JSON、截图） -->
+<!-- Paste key output (build log, probe JSON, screenshots). -->
 
-## 截图（界面类改动必填）
+## Screenshots (required for UI changes)
 
-<!-- 前后对比更好；light 与 dark 都建议给一张。 -->
+<!-- Before/after is best; light and dark if possible. -->
 
-## 检查清单
+## Checklist
 
-- [ ] 没有提交 `dist/`、安装包、`.tmp-test/`、`data/`、`client/styles.generated.css` 或 `src/generated/`
-- [ ] 没有把 Node 专用模块（`node:sqlite` / `node:fs` / `@/lib/db` 等）带进客户端 bundle
-- [ ] 新文案与现有中文风格一致；README / docs 相关说明已同步（含 `docs/en/`）
-- [ ] 没有隐私信息（API Key、书稿正文、个人路径）
+- [ ] No `dist/`, package archives, `.tmp-test/`, `data/`, `client/styles.generated.css`, or `src/generated/`
+- [ ] No Node-only modules (`node:sqlite` / `node:fs` / `@/lib/db`) in the client bundle
+- [ ] New copy is translated in both Chinese and English (`vendor/yanfield/lib/i18n/en/`), and README / docs are updated (including `docs/en/`)
+- [ ] No private data (API keys, manuscript text, personal paths)

@@ -9,7 +9,7 @@
 Manuscript, outline, world notes and an AI assistant on one desk.<br>
 Your book stays local, the model is the DeepSeek you already configured, and every AI edit is reviewed by you.
 
-[![DSH version](https://img.shields.io/badge/DSH-%E2%89%A5%200.2.1--rc.5%20%3C%200.3.0-4f7864?style=flat-square)](#install)
+[![DSH version](https://img.shields.io/badge/DSH-%E2%89%A5%200.2.1--rc.5-4f7864?style=flat-square)](#install)
 [![Node for builds](https://img.shields.io/badge/Node-%E2%89%A5%2022.19-4f7864?style=flat-square)](https://nodejs.org)
 [![Version](https://img.shields.io/github/v/release/ZzimaR/dsh-yanfield?label=version&style=flat-square)](https://github.com/ZzimaR/dsh-yanfield/releases/latest)
 [![license](https://img.shields.io/badge/license-PolyForm%20Noncommercial-a97f2b?style=flat-square)](LICENSE)
@@ -23,22 +23,23 @@ Your book stays local, the model is the DeepSeek you already configured, and eve
 
 [![Yanfield inside DeepSeek Harness: open the bookshelf from the host sidebar, switch between outline and notes, preview AI context, and review a prose edit](docs/screenshots/yanfield-in-dsh.gif)](docs/screenshots/yanfield-in-dsh.gif)
 
-24-second walkthrough of a sample novel in DSH. The review uses a prepared example edit. The interface and captions are in Chinese.
+24-second walkthrough of a sample novel in DSH, recorded in the Chinese interface (the interface is bilingual now; the screenshots below show English). The review uses a prepared example edit.
 
 <p align="center"><sub>Three-column writing desk · sample manuscript · click for full size</sub></p>
 
 ## What this plugin is
 
-Yanfield is a **DeepSeek Harness plugin**, not a standalone app. After installation a 「砚田」 entry appears in the Harness sidebar; opening it gives you a long-form writing desk rendered inside the panel.
+Yanfield is a **DeepSeek Harness plugin**, not a standalone app. After installation a **Yanfield** entry (「砚田」 when the interface is Chinese) appears in the Harness sidebar; opening it gives you a long-form writing desk rendered inside the panel.
 
 - **Writing desk** — novels / volumes / chapters, three columns (outline · prose · AI), autosave, word counts, focus mode, adjustable typography, and two themes (rice-paper light, night-sail dark).
 - **Notes at hand** — chapter blueprints, characters, world settings, foreshadowing and story archives live in the left rail, edited in place without leaving the page.
 - **AI proposes, you decide** — the assistant reads your notes, works in several steps, and proposes prose and note changes; prose is reviewed paragraph by paragraph (green insertions, red deletions) and only what you keep is written into the manuscript.
-- **Local first** — manuscript, notes and conversations live in a local SQLite file; the model comes from the DeepSeek service you already configured in Harness, so there is no second API key to manage.
+- **Local first** — manuscript, notes and conversations live in a local SQLite file; the model comes from the DeepSeek service you already configured in Harness, so there is no second API key to manage. The bundled sample books are Chinese demo manuscripts, included to show the workflow; create a new book to write in English.
+- **English and Chinese** — the interface follows the Harness language (`Settings → General → Language`): the sidebar entry and every screen switch between 砚田 and Yanfield. Manuscripts are never translated, and the AI replies in the language you write in.
 
 ## Install
 
-Requires DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`. Choose the command for your profile to install the prebuilt package from [npm](https://www.npmjs.com/package/dsh-yanfield).
+Requires DeepSeek Harness `>=0.2.1-rc.5`. Choose the command for your profile to install the prebuilt package from [npm](https://www.npmjs.com/package/dsh-yanfield).
 
 ```bash
 # Web
@@ -54,14 +55,14 @@ For offline installation, download `dsh-yanfield.tgz` from [GitHub Releases](htt
 
 How to confirm it worked:
 
-1. a 「砚田」 entry appears in the left sidebar;
-2. Check the version and build time in `砚田 → Settings → About`. The build time comes from the bundle.
+1. a **Yanfield** entry appears in the left sidebar;
+2. Check the version and build time in `Yanfield → Settings → About`. The build time comes from the bundle.
 
 To update, run `dsh plugin --profile <profile> add dsh-yanfield@latest` in the same profile and restart Harness. To roll back, replace `@latest` with the desired version, such as `@0.1.1`. This also switches an existing GitHub install to npm.
 
 ## First run
 
-1. Open 「砚田」 from the sidebar and click **New novel** on the shelf (title, genre, cover color, one-line pitch).
+1. Open **Yanfield** from the sidebar and click **New novel** on the shelf (title, genre, cover color, one-line pitch).
 2. Open the novel and click **Write** to enter the three-column desk.
 3. Type into the AI box on the right, e.g. "make the first paragraph more vivid, only the first paragraph", "draft a blueprint for the next chapter", "create a character card for Zhou Wan".
 4. Prose edits open in a review view: keep or revert each paragraph, then press **Confirm review** — only kept paragraphs are written. Note changes are confirmed item by item in the task card.
@@ -109,18 +110,18 @@ Both real routes can be switched in Settings; an unavailable route explains why 
 ## AI and cost
 
 - **Models** — by default the DeepSeek account already signed in to Harness; you can switch to an official API key. Both routes live in `Settings → Model services` with availability and reasons.
-- **Catalogue** — `deepseek-flash` (DeepSeek-V4.1-Flash, text and images) and `deepseek-v4-pro` (DeepSeek-V4-Pro, text only), roughly 1M tokens of context each; new models registered in Harness are synced automatically.
-- **Balance** — the 「余额」 button under the composer queries the signed-in DSH account, no key needed.
+- **Catalog** — `deepseek-flash` (DeepSeek-V4.1-Flash, text and images) and `deepseek-v4-pro` (DeepSeek-V4-Pro, text only), roughly 1M tokens of context each; new models registered in Harness are synced automatically.
+- **Balance** — the **Balance** button under the composer queries the signed-in DSH account, no key needed.
 - **Cost** — the footer shows *today's* cumulative estimate, not a single task. Unit prices come from a built-in DeepSeek price table and switch between peak and off-peak by Beijing time (peak: weekdays 09:00–12:00 and 14:00–18:00; everything else, including weekends and public holidays, is off-peak at half price). **Estimates only — the DeepSeek bill is authoritative.**
-- **Built-in thrift** — decision rounds skip deep thinking, short polishes drop a tier, small edits skip the note-organising pass, and oversized tool results are truncated with paging hints. A single-paragraph polish usually costs a few cents of a yuan; a blueprint task about a dime.
+- **Built-in thrift** — decision rounds skip deep thinking, short polishes drop a tier, small edits skip the note-organizing pass, and oversized tool results are truncated with paging hints. A single-paragraph polish usually costs well under a cent; a blueprint task costs a few cents.
 
 ## Screenshots
 
-| Shelf | Dark writing desk |
+| Bookshelf (English UI) | Writing desk (English UI) |
 | --- | --- |
-| [![Shelf: novel cards with cover colors](docs/screenshots/library.png)](docs/screenshots/library.png) | [![Writing desk in the night-sail theme](docs/screenshots/workspace-dark.png)](docs/screenshots/workspace-dark.png) |
+| [![Shelf: book cards with cover colors](docs/screenshots/en-library.png)](docs/screenshots/en-library.png) | [![Three-column writing desk with the AI panel](docs/screenshots/en-editor.png)](docs/screenshots/en-editor.png) |
 
-More: [model services](docs/screenshots/settings-models.png) · [screenshot notes](docs/screenshots/README.md)
+More: [model services](docs/screenshots/en-settings.png) · [Chinese screenshots](docs/screenshots/library.png) · [screenshot notes](docs/screenshots/README.md)
 
 ## Data and backup
 
@@ -132,7 +133,7 @@ More: [model services](docs/screenshots/settings-models.png) · [screenshot note
 ## Troubleshooting
 
 <details>
-<summary>No 「砚田」 entry in the sidebar</summary>
+<summary>No **Yanfield** entry in the sidebar</summary>
 
 Make sure you fully quit and restarted Harness (a page refresh is not enough), then check `Settings → Plugins` that `dsh-yanfield` is enabled and at the version you just installed.
 </details>
@@ -140,7 +141,7 @@ Make sure you fully quit and restarted Harness (a page refresh is not enough), t
 <details>
 <summary>"no API key" / model unavailable</summary>
 
-The active route is the official API key route but no key is stored. Switch the route back to "DeepSeek account" in `砚田 → Settings → Model services`, or store `DEEPSEEK_API_KEY` on Harness' model page.
+The active route is the official API key route but no key is stored. Switch the route back to "DeepSeek account" in `Yanfield → Settings → Model services`, or store `DEEPSEEK_API_KEY` on Harness' model page.
 </details>
 
 <details>

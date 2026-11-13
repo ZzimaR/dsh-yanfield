@@ -16,6 +16,7 @@ import {
 import { Badge, Card, Progress } from "@/components/ui/kit";
 import { LinkPendingIcon } from "@/components/ui/LinkPendingIcon";
 import { CHAPTER_STATUS_LABEL, type Chapter, type ChapterSummary } from "@/lib/types";
+import { useT } from "@/lib/i18n";
 import { cn, formatRelativeTime, formatWords } from "@/lib/ui/cn";
 
 export interface ChapterEntry {
@@ -59,35 +60,39 @@ export function OverviewStats({
   archiveRate,
   todayWords,
 }: OverviewStatsProps) {
+  const tr = useT();
   const items: StatItem[] = [
     {
-      label: "总字数",
+      label: tr("总字数"),
       value: formatWords(totalWords),
-      unit: "字",
-      hint: todayWords > 0 ? `今日 +${formatWords(todayWords)}` : "今天还没动笔",
+      unit: tr("字", { count: totalWords }),
+      hint: todayWords > 0 ? tr("今日 +{words}", { words: formatWords(todayWords) }) : tr("今天还没动笔"),
       icon: PenLine,
       tone: "accent",
     },
     {
-      label: "章节数",
+      label: tr("章节数"),
       value: String(chapterCount),
-      unit: "章",
-      hint: `${volumeCount} 卷`,
+      unit: tr("章", { count: chapterCount }),
+      hint: tr("{count} 卷", { count: volumeCount }),
       icon: Layers,
       tone: "jade",
     },
     {
-      label: "已完稿",
+      label: tr("已完稿"),
       value: String(doneChapters),
-      unit: "章",
-      hint: chapterCount > 0 ? `${Math.round((doneChapters / chapterCount) * 100)}% 完稿率` : "还没有章节",
+      unit: tr("章", { count: doneChapters }),
+      hint:
+        chapterCount > 0
+          ? tr("{percent}% 完稿率", { percent: Math.round((doneChapters / chapterCount) * 100) })
+          : tr("还没有章节"),
       icon: CircleCheck,
       tone: "jade",
     },
     {
-      label: "故事档案",
+      label: tr("故事档案"),
       value: `${archiveRate}%`,
-      hint: `${archiveCount} / ${chapterCount} 章有档案`,
+      hint: tr("{done} / {total} 章有档案", { done: archiveCount, total: chapterCount }),
       icon: Archive,
       tone: "gold",
     },
@@ -123,6 +128,7 @@ export interface ContinueWritingCardProps {
 }
 
 export function ContinueWritingCard({ editorHref, lastChapter, todayWords }: ContinueWritingCardProps) {
+  const tr = useT();
   return (
     <Card className="relative overflow-hidden border-accent/20 bg-accent-soft/40 p-4 sm:p-5">
       <div
@@ -131,15 +137,19 @@ export function ContinueWritingCard({ editorHref, lastChapter, todayWords }: Con
       />
       <div className="relative flex flex-col gap-3.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent">继续写作</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-accent">{tr("继续写作")}</p>
           <h2 className="mt-1.5 truncate font-serif text-[20px] leading-snug text-ink sm:text-[22px]">
-            {lastChapter ? lastChapter.chapter.title : "从第一章开始"}
+            {lastChapter ? lastChapter.chapter.title : tr("从第一章开始")}
           </h2>
           <p className="mt-1 truncate text-[11.5px] text-ink-3">
             {lastChapter
-              ? `${lastChapter.volumeTitle} · 上次更新 ${formatRelativeTime(lastChapter.chapter.updatedAt)} · ${formatWords(lastChapter.chapter.wordCount)} 字`
-              : "还没有章节，打开编辑器写下第一句。"}
-            {todayWords > 0 ? ` · 今日已写 ${formatWords(todayWords)} 字` : ""}
+              ? tr("{volume} · 上次更新 {time} · {words} 字", {
+                  volume: lastChapter.volumeTitle,
+                  time: formatRelativeTime(lastChapter.chapter.updatedAt),
+                  words: formatWords(lastChapter.chapter.wordCount),
+                })
+              : tr("还没有章节，打开编辑器写下第一句。")}
+            {todayWords > 0 ? tr(" · 今日已写 {words} 字", { words: formatWords(todayWords) }) : ""}
           </p>
         </div>
         <Link
@@ -149,7 +159,7 @@ export function ContinueWritingCard({ editorHref, lastChapter, todayWords }: Con
           <LinkPendingIcon className="size-4">
             <PenLine className="size-4" aria-hidden />
           </LinkPendingIcon>
-          继续写作
+          {tr("继续写作")}
           <ArrowRight className="size-3.5" aria-hidden />
         </Link>
       </div>
@@ -166,11 +176,12 @@ export interface VolumeProgressCardProps {
 }
 
 export function VolumeProgressCard({ volumes, looseChapters, editorBase }: VolumeProgressCardProps) {
+  const tr = useT();
   return (
     <Card className="p-4 sm:p-5">
       <div className="flex items-center justify-between">
-        <h3 className="text-[13.5px] font-medium text-ink">卷进度</h3>
-        <span className="text-[11px] text-ink-3">{volumes.length} 卷</span>
+        <h3 className="text-[13.5px] font-medium text-ink">{tr("卷进度")}</h3>
+        <span className="text-[11px] text-ink-3">{tr("{count} 卷", { count: volumes.length })}</span>
       </div>
       <div className="mt-3.5 space-y-4">
         {volumes.map((volume) => {
@@ -188,7 +199,7 @@ export function VolumeProgressCard({ volumes, looseChapters, editorBase }: Volum
                   {volume.title}
                 </Link>
                 <span className="shrink-0 font-mono text-[10.5px] text-ink-3">
-                  {done}/{chapterCount} 章 · {formatWords(words)}
+                  {tr("{done}/{total} 章 · {words}", { done, total: chapterCount, words: formatWords(words) })}
                 </span>
               </div>
               <Progress value={percent} max={100} tone={percent === 100 ? "jade" : "accent"} className="mt-1.5" />
@@ -198,15 +209,15 @@ export function VolumeProgressCard({ volumes, looseChapters, editorBase }: Volum
 
         {volumes.length === 0 ? (
           <p className="rounded-md border border-dashed border-line px-3 py-6 text-center text-[12px] text-ink-3">
-            还没有分卷。去大纲里创建第一卷吧。
+            {tr("还没有分卷。去大纲里创建第一卷吧。")}
           </p>
         ) : null}
 
         {looseChapters.length > 0 ? (
           <div>
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-[12.5px] text-ink-2">未分卷章节</span>
-              <span className="shrink-0 font-mono text-[10.5px] text-ink-3">{looseChapters.length} 章</span>
+              <span className="text-[12.5px] text-ink-2">{tr("未分卷章节")}</span>
+              <span className="shrink-0 font-mono text-[10.5px] text-ink-3">{tr("{count} 章", { count: looseChapters.length })}</span>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-1">
               {looseChapters.slice(0, 8).map((chapter) => (
@@ -240,15 +251,16 @@ export interface RecentChaptersCardProps {
 }
 
 export function RecentChaptersCard({ chapters, editorBase }: RecentChaptersCardProps) {
+  const tr = useT();
   return (
     <Card className="p-4 sm:p-5">
       <div className="flex items-center justify-between">
-        <h3 className="text-[13.5px] font-medium text-ink">最近章节</h3>
-        <span className="text-[11px] text-ink-3">按最近编辑排序</span>
+        <h3 className="text-[13.5px] font-medium text-ink">{tr("最近章节")}</h3>
+        <span className="text-[11px] text-ink-3">{tr("按最近编辑排序")}</span>
       </div>
       {chapters.length === 0 ? (
         <p className="mt-4 rounded-md border border-dashed border-line px-3 py-6 text-center text-[12px] text-ink-3">
-          还没有章节，去编辑器写第一章吧。
+          {tr("还没有章节，去编辑器写第一章吧。")}
         </p>
       ) : (
         <ul className="mt-2 divide-y divide-line/70">
@@ -267,10 +279,14 @@ export function RecentChaptersCard({ chapters, editorBase }: RecentChaptersCardP
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12.5px] text-ink group-hover:text-accent">{chapter.title}</span>
                   <span className="mt-0.5 block truncate text-[10.5px] text-ink-3">
-                    {volumeTitle} · {formatWords(chapter.wordCount)} 字 · {formatRelativeTime(chapter.updatedAt)}
+                    {tr("{volume} · {words} 字 · {time}", {
+                      volume: volumeTitle,
+                      words: formatWords(chapter.wordCount),
+                      time: formatRelativeTime(chapter.updatedAt),
+                    })}
                   </span>
                 </span>
-                <Badge tone={STATUS_TONE[chapter.status]}>{CHAPTER_STATUS_LABEL[chapter.status]}</Badge>
+                <Badge tone={STATUS_TONE[chapter.status]}>{tr(CHAPTER_STATUS_LABEL[chapter.status])}</Badge>
               </Link>
             </li>
           ))}
@@ -290,6 +306,7 @@ const QUICK_LINKS: { href: (id: string) => string; icon: LucideIcon; title: stri
 ];
 
 export function QuickLinks({ novelId }: { novelId: string }) {
+  const tr = useT();
   return (
     <div className="grid grid-cols-2 gap-3">
       {QUICK_LINKS.map(({ href, icon: Icon, title, description }) => (
@@ -304,8 +321,8 @@ export function QuickLinks({ novelId }: { novelId: string }) {
             </span>
             <ArrowRight className="size-3.5 text-ink-3 transition-transform group-hover:translate-x-0.5 group-hover:text-accent" aria-hidden />
           </span>
-          <span className="mt-2.5 block text-[12.5px] font-medium text-ink">{title}</span>
-          <span className="mt-0.5 block text-[10.5px] text-ink-3">{description}</span>
+          <span className="mt-2.5 block text-[12.5px] font-medium text-ink">{tr(title)}</span>
+          <span className="mt-0.5 block text-[10.5px] text-ink-3">{tr(description)}</span>
         </Link>
       ))}
     </div>

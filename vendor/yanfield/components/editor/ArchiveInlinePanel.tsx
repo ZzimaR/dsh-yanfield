@@ -21,6 +21,7 @@ import {
 } from "@/lib/types";
 import { cn, formatWords, stripHtml } from "@/lib/ui/cn";
 import { InlineError, reindexChaptersByVolume, stripChapterNumber } from "@/components/outline/form-kit";
+import { useT } from "@/lib/i18n";
 import { ArchiveDetail } from "@/components/archives/ArchiveDetail";
 import { extractChapterArchive } from "@/components/archives/extract";
 import { FloatWindow } from "./FloatWindow";
@@ -74,6 +75,7 @@ export interface ArchiveInlinePanelProps {
 }
 
 export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
+  const tr = useT();
   const { toast } = useToast();
   const query = React.useMemo(() => `?novelId=${encodeURIComponent(novelId)}`, [novelId]);
 
@@ -148,7 +150,7 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
     const ordered = [...volumes].sort((a, b) => a.orderIndex - b.orderIndex);
     const groups = ordered.map<VolumeGroup>((volume) => ({
       key: volume.id,
-      title: volume.title || "未命名卷",
+      title: volume.title || tr("未命名卷"),
       chapters: [],
     }));
     const byId = new Map(groups.map((group) => [group.key, group]));
@@ -159,9 +161,9 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
       else loose.push(chapter);
     }
     const result = groups.filter((group) => group.chapters.length > 0);
-    if (loose.length > 0) result.push({ key: "__loose", title: "未分卷", chapters: loose });
+    if (loose.length > 0) result.push({ key: "__loose", title: tr("未分卷"), chapters: loose });
     return result;
-  }, [chapters, volumes]);
+  }, [chapters, volumes, tr]);
 
   const chaptersLoading = chaptersApi.loading && chaptersApi.data === undefined;
   const chaptersError = chaptersApi.error && chaptersApi.data === undefined ? chaptersApi.error : null;
@@ -252,11 +254,11 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
   const extractOne = async () => {
     if (!selectedChapter || selectedExtracting || oneAbortRef.current) return;
     if (!selectedHasContent) {
-      toast({ title: "本章还没有正文", description: "先写一点正文，再提取档案。", tone: "error" });
+      toast({ title: tr("本章还没有正文"), description: tr("先写一点正文，再提取档案。"), tone: "error" });
       return;
     }
     if (building) {
-      toast({ title: "正在补齐缺失档案", description: "等补齐结束或先中止，再单独提取本章。", tone: "default" });
+      toast({ title: tr("正在补齐缺失档案"), description: tr("等补齐结束或先中止，再单独提取本章。"), tone: "default" });
       return;
     }
     const controller = new AbortController();
@@ -269,11 +271,11 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
         if (aliveRef.current) {
           const conflicts = result.newConflicts ?? 0;
           toast({
-            title: result.preservedManual ? "档案已更新，保留了你的手动修改" : "档案已提取",
+            title: result.preservedManual ? tr("档案已更新，保留了你的手动修改") : tr("档案已提取"),
             description: result.preservedManual
               ? conflicts > 0
-                ? `发现 ${conflicts} 处档案与正文不一致。若档案校订正确，请同步修改正文。`
-                : "只补充了正文里的新事实。若校订了事实，请同步修改正文。"
+                ? tr("发现 {n} 处档案与正文不一致。若档案校订正确，请同步修改正文。", { n: conflicts, count: conflicts })
+                : tr("只补充了正文里的新事实。若校订了事实，请同步修改正文。")
               : selectedChapter.title,
             tone: conflicts > 0 ? "default" : "success",
           });
@@ -281,13 +283,13 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
         await archivesApi.refresh();
         notifyDataChanged("archives");
       } else if (result.error !== "已中止") {
-        if (aliveRef.current) setExtractError(result.error ?? "提取失败");
+        if (aliveRef.current) setExtractError(result.error ?? tr("提取失败"));
       }
     } catch (error) {
       if (aliveRef.current) {
-        const message = error instanceof Error ? error.message : "提取档案时发生错误";
+        const message = error instanceof Error ? error.message : tr("提取档案时发生错误");
         setExtractError(message);
-        toast({ title: "提取档案失败", description: message, tone: "error" });
+        toast({ title: tr("提取档案失败"), description: message, tone: "error" });
       }
     } finally {
       if (oneAbortRef.current === controller) {
@@ -302,11 +304,11 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
   const buildMissing = async () => {
     if (building || buildAbortRef.current) return;
     if (missingChapters.length === 0) {
-      toast({ title: "全书档案都已建好", tone: "success" });
+      toast({ title: tr("全书档案都已建好"), tone: "success" });
       return;
     }
     if (missingWithContent.length === 0) {
-      toast({ title: "没有可补建的正文", description: "剩余缺失章节都还没有正文，写完再补齐。", tone: "default" });
+      toast({ title: tr("没有可补建的正文"), description: tr("剩余缺失章节都还没有正文，写完再补齐。"), tone: "default" });
       return;
     }
     const controller = new AbortController();
@@ -328,7 +330,7 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
           total: targets.length,
           done,
           failed,
-          currentTitle: chapter.title || "未命名章节",
+          currentTitle: chapter.title || tr("未命名章节"),
         });
         const result = await extractChapterArchive({ novelId, chapterId: chapter.id, signal: controller.signal });
         if (result.ok) {
@@ -343,7 +345,7 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
     } catch (error) {
       failed += 1;
       if (aliveRef.current) {
-        const message = error instanceof Error ? error.message : "补齐档案时发生错误";
+        const message = error instanceof Error ? error.message : tr("补齐档案时发生错误");
         setExtractError(message);
       }
     } finally {
@@ -357,16 +359,18 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
       }
       if (!aliveRef.current) return;
       if (aborted) {
-        toast({ title: "已中止补齐", description: `本次完成 ${done} 章，失败 ${failed} 章。`, tone: "default" });
+        toast({ title: tr("已中止补齐"), description: tr("本次完成 {done} 章，失败 {failed} 章。", { done, failed }), tone: "default" });
       } else if (done === 0 && failed === 0) {
-        toast({ title: "没有需要补建的档案", tone: "default" });
+        toast({ title: tr("没有需要补建的档案"), tone: "default" });
       } else {
         toast({
-          title: "补齐完成",
+          title: tr("补齐完成"),
           description: [
-            `成功 ${done} 章${failed > 0 ? `，失败 ${failed} 章` : ""}。`,
-            preservedManual > 0 ? `其中 ${preservedManual} 章保留了手动校订。` : "",
-            newConflicts > 0 ? `发现 ${newConflicts} 处档案与正文不一致，请同步修改正文。` : "",
+            failed > 0
+              ? tr("成功 {done} 章，失败 {failed} 章。", { done, failed })
+              : tr("成功 {done} 章。", { done, count: done }),
+            preservedManual > 0 ? tr("其中 {n} 章保留了手动校订。", { n: preservedManual, count: preservedManual }) : "",
+            newConflicts > 0 ? tr("发现 {n} 处档案与正文不一致，请同步修改正文。", { n: newConflicts, count: newConflicts }) : "",
           ].filter(Boolean).join(" "),
           tone: failed > 0 ? "error" : newConflicts > 0 ? "default" : "success",
         });
@@ -384,7 +388,7 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
   const windowFooter = selectedChapter ? (
     <div className="flex items-center justify-between gap-2 text-[11px] text-ink-3">
       <span className="min-w-0 truncate">
-        {formatWords(selectedChapter.wordCount)} 字 · {CHAPTER_STATUS_LABEL[selectedChapter.status] ?? "草稿"}
+        {tr("{words} 字", { words: formatWords(selectedChapter.wordCount) })} · {tr(CHAPTER_STATUS_LABEL[selectedChapter.status] ?? "草稿")}
       </span>
       {selectedArchive ? (
         <span
@@ -399,11 +403,13 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
                   : "text-jade",
           )}
         >
-          {ARCHIVE_STATUS_LABEL[selectedArchive.status] ?? "最新"}
-          {selectedArchive.conflicts.length > 0 ? ` · 冲突 ${selectedArchive.conflicts.length}` : ""}
+          {tr(ARCHIVE_STATUS_LABEL[selectedArchive.status] ?? "最新")}
+          {selectedArchive.conflicts.length > 0
+            ? ` · ${tr("冲突 {n}", { n: selectedArchive.conflicts.length, count: selectedArchive.conflicts.length })}`
+            : ""}
         </span>
       ) : (
-        <span className="shrink-0 text-ink-4">未建档</span>
+        <span className="shrink-0 text-ink-4">{tr("未建档")}</span>
       )}
     </div>
   ) : null;
@@ -418,13 +424,15 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
           <p className="min-w-0 flex-1 text-[11.5px] leading-relaxed text-ink-2">
             <Archive className="mr-1 inline size-3.5 -translate-y-px text-ink-3" aria-hidden />
             {chaptersLoading || (archivesApi.loading && !archivesReady) ? (
-              "加载档案中…"
+              tr("加载档案中…")
             ) : !archivesReady ? (
-              <>已建档 — 章 · 待提取 — 章</>
+              <>{tr("已建档 — 章 · 待提取 — 章")}</>
             ) : (
               <>
-                已建档 <span className="font-medium tabular-nums text-ink">{archivedCount}</span> 章 · 待提取{" "}
-                <span className="font-medium tabular-nums text-ink">{missingChapters.length}</span> 章
+                <span className="font-medium tabular-nums text-ink">{archivedCount}</span>{" "}
+                {tr("章已建档", { count: archivedCount })} ·{" "}
+                <span className="font-medium tabular-nums text-ink">{missingChapters.length}</span>{" "}
+                {tr("章待提取", { count: missingChapters.length })}
               </>
             )}
           </p>
@@ -436,7 +444,7 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
               icon={<Square className="size-3" />}
               onClick={stopBuild}
             >
-              中止
+              {tr("中止")}
             </Button>
           ) : (
             <Button
@@ -447,7 +455,7 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
               disabled={!canBuild}
               onClick={() => void buildMissing()}
             >
-              补齐缺失
+              {tr("补齐缺失")}
             </Button>
           )}
         </div>
@@ -457,19 +465,19 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
             {staleCount > 0 ? (
               <span className="inline-flex items-center gap-1">
                 <span className="size-1.5 rounded-full bg-gold" aria-hidden />
-                已过期 {staleCount}
+                {tr("已过期 {n}", { n: staleCount })}
               </span>
             ) : null}
             {pendingCount > 0 ? (
               <span className="inline-flex items-center gap-1">
                 <span className="size-1.5 rounded-full bg-accent" aria-hidden />
-                待确认 {pendingCount}
+                {tr("待确认 {n}", { n: pendingCount })}
               </span>
             ) : null}
             {conflictCount > 0 ? (
               <span className="inline-flex items-center gap-1">
                 <AlertTriangle className="size-3 text-danger" aria-hidden />
-                冲突 {conflictCount}
+                {tr("冲突 {n}", { n: conflictCount, count: conflictCount })}
               </span>
             ) : null}
           </p>
@@ -479,13 +487,13 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
             <p className="flex items-center gap-1.5 text-[11px] text-ink-3">
               <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
               <span className="min-w-0 flex-1 truncate">
-                提取中 {buildProgress.processed}/{buildProgress.total} · {buildProgress.currentTitle}
+                {tr("提取中 {n}/{total} · {title}", { n: buildProgress.processed, total: buildProgress.total, title: buildProgress.currentTitle })}
               </span>
               {buildProgress.done > 0 ? (
-                <span className="shrink-0 tabular-nums text-jade">成功 {buildProgress.done}</span>
+                <span className="shrink-0 tabular-nums text-jade">{tr("成功 {n}", { n: buildProgress.done })}</span>
               ) : null}
               {buildProgress.failed > 0 ? (
-                <span className="shrink-0 tabular-nums text-danger">失败 {buildProgress.failed}</span>
+                <span className="shrink-0 tabular-nums text-danger">{tr("失败 {n}", { n: buildProgress.failed })}</span>
               ) : null}
             </p>
             <Progress value={buildProgress.processed} max={Math.max(buildProgress.total, 1)} tone="accent" className="h-1" />
@@ -496,7 +504,7 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
       {/* 按卷分组的章节列表 */}
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
         {chaptersError ? (
-          <InlineError message={`章节加载失败：${chaptersError}`} onRetry={() => void chaptersApi.refresh()} />
+          <InlineError message={tr("章节加载失败：{error}", { error: chaptersError })} onRetry={() => void chaptersApi.refresh()} />
         ) : chaptersLoading ? (
           <div className="space-y-1.5 px-0.5 py-1">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -507,13 +515,13 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
           <EmptyState
             className="px-2 py-8"
             icon={<Archive className="size-5" />}
-            title="还没有章节"
-            description="先在目录里建章节并写正文，这里会按卷列出每章的档案状态。"
+            title={tr("还没有章节")}
+            description={tr("先在目录里建章节并写正文，这里会按卷列出每章的档案状态。")}
           />
         ) : (
           <div className="space-y-2">
             {archivesWarning ? (
-              <InlineError message={`档案列表加载失败：${archivesWarning}`} onRetry={() => void archivesApi.refresh()} />
+              <InlineError message={tr("档案列表加载失败：{error}", { error: archivesWarning })} onRetry={() => void archivesApi.refresh()} />
             ) : null}
             {volumeGroups.map((group) => (
               <section key={group.key}>
@@ -533,8 +541,8 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
                       <li key={chapter.id}>
                         <button
                           type="button"
-                          title={`${DOT_TEXT[dot]} · 点击查看档案`}
-                          aria-label={`第 ${chapter.orderIndex + 1} 章 ${stripChapterNumber(chapter.title)}，${DOT_TEXT[dot]}`}
+                          title={tr("{status} · 点击查看档案", { status: tr(DOT_TEXT[dot]) })}
+                          aria-label={tr("第 {n} 章 {title}，{status}", { n: chapter.orderIndex + 1, title: stripChapterNumber(chapter.title), status: tr(DOT_TEXT[dot]) })}
                           onClick={() => openChapter(chapter)}
                           className={cn(
                             "flex w-full items-center gap-2 rounded-sm px-1.5 py-1.5 text-left transition-colors",
@@ -563,7 +571,7 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
                           {archive && archive.conflicts.length > 0 ? (
                             <AlertTriangle className="size-3 shrink-0 text-danger" aria-hidden />
                           ) : null}
-                          {!hasContent ? <span className="shrink-0 text-[10.5px] text-ink-4">空</span> : null}
+                          {!hasContent ? <span className="shrink-0 text-[10.5px] text-ink-4">{tr("空")}</span> : null}
                         </button>
                       </li>
                     );
@@ -582,8 +590,8 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
         keepMounted={selectedChapter !== null}
         title={
           selectedChapter
-            ? `第 ${selectedChapter.orderIndex + 1} 章 · ${stripChapterNumber(selectedChapter.title)}`
-            : "档案"
+            ? tr("第 {n} 章 · {title}", { n: selectedChapter.orderIndex + 1, title: stripChapterNumber(selectedChapter.title) })
+            : tr("档案")
         }
         minimized={minimized}
         onMinimizedChange={setMinimized}
@@ -606,11 +614,11 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
               <EmptyState
                 className="px-0 py-4"
                 icon={<Archive className="size-5" />}
-                title="这一章还没有档案"
+                title={tr("这一章还没有档案")}
                 description={
                   selectedHasContent
-                    ? "从本章正文提取事实档案，供后续章节保持前后一致。"
-                    : "本章还没有正文，先写一点内容再提取档案。"
+                    ? tr("从本章正文提取事实档案，供后续章节保持前后一致。")
+                    : tr("本章还没有正文，先写一点内容再提取档案。")
                 }
                 action={
                   <Button
@@ -621,15 +629,15 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
                     disabled={!selectedHasContent || building}
                     onClick={() => void extractOne()}
                   >
-                    {selectedExtracting ? "提取中…" : "提取本章档案"}
+                    {selectedExtracting ? tr("提取中…") : tr("提取本章档案")}
                   </Button>
                 }
               />
               {selectedExtracting ? (
-                <p className="mt-1 text-center text-[11px] text-ink-3">AI 正在按本章正文提取，可能需要几十秒。</p>
+                <p className="mt-1 text-center text-[11px] text-ink-3">{tr("AI 正在按本章正文提取，可能需要几十秒。")}</p>
               ) : null}
               {extractError ? <InlineError message={extractError} onRetry={() => void extractOne()} /> : null}
-              {building ? <p className="mt-2 text-[11px] text-ink-3">正在补齐缺失档案，可等结束或先中止，再单独提取本章。</p> : null}
+              {building ? <p className="mt-2 text-[11px] text-ink-3">{tr("正在补齐缺失档案，可等结束或先中止，再单独提取本章。")}</p> : null}
             </div>
           )
         ) : null}

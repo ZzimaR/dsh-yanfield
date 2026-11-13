@@ -10,6 +10,7 @@
 import * as React from "react";
 import { apiPatch, notifyDataChanged } from "@/lib/client/api";
 import { useToast } from "@/components/ui/kit";
+import { t } from "@/lib/i18n/core";
 import type { AppSettings } from "@/lib/types";
 import { mergePatches, mergeSettings } from "./settings-utils";
 
@@ -74,10 +75,10 @@ export function useSettingsEditor(server: AppSettings | undefined, setServer: (v
         } catch (cause) {
           pending.current = mergePatches(patch, pending.current);
           if (!mounted.current) return;
-          const message = cause instanceof Error ? cause.message : "保存设置失败";
+          const message = cause instanceof Error ? t(cause.message) : t("保存设置失败");
           setSaveError(message);
           setDirty(true);
-          toast({ title: "设置保存失败", description: message, tone: "error" });
+          toast({ title: t("设置保存失败"), description: message, tone: "error" });
           return;
         }
       } while (!timer.current && Object.keys(pending.current).length > 0);

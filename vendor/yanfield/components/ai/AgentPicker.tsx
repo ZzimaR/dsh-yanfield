@@ -5,9 +5,11 @@
  * 触发器显示当前智能体 tint 色头像、中文名与一句话角色；下拉卡片列出全部候选。
  */
 import * as React from "react";
+import { localizedAgentName } from "@/lib/ai/agent-display";
 import { Check, ChevronDown } from "lucide-react";
 import type { AgentDef, AgentId } from "@/lib/types";
 import { useOnClickOutside } from "@/lib/ui/hooks";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/ui/cn";
 import { AGENT_TINT_CLASS, agentInitial } from "./utils";
 
@@ -20,6 +22,7 @@ export interface AgentPickerProps {
 }
 
 export function AgentPicker({ value, onChange, agents, disabled = false, className }: AgentPickerProps) {
+  const tr = useT();
   const [open, setOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   useOnClickOutside(containerRef, () => setOpen(false));
@@ -34,7 +37,7 @@ export function AgentPicker({ value, onChange, agents, disabled = false, classNa
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`选择智能体，当前：${current.name}`}
+        aria-label={tr("选择智能体，当前：{name}", { name: current.name })}
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
         className="flex w-full items-center gap-2 rounded-md border border-line bg-surface px-2 py-1.5 text-left transition-colors duration-150 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-60"
@@ -50,14 +53,14 @@ export function AgentPicker({ value, onChange, agents, disabled = false, classNa
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1">
-            <span className="truncate text-[12.5px] font-medium text-ink">{current.name}</span>
+            <span className="truncate text-[12.5px] font-medium text-ink">{localizedAgentName(current)}</span>
             {current.id === "custom" ? (
               <span className="shrink-0 rounded-full border border-line px-1 text-[10px] text-ink-4">
-                自定义
+                {tr("自定义")}
               </span>
             ) : null}
           </span>
-          <span className="mt-0.5 block truncate text-[10.5px] text-ink-4">{current.role}</span>
+          <span className="mt-0.5 block truncate text-[10.5px] text-ink-4">{tr(current.role)}</span>
         </span>
         <ChevronDown
           className={cn(
@@ -70,7 +73,7 @@ export function AgentPicker({ value, onChange, agents, disabled = false, classNa
       {open ? (
         <div
           role="listbox"
-          aria-label="智能体列表"
+          aria-label={tr("智能体列表")}
           className="scroll-thin absolute left-0 right-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-md border border-line bg-surface p-1 shadow-float rise-in"
         >
           {agents.map((agent) => {
@@ -108,17 +111,17 @@ export function AgentPicker({ value, onChange, agents, disabled = false, classNa
                         active ? tint.text : "text-ink",
                       )}
                     >
-                      {agent.name}
+                      {localizedAgentName(agent)}
                     </span>
                     <span className="shrink-0 text-[10px] text-ink-4">{agent.englishName}</span>
                     {agent.id === "custom" ? (
                       <span className="shrink-0 rounded-full border border-line px-1 text-[10px] text-ink-4">
-                        可配置
+                        {tr("可配置")}
                       </span>
                     ) : null}
                   </span>
                   <span className="mt-0.5 block truncate text-[10.5px] text-ink-4">
-                    {agent.role} · {agent.description}
+                    {tr(agent.role)} · {tr(agent.description)}
                   </span>
                   {agent.skills.length > 0 ? (
                     <span className="mt-1 flex flex-wrap gap-1">
@@ -127,7 +130,7 @@ export function AgentPicker({ value, onChange, agents, disabled = false, classNa
                           key={skill}
                           className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-3"
                         >
-                          {skill}
+                          {tr(skill)}
                         </span>
                       ))}
                     </span>

@@ -529,6 +529,8 @@ export interface AiChatRequest {
   /** 选中的正文片段（供改写/润色使用） */
   selection?: string;
   presetId?: ID | null;
+  /** 界面语言（决定内置预设的提示词语言） */
+  locale?: "zh" | "en";
   /** 引用资料（@ 到的角色/设定/章节） */
   mentions?: { type: "character" | "world" | "chapter" | "archive" | "foreshadow"; id: ID; label: string }[];
 }
@@ -543,6 +545,7 @@ export interface AiTaskRequest {
   selection?: string;
   context?: Partial<ContextConfig>;
   presetId?: ID | null;
+  locale?: "zh" | "en";
   targetWords?: number;
   instruction?: string;
 }
@@ -808,7 +811,7 @@ export const AGENTS: AgentDef[] = [
   {
     id: "setting",
     name: "设定",
-    englishName: "Setting",
+    englishName: "Codex",
     role: "世界观与角色资料补全",
     description:
       "把整段设定材料拆成可勾选的新建/修改卡片清单，确认后写入；也能补全现有卡片、整理正文里出现过的设定。",

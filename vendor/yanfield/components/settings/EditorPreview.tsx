@@ -4,6 +4,7 @@ import * as React from "react";
 import { AlignLeft, PenLine } from "lucide-react";
 import { Card } from "@/components/ui/kit";
 import type { EditorLayoutSettings } from "@/lib/editor/settings";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/ui/cn";
 
 const SAMPLE_PARAGRAPHS = [
@@ -22,6 +23,7 @@ export interface EditorPreviewProps {
 
 /** 编辑器设置的实时预览：按当前字号 / 行高 / 字重 / 留白渲染，改完立即可见。 */
 export function EditorPreview({ fontSize, lineHeight, proseFont, firstLineIndent, layout }: EditorPreviewProps) {
+  const tr = useT();
   const pageStyle = {
     maxWidth: layout.maxContentWidth > 0 ? `${layout.maxContentWidth}px` : "100%",
     padding: `${layout.pagePaddingY}px ${layout.pagePaddingX}px`,
@@ -42,9 +44,9 @@ export function EditorPreview({ fontSize, lineHeight, proseFont, firstLineIndent
       <Card className="p-4">
         <h3 className="flex items-center gap-1.5 text-[13px] font-medium text-ink">
           <PenLine className="size-3.5 text-ink-3" aria-hidden />
-          实时预览
+          {tr("实时预览")}
         </h3>
-        <p className="mt-1 text-[11px] leading-5 text-ink-3">按当前字号、行高、字重与页面留白渲染，改完立即可见。</p>
+        <p className="mt-1 text-[11px] leading-5 text-ink-3">{tr("按当前字号、行高、字重与页面留白渲染，改完立即可见。")}</p>
         <div className="mt-3 overflow-hidden rounded-lg border border-line bg-surface-2/50 p-2.5">
           <div
             className={cn(
@@ -54,8 +56,8 @@ export function EditorPreview({ fontSize, lineHeight, proseFont, firstLineIndent
             )}
             style={{ ...pageStyle, ...proseStyle }}
           >
-            <h2 className="font-serif text-[17px] text-ink">示例章节</h2>
-            <p className="mt-1 font-ui text-[10.5px] text-ink-3">以下为示例文本，用于预览字号与排版。</p>
+            <h2 className="font-serif text-[17px] text-ink">{tr("示例章节")}</h2>
+            <p className="mt-1 font-ui text-[10.5px] text-ink-3">{tr("以下为示例文本，用于预览字号与排版。")}</p>
             {SAMPLE_PARAGRAPHS.map((paragraph, index) => (
               <p
                 key={index}
@@ -69,13 +71,13 @@ export function EditorPreview({ fontSize, lineHeight, proseFont, firstLineIndent
             {layout.showInlineHints ? (
               <div className="mt-3 flex items-center gap-1.5 rounded-sm border-l-2 border-line bg-surface-2/60 px-2 py-1.5 font-ui text-[10.5px] text-ink-3">
                 <AlignLeft className="size-3 shrink-0 text-ink-4" aria-hidden />
-                AI 建议（示例）· 第 2 段：可以把「碎成细小的光」换成更慢的动势
+                {tr("AI 建议（示例）· 第 2 段：可以把「碎成细小的光」换成更慢的动势")}
               </div>
             ) : null}
             {layout.showStatusBar ? (
               <div className="mt-3 flex items-center justify-between gap-2 border-t border-line px-1 pt-2 font-ui text-[10.5px] text-ink-3">
-                <span>第 2 章 · 1,842 字</span>
-                <span>已自动保存</span>
+                <span>{tr("第 {number} 章 · {words} 字", { number: 2, words: "1,842" })}</span>
+                <span>{tr("已自动保存")}</span>
               </div>
             ) : null}
           </div>
@@ -83,43 +85,43 @@ export function EditorPreview({ fontSize, lineHeight, proseFont, firstLineIndent
       </Card>
 
       <Card className="p-4">
-        <h3 className="text-[13px] font-medium text-ink">当前排版</h3>
+        <h3 className="text-[13px] font-medium text-ink">{tr("当前排版")}</h3>
         <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11.5px]">
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-ink-3">字号</dt>
+            <dt className="text-ink-3">{tr("字号")}</dt>
             <dd className="font-mono text-ink-2">{fontSize}px</dd>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-ink-3">行高</dt>
+            <dt className="text-ink-3">{tr("行高")}</dt>
             <dd className="font-mono text-ink-2">{lineHeight.toFixed(2)}</dd>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-ink-3">字重</dt>
+            <dt className="text-ink-3">{tr("字重")}</dt>
             <dd className="font-mono text-ink-2">{layout.editorFontWeight}</dd>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-ink-3">字间距</dt>
+            <dt className="text-ink-3">{tr("字间距")}</dt>
             <dd className="font-mono text-ink-2">{Number(layout.editorLetterSpacing.toFixed(3))}em</dd>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-ink-3">段落间距</dt>
+            <dt className="text-ink-3">{tr("段落间距")}</dt>
             <dd className="font-mono text-ink-2">{layout.paragraphSpacing}px</dd>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-ink-3">页边距</dt>
+            <dt className="text-ink-3">{tr("页边距")}</dt>
             <dd className="font-mono text-ink-2">
               {layout.pagePaddingX} / {layout.pagePaddingY}px
             </dd>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-ink-3">最大行宽</dt>
+            <dt className="text-ink-3">{tr("最大行宽")}</dt>
             <dd className="font-mono text-ink-2">
-              {layout.maxContentWidth === 0 ? "自适应" : `${layout.maxContentWidth}px`}
+              {layout.maxContentWidth === 0 ? tr("自适应") : `${layout.maxContentWidth}px`}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <dt className="text-ink-3">首行缩进</dt>
-            <dd className="font-mono text-ink-2">{firstLineIndent ? "开" : "关"}</dd>
+            <dt className="text-ink-3">{tr("首行缩进")}</dt>
+            <dd className="font-mono text-ink-2">{firstLineIndent ? tr("开") : tr("关")}</dd>
           </div>
         </dl>
       </Card>

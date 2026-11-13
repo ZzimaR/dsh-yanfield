@@ -116,6 +116,7 @@ await build({
   loader: { ".css": "text" },
   define: { __YANFIELD_BUILD__: JSON.stringify(buildStamp) },
   minify: true,
+  keepNames: true,
   legalComments: "none",
   logLevel: "info",
   banner: {

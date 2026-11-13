@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { getYanfieldLocale } from "@/lib/i18n/core";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -21,6 +22,10 @@ export function countWords(text: string): number {
 
 export function formatWords(n: number): string {
   if (!Number.isFinite(n)) return "0";
+  if (getYanfieldLocale() === "en") {
+    if (n >= 10000) return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+    return n.toLocaleString("en-US");
+  }
   if (n >= 10000) return `${(n / 10000).toFixed(n % 10000 === 0 ? 0 : 1)} 万`;
   if (n >= 1000) return n.toLocaleString("zh-CN");
   return String(n);
@@ -34,6 +39,13 @@ export function formatRelativeTime(iso?: string | null): string {
   const min = 60_000;
   const hour = 60 * min;
   const day = 24 * hour;
+  if (getYanfieldLocale() === "en") {
+    if (diff < min) return "just now";
+    if (diff < hour) return `${Math.floor(diff / min)} min ago`;
+    if (diff < day) return `${Math.floor(diff / hour)} hr ago`;
+    if (diff < 7 * day) return `${Math.floor(diff / day)} days ago`;
+    return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
   if (diff < min) return "刚刚";
   if (diff < hour) return `${Math.floor(diff / min)} 分钟前`;
   if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
@@ -46,12 +58,15 @@ export function formatDateTime(iso?: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
+  if (getYanfieldLocale() === "en") {
+    return d.toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+  }
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 export function formatNumber(n: number): string {
-  return new Intl.NumberFormat("zh-CN").format(n);
+  return new Intl.NumberFormat(getYanfieldLocale() === "en" ? "en-US" : "zh-CN").format(n);
 }
 
 export function truncate(s: string, max = 40): string {

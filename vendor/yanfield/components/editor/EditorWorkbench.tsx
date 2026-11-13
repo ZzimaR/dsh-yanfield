@@ -21,6 +21,7 @@ import { useChapterDraft } from "@/lib/editor/useChapterDraft";
 import { useEditorBridgeValue } from "@/lib/editor/useEditorBridgeValue";
 import { useNovelTree } from "@/lib/editor/useNovelTree";
 import { cn } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import { useHotkeys, useLocalStorageState, useResizePanel, useYanfieldPanelBounds } from "@/lib/ui/hooks";
 import { applySurfaceDataset, applyTheme, readSurfaceTheme } from "@/lib/ui/theme";
 import type { AppSettings, Chapter } from "@/lib/types";
@@ -55,6 +56,7 @@ interface EditorWorkbenchProps {
 export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWorkbenchProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const tr = useT();
   const saveGuard = useEditorSaveGuard();
 
   /* ---------------- 视图偏好（localStorage） ---------------- */
@@ -117,9 +119,9 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
 
   const onTreeError = React.useCallback(
     (message: string) => {
-      toast({ title: "操作失败", description: message, tone: "error" });
+      toast({ title: tr("操作失败"), description: message, tone: "error" });
     },
-    [toast],
+    [toast, tr],
   );
   const onTreeSuccess = React.useCallback(
     (message: string) => {
@@ -201,15 +203,15 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
 
   const onSaveError = React.useCallback(
     (message: string) => {
-      toast({ title: "保存失败", description: message, tone: "error", duration: 6000 });
+      toast({ title: tr("保存失败"), description: message, tone: "error", duration: 6000 });
     },
-    [toast],
+    [toast, tr],
   );
   const onRecoveryError = React.useCallback(
     (message: string) => {
-      toast({ title: "临时草稿提示", description: message, tone: "error", duration: 8000 });
+      toast({ title: tr("临时草稿提示"), description: message, tone: "error", duration: 8000 });
     },
-    [toast],
+    [toast, tr],
   );
 
   /** 真正落库：PATCH 成功后把结果同步回目录树（不整树刷新，避免打断写作） */
@@ -217,7 +219,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
     async (id: string, patch: ChapterPatch): Promise<void> => {
       const { title, ...rest } = patch;
       const trimmedTitle = title?.trim();
-      if (title !== undefined && !trimmedTitle) throw new Error("章节标题不能为空，请填写标题后保存。");
+      if (title !== undefined && !trimmedTitle) throw new Error(tr("章节标题不能为空，请填写标题后保存。"));
       const safePatch: ChapterPatch = trimmedTitle === undefined ? rest : { ...rest, title: trimmedTitle };
       const updated = await saveGuard.runExclusive(id, () =>
         apiPatch<Partial<Chapter>>(`/api/chapters/${id}`, safePatch),
@@ -228,7 +230,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
         updatedAt: updated?.updatedAt ?? new Date().toISOString(),
       });
     },
-    [actions, saveGuard],
+    [actions, saveGuard, tr],
   );
 
   const {
@@ -279,14 +281,14 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
       setDiscardRecoveryOpen(false);
     } catch (error) {
       toast({
-        title: "读取已保存章节失败",
-        description: error instanceof Error ? error.message : "请稍后重试。",
+        title: tr("读取已保存章节失败"),
+        description: error instanceof Error ? error.message : tr("请稍后重试。"),
         tone: "error",
       });
     } finally {
       setDiscardRecoveryLoading(false);
     }
-  }, [chapter, activeRecovery, saveGuard, adoptSaved, actions, discardRecovery, toast]);
+  }, [chapter, activeRecovery, saveGuard, adoptSaved, actions, discardRecovery, toast, tr]);
 
   /** 切换章节：先把当前章落库，再换；窄屏切换后自动收起目录抽屉 */
   const selectChapter = React.useCallback(
@@ -429,8 +431,8 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   // 浏览器标签页标题跟着作品走
   React.useEffect(() => {
     if (!tree?.novel.title) return;
-    document.title = `${tree.novel.title} · 写作台`;
-  }, [tree?.novel.title]);
+    document.title = `${tree.novel.title} · ${tr("写作台")}`;
+  }, [tree?.novel.title, tr]);
 
   /* ---------------- 三栏 / 沉浸 ---------------- */
 
@@ -492,12 +494,12 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   const navigate = React.useCallback((href: string) => {
     void navigateAfterSaving(flush, () => router.push(href)).catch((error) => {
       toast({
-        title: "未能离开写作台",
-        description: error instanceof Error ? error.message : "请检查保存状态后重试。",
+        title: tr("未能离开写作台"),
+        description: error instanceof Error ? error.message : tr("请检查保存状态后重试。"),
         tone: "error",
       });
     });
-  }, [flush, router, toast]);
+  }, [flush, router, toast, tr]);
   const goBack = React.useCallback(() => navigate(back.href), [navigate, back.href]);
   const goOverview = React.useCallback(() => navigate(`/novel/${novelId}`), [navigate, novelId]);
 
@@ -673,7 +675,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
               <aside
                 style={{ width: Math.min(leftPanel.width, panelWidth * 0.28) }}
                 className={cn("min-h-0 shrink-0 overflow-hidden", leftInlineVisible ? "flex" : "hidden")}
-                aria-label="目录、章纲、设定与档案"
+                aria-label={tr("目录、章纲、设定与档案")}
                 aria-hidden={leftInlineVisible ? undefined : true}
               >
                 <LeftPanel
@@ -692,7 +694,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
                 <div
                   role="separator"
                   aria-orientation="vertical"
-                  aria-label="拖拽调整左栏宽度"
+                  aria-label={tr("拖拽调整左栏宽度")}
                   onPointerDown={leftPanel.onPointerDown}
                   className="w-1 shrink-0 cursor-col-resize border-r border-line bg-surface-2/40 transition-colors duration-150 hover:bg-accent-soft"
                 />
@@ -704,31 +706,31 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
           <main className="flex min-h-0 min-w-0 flex-1 flex-col">
             {chapterApi.error && !chapter ? (
               <div role="alert" className="m-auto space-y-3 p-6 text-sm text-ink-3">
-                <p>正文加载失败：{chapterApi.error}</p>
-                <button type="button" className="text-accent" onClick={() => void chapterApi.refresh()}>重新加载</button>
+                <p>{tr("正文加载失败：{error}", { error: chapterApi.error })}</p>
+                <button type="button" className="text-accent" onClick={() => void chapterApi.refresh()}>{tr("重新加载")}</button>
               </div>
             ) : chapterMeta && !chapter ? (
-              <p role="status" className="m-auto text-sm text-ink-4">正在加载正文…</p>
+              <p role="status" className="m-auto text-sm text-ink-4">{tr("正在加载正文…")}</p>
             ) : chapter && !activeDraft ? (
-              <p role="status" className="m-auto text-sm text-ink-4">正在加载草稿…</p>
+              <p role="status" className="m-auto text-sm text-ink-4">{tr("正在加载草稿…")}</p>
             ) : chapter && activeRecovery ? (
               <div className="flex h-full items-center justify-center">
                 <EmptyState
                   icon={<Feather className="size-5" />}
-                  title="发现未保存的临时草稿"
-                  description="上次离开时未能确认保存。数据库内容可能已经变化；恢复后请核对，保存会覆盖当前章节。临时草稿只保存在此浏览器标签页中，不能代替备份。"
+                  title={tr("发现未保存的临时草稿")}
+                  description={tr("上次离开时未能确认保存。数据库内容可能已经变化；恢复后请核对，保存会覆盖当前章节。临时草稿只保存在此浏览器标签页中，不能代替备份。")}
                   action={
                     <div className="flex flex-wrap justify-center gap-2">
-                      <Button variant="primary" onClick={restoreRecovery}>恢复临时草稿</Button>
-                      <Button variant="secondary" onClick={() => setDiscardRecoveryOpen(true)}>使用已保存版本</Button>
+                      <Button variant="primary" onClick={restoreRecovery}>{tr("恢复临时草稿")}</Button>
+                      <Button variant="secondary" onClick={() => setDiscardRecoveryOpen(true)}>{tr("使用已保存版本")}</Button>
                     </div>
                   }
                 />
                 <ConfirmDialog
                   open={discardRecoveryOpen}
-                  title="丢弃临时草稿？"
-                  description="临时草稿将被删除，无法撤销；数据库中已保存的章节不会改变。"
-                  confirmText="丢弃草稿"
+                  title={tr("丢弃临时草稿？")}
+                  description={tr("临时草稿将被删除，无法撤销；数据库中已保存的章节不会改变。")}
+                  confirmText={tr("丢弃草稿")}
                   danger
                   loading={discardRecoveryLoading}
                   onClose={() => setDiscardRecoveryOpen(false)}
@@ -770,7 +772,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
                 aiBar={
                   <EditorErrorBoundary
                     resetKey={`tasks:${chapter.id}`}
-                    title="AI 快捷任务"
+                    title={tr("AI 快捷任务")}
                   >
                     <AiTaskBar
                       novelId={novelId}
@@ -785,11 +787,11 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
               <div className="flex h-full items-center justify-center px-6">
                 <EmptyState
                   icon={<Feather className="size-5" />}
-                  title={chapters.length === 0 ? "这份作品还没有章节" : "选择一章开始写"}
+                  title={chapters.length === 0 ? tr("这份作品还没有章节") : tr("选择一章开始写")}
                   description={
                     chapters.length === 0
-                      ? "先在左侧目录新建一章；写下的每个字都会自动保存在本地。"
-                      : "从左侧目录点开一章，或者新建一章继续往下写。"
+                      ? tr("先在左侧目录新建一章；写下的每个字都会自动保存在本地。")
+                      : tr("从左侧目录点开一章，或者新建一章继续往下写。")
                   }
                   action={
                     <Button
@@ -798,7 +800,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
                       icon={<Plus className="size-3.5" />}
                       onClick={openToc}
                     >
-                      打开目录
+                      {tr("打开目录")}
                     </Button>
                   }
                 />
@@ -807,13 +809,13 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
           </main>
 
           {/* 右栏：AI 协作（仅 ≥1024 内联，窄屏走抽屉） */}
-          {showRightInline ? <div role="separator" aria-orientation="vertical" aria-label="拖拽调整右栏宽度" onPointerDown={rightPanel.onPointerDown} className="w-1 shrink-0 cursor-col-resize border-l border-line bg-surface-2/40 hover:bg-accent-soft" /> : null}
-          {!isWide && drawerRightOpen ? <button type="button" aria-label="关闭助手遮罩" className="absolute inset-0 z-40 bg-black/30" onClick={()=>setDrawerRightOpen(false)} /> : null}
+          {showRightInline ? <div role="separator" aria-orientation="vertical" aria-label={tr("拖拽调整右栏宽度")} onPointerDown={rightPanel.onPointerDown} className="w-1 shrink-0 cursor-col-resize border-l border-line bg-surface-2/40 hover:bg-accent-soft" /> : null}
+          {!isWide && drawerRightOpen ? <button type="button" aria-label={tr("关闭助手遮罩")} className="absolute inset-0 z-40 bg-black/30" onClick={()=>setDrawerRightOpen(false)} /> : null}
           {/* Keep one panel mounted across collapse, immersion and responsive layouts. */}
           <aside
             style={{ width: isWide ? Math.min(rightPanel.width, panelWidth * 0.38) : 440, maxWidth: "100%" }}
             className={cn("min-h-0 min-w-0 shrink-0 overflow-hidden bg-surface", isWide ? (showRightInline ? "flex" : "hidden") : (drawerRightOpen ? "absolute inset-y-0 right-0 z-50 flex shadow-float" : "hidden"))}
-            aria-label="AI 协作面板"
+            aria-label={tr("AI 协作面板")}
             role={!isWide&&drawerRightOpen?"dialog":undefined}
             aria-modal={!isWide&&drawerRightOpen?true:undefined}
           >
@@ -825,7 +827,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
         <Sheet
           open={!isDesktop && drawerLeftOpen && !immersive}
           onClose={() => setDrawerLeftOpen(false)}
-          title="目录与资料"
+          title={tr("目录与资料")}
           width={336}
         >
           <div className="flex h-full min-h-0 flex-col">
@@ -854,7 +856,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
 
         {/* 选区状态给屏幕阅读器（视觉上已在正文状态条展示） */}
         <span className="sr-only" aria-live="polite">
-          {selection.empty ? "" : `已选中 ${selection.text.length} 字`}
+          {selection.empty ? "" : tr("已选中 {n} 字", { n: selection.text.length })}
         </span>
       </div>
     </EditorBridgeProvider>

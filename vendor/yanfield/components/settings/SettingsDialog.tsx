@@ -11,6 +11,7 @@ import { Settings2, X } from "lucide-react";
 import { IconButton, Skeleton, useMounted } from "@/components/ui/kit";
 import { Button } from "@/components/ui/kit";
 import { useApi } from "@/lib/client/api";
+import { useT } from "@/lib/i18n";
 import type { AppSettings } from "@/lib/types";
 import { applySurfaceDataset } from "@/lib/ui/theme";
 import { cn } from "@/lib/ui/cn";
@@ -32,6 +33,7 @@ export interface SettingsDialogProps {
 }
 
 export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) {
+  const tr = useT();
   const mounted = useMounted();
   const settingsApi = useApi<AppSettings>("/api/settings");
   const editor = useSettingsEditor(settingsApi.data, (value) => settingsApi.setData(value));
@@ -88,17 +90,17 @@ export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) 
           ref={dialogRef}
           role="dialog"
           aria-modal="true"
-          aria-label="设置"
+          aria-label={tr("设置")}
           className="rise-in pointer-events-auto flex h-full w-full flex-col overflow-hidden border-line bg-surface shadow-float @min-[720px]/settings:h-[82%] @min-[720px]/settings:max-w-5xl @min-[720px]/settings:rounded-xl @min-[720px]/settings:border"
         >
           <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
             <div className="flex min-w-0 items-center gap-2">
               <Settings2 className="size-4 shrink-0 text-ink-3" aria-hidden />
-              <h2 className="font-serif text-[17px] text-ink">设置</h2>
+              <h2 className="font-serif text-[17px] text-ink">{tr("设置")}</h2>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {status}
-              <IconButton label="关闭设置" onClick={onClose}>
+              <IconButton label={tr("关闭设置")} onClick={onClose}>
                 <X className="size-4" />
               </IconButton>
             </div>
@@ -107,7 +109,7 @@ export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) 
           <div className="flex min-h-0 flex-1 flex-col @min-[720px]/settings:flex-row">
             {/* 桌面端左侧分区导航 */}
             <aside className="scroll-thin hidden w-48 shrink-0 overflow-y-auto border-r border-line p-2.5 @min-[720px]/settings:block">
-              <nav className="space-y-0.5" aria-label="设置分区">
+              <nav className="space-y-0.5" aria-label={tr("设置分区")}>
                 {SETTINGS_SECTIONS.map((item) => (
                   <button
                     key={item.key}
@@ -122,18 +124,18 @@ export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) 
                     aria-current={active === item.key ? "page" : undefined}
                   >
                     {item.icon}
-                    {item.label}
+                    {tr(item.label)}
                   </button>
                 ))}
               </nav>
               <p className="mt-4 px-2.5 text-[10.5px] leading-5 text-ink-3">
-                设置是全局的；作品内的提示词与上下文可以在编辑器里单独覆盖。
+                {tr("设置是全局的；作品内的提示词与上下文可以在编辑器里单独覆盖。")}
               </p>
             </aside>
 
             <div className="border-b border-line px-4 py-2 @min-[720px]/settings:hidden">
               <select
-                aria-label="设置分区"
+                aria-label={tr("设置分区")}
                 value={active}
                 onChange={(event) => {
                   const section = SETTINGS_SECTIONS.find((item) => item.key === event.target.value);
@@ -141,7 +143,7 @@ export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) 
                 }}
                 className="w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-[12px] text-ink focus-visible:outline-accent"
               >
-                {SETTINGS_SECTIONS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+                {SETTINGS_SECTIONS.map((item) => <option key={item.key} value={item.key}>{tr(item.label)}</option>)}
               </select>
             </div>
 
@@ -154,9 +156,9 @@ export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) 
                 </div>
               ) : settingsApi.error ? (
                 <div className="rounded-lg border border-danger/30 bg-danger/5 p-5 text-center">
-                  <p className="text-[12.5px] text-danger">设置加载失败：{settingsApi.error}</p>
+                  <p className="text-[12.5px] text-danger">{tr("设置加载失败：{error}", { error: settingsApi.error })}</p>
                   <Button variant="secondary" size="sm" className="mt-3" onClick={() => void settingsApi.refresh()}>
-                    重试
+                    {tr("重试")}
                   </Button>
                 </div>
               ) : (

@@ -6,6 +6,7 @@ import { Minus, X } from "lucide-react";
 import { IconButton } from "@/components/ui/kit";
 import { cn } from "@/lib/ui/cn";
 import { yanfieldPortal } from "@/lib/ui/portal";
+import { useT } from "@/lib/i18n";
 
 /** 浮窗与视口边缘的最小间距 */
 const VIEWPORT_MARGIN = 8;
@@ -123,6 +124,7 @@ export function FloatWindow({
    */
   keepMounted?: boolean;
 }) {
+  const tr = useT();
   const [pos, setPos] = React.useState({ x: 292, y: 76 });
   /** null = 默认 560 宽 + 高度随内容；非 null = 用户调整过尺寸（高度固定，内容区滚动） */
   const [size, setSize] = React.useState<FloatWindowSize | null>(null);
@@ -309,11 +311,11 @@ export function FloatWindow({
         onPointerCancel={onPointerUp}
       >
         <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{title}</p>
-        <span className="shrink-0 text-[11px] text-ink-4">{minimized ? "已最小化" : "拖动"}</span>
-        <IconButton label={minimized ? "展开" : "最小化"} size="sm" onClick={() => onMinimizedChange(!minimized)}>
+        <span className="shrink-0 text-[11px] text-ink-4">{minimized ? tr("已最小化") : tr("拖动")}</span>
+        <IconButton label={minimized ? tr("展开") : tr("最小化")} size="sm" onClick={() => onMinimizedChange(!minimized)}>
           <Minus className="size-3.5" />
         </IconButton>
-        <IconButton label="关闭" size="sm" onClick={onClose}>
+        <IconButton label={tr("关闭")} size="sm" onClick={onClose}>
           <X className="size-3.5" />
         </IconButton>
       </div>
@@ -326,8 +328,8 @@ export function FloatWindow({
       {minimized ? null : (
         <button
           type="button"
-          aria-label="调整窗口大小"
-          title="拖动调整窗口大小"
+          aria-label={tr("调整窗口大小")}
+          title={tr("拖动调整窗口大小")}
           className="absolute bottom-0 right-0 flex size-4 cursor-nwse-resize touch-none items-end justify-end rounded-br-[7px] border-0 bg-transparent p-0.5 text-ink-4 outline-none transition-colors hover:bg-accent-soft hover:text-ink active:bg-accent-soft"
           onPointerDown={onResizePointerDown}
           onPointerMove={onResizePointerMove}

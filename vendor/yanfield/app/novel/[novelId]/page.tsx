@@ -16,6 +16,7 @@ import {
   type Volume,
 } from "@/lib/types";
 import { resolveCoverStyle } from "@/lib/cover";
+import { useT } from "@/lib/i18n";
 import { formatRelativeTime, formatWords } from "@/lib/ui/cn";
 import { EditNovelDialog } from "@/components/library/EditNovelDialog";
 import { editorHref } from "@/components/library/types";
@@ -42,6 +43,7 @@ interface ArchivesResponse {
 export default function NovelOverviewPage() {
   const params = useParams<{ novelId: string }>();
   const novelId = params?.novelId ?? "";
+  const tr = useT();
 
   const novelApi = useApi<Novel>(novelId ? `/api/novels/${novelId}` : null);
   const treeApi = useApi<NovelTreeResponse>(novelId ? `/api/novels/${novelId}/tree?view=summary` : null);
@@ -70,9 +72,9 @@ export default function NovelOverviewPage() {
     volumes.forEach((volume) => {
       volume.chapters.forEach((chapter) => entries.push({ chapter, volumeTitle: volume.title }));
     });
-    looseChapters.forEach((chapter) => entries.push({ chapter, volumeTitle: "未分卷" }));
+    looseChapters.forEach((chapter) => entries.push({ chapter, volumeTitle: tr("未分卷") }));
     return entries.sort((a, b) => b.chapter.updatedAt.localeCompare(a.chapter.updatedAt));
-  }, [volumes, looseChapters]);
+  }, [looseChapters, tr, volumes]);
 
   const chapterCount = chapterEntries.length;
   const totalWords = chapterEntries.reduce((sum, entry) => sum + entry.chapter.wordCount, 0);
@@ -115,21 +117,21 @@ export default function NovelOverviewPage() {
             <Archive className="size-5" aria-hidden />
           </span>
           <div>
-            <h1 className="font-serif text-xl text-ink">作品不存在或已被删除</h1>
+            <h1 className="font-serif text-xl text-ink">{tr("作品不存在或已被删除")}</h1>
             <p className="mt-1.5 text-[12.5px] text-ink-3">
-              {novelApi.error ?? "检查一下书架，这本书也许已经被移除了。"}
+              {novelApi.error ?? tr("检查一下书架，这本书也许已经被移除了。")}
             </p>
           </div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => void novelApi.refresh()} loading={novelApi.loading}>
-              重试
+              {tr("重试")}
             </Button>
             <Link
               href="/library"
               className="inline-flex h-9 items-center gap-1.5 rounded-md border border-line bg-surface px-4 text-[13px] text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
             >
               <ArrowLeft className="size-3.5" aria-hidden />
-              返回书架
+              {tr("返回书架")}
             </Link>
           </div>
         </div>
@@ -160,23 +162,23 @@ export default function NovelOverviewPage() {
                 className="rounded-sm px-1.5 py-0.5 text-[9px] tracking-[0.16em]"
                 style={{ color: cover.ink, backgroundColor: "rgba(0,0,0,0.18)" }}
               >
-                {cover.label}
+                {tr(cover.label)}
               </span>
             </div>
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
-              <Badge tone="accent">{novel.genre}</Badge>
+              <Badge tone="accent">{tr(novel.genre)}</Badge>
               <Badge tone={novel.status === "completed" ? "jade" : "default"}>
-                {NOVEL_STATUS_LABEL[novel.status]}
+                {tr(NOVEL_STATUS_LABEL[novel.status])}
               </Badge>
-              <span className="text-[11px] text-ink-3">最近更新 {formatRelativeTime(novel.updatedAt)}</span>
+              <span className="text-[11px] text-ink-3">{tr("最近更新 {time}", { time: formatRelativeTime(novel.updatedAt) })}</span>
             </div>
             <h1 className="mt-1.5 font-serif text-[26px] leading-tight text-ink sm:text-[32px]">{novel.title}</h1>
             {novel.subtitle ? <p className="mt-1 text-[13px] text-ink-3">{novel.subtitle}</p> : null}
             <p className="mt-2 max-w-3xl text-[12.5px] leading-6 text-ink-2 sm:line-clamp-3">
-              {novel.synopsis || "还没有写简介。点右侧「编辑信息」补上一句话，让书架更有存在感。"}
+              {novel.synopsis || tr("还没有写简介。点右侧「编辑信息」补上一句话，让书架更有存在感。")}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button
@@ -188,7 +190,7 @@ export default function NovelOverviewPage() {
                   setEditOpen(true);
                 }}
               >
-                编辑信息
+                {tr("编辑信息")}
               </Button>
               <Button
                 variant="ghost"
@@ -196,14 +198,14 @@ export default function NovelOverviewPage() {
                 icon={<Download className="size-3.5" />}
                 onClick={() => downloadNovelExport(novel.id, { format: "md", scope: "book" })}
               >
-                导出全书
+                {tr("导出全书")}
               </Button>
               <Link
                 href={editorHref(novel.id, lastChapter?.chapter.id)}
                 className="inline-flex h-8 items-center gap-1.5 rounded-md border border-accent/40 bg-accent-soft px-3 text-[12.5px] font-medium text-accent transition-colors hover:bg-accent-soft/70"
               >
                 <Pencil className="size-3.5" aria-hidden />
-                打开编辑器
+                {tr("打开编辑器")}
               </Link>
             </div>
           </div>
@@ -230,9 +232,9 @@ export default function NovelOverviewPage() {
 
         {treeApi.error ? (
           <Card className="flex items-center justify-between gap-3 border-danger/30 bg-danger/5 p-3.5">
-            <p className="text-[12px] text-danger">目录加载失败：{treeApi.error}</p>
+            <p className="text-[12px] text-danger">{tr("目录加载失败：{error}", { error: treeApi.error })}</p>
             <Button variant="ghost" size="sm" onClick={() => void treeApi.refresh()}>
-              重试
+              {tr("重试")}
             </Button>
           </Card>
         ) : null}
@@ -256,7 +258,7 @@ export default function NovelOverviewPage() {
               <div className="flex items-center justify-between">
                 <h3 className="flex items-center gap-1.5 text-[12.5px] font-medium text-ink">
                   <Target className="size-3.5 text-ink-3" aria-hidden />
-                  写作目标
+                  {tr("写作目标")}
                 </h3>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[10.5px] text-ink-3">{goalPercent}%</span>
@@ -269,27 +271,27 @@ export default function NovelOverviewPage() {
                       setEditOpen(true);
                     }}
                   >
-                    调整
+                    {tr("调整")}
                   </Button>
                 </div>
               </div>
               <Progress value={goalPercent} max={100} tone="gold" className="mt-2.5" />
               <p className="mt-2 text-[10.5px] text-ink-3">
-                {wordGoal > 0 ? `${formatWords(totalWords)} / ${formatWords(wordGoal)} 字` : "尚未设置目标字数（在编辑信息里补充）"}
+                {wordGoal > 0 ? tr("{current} / {goal} 字", { current: formatWords(totalWords), goal: formatWords(wordGoal) }) : tr("尚未设置目标字数（在编辑信息里补充）")}
               </p>
               <dl className="mt-3 space-y-1.5 border-t border-line pt-3 text-[11px]">
                 <div className="flex justify-between gap-2">
-                  <dt className="text-ink-3">开始创作</dt>
+                  <dt className="text-ink-3">{tr("开始创作")}</dt>
                   <dd className="text-ink-2">{formatRelativeTime(novel.createdAt)}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt className="text-ink-3">最近更新</dt>
+                  <dt className="text-ink-3">{tr("最近更新")}</dt>
                   <dd className="text-ink-2">{formatRelativeTime(novel.updatedAt)}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt className="text-ink-3">平均章长</dt>
+                  <dt className="text-ink-3">{tr("平均章长")}</dt>
                   <dd className="text-ink-2">
-                    {chapterCount > 0 ? `${formatWords(Math.round(totalWords / chapterCount))} 字` : "—"}
+                    {chapterCount > 0 ? tr("{words} 字", { words: formatWords(Math.round(totalWords / chapterCount)) }) : "—"}
                   </dd>
                 </div>
               </dl>
@@ -299,31 +301,31 @@ export default function NovelOverviewPage() {
               <div className="flex items-center justify-between">
                 <h3 className="flex items-center gap-1.5 text-[12.5px] font-medium text-ink">
                   <Archive className="size-3.5 text-ink-3" aria-hidden />
-                  故事档案
+                  {tr("故事档案")}
                 </h3>
                 <Link
                   href={`/editor/${novelId}?tab=archives`}
                   className="text-[11px] text-accent transition-opacity hover:opacity-80"
                 >
-                  查看
+                  {tr("查看")}
                 </Link>
               </div>
               <div className="mt-2.5 space-y-1.5 text-[11.5px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-ink-3">最新档案</span>
+                  <span className="text-ink-3">{tr("最新档案")}</span>
                   <Badge tone="jade">{freshCount}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-ink-3">待更新</span>
+                  <span className="text-ink-3">{tr("待更新")}</span>
                   <Badge tone="gold">{staleCount}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-ink-3">待提取</span>
+                  <span className="text-ink-3">{tr("待提取")}</span>
                   <Badge tone="default">{pendingCount}</Badge>
                 </div>
               </div>
               <p className="mt-2.5 text-[10.5px] leading-5 text-ink-3">
-                写完一章就提取一次档案，角色状态与数值总账不会走丢。
+                {tr("写完一章就提取一次档案，角色状态与数值总账不会走丢。")}
               </p>
             </Card>
           </aside>

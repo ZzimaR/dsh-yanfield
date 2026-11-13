@@ -15,7 +15,7 @@ export const MAX_IMPORT_CHAPTERS = 2000;
  * 标题取整行文本，正文从标题行末尾切到下一个标题行之前。
  */
 export const DEFAULT_SPLIT_REGEX =
-  "^[ \\t　]*(?:第[零〇一二三四五六七八九十百千万两\\d]+[章回节卷篇集][^\\n]{0,40}|\\d{1,4}[、.．:：][^\\n]{0,40})[ \\t]*$";
+  "^[ \\t　]*(?:第[零〇一二三四五六七八九十百千万两\\d]+[章回节卷篇集][^\\n]{0,40}|\\d{1,4}[、.．:：][^\\n]{0,40}|(?:chapter|volume|book|part)\\s+(?:\\d{1,4}|[ivxlcdm]{1,8}|[a-z]+(?:[- ][a-z]+){0,2})(?:\\s*[:.\\-–—]\\s*[^\\n]{0,80})?|(?:prologue|epilogue|interlude|afterword|foreword)\\b[^\\n]{0,80})[ \\t]*$";
 
 const HTML_HINT = /<(?:p|div|br|span|strong|em|h[1-6]|ul|ol|li|blockquote)\b[^>]*>/i;
 
@@ -66,7 +66,7 @@ export function splitChapters(text: string, customRegex?: string, fallbackTitle 
 
   let regex: RegExp;
   try {
-    regex = new RegExp(customRegex?.trim() || DEFAULT_SPLIT_REGEX, "gm");
+    regex = new RegExp(customRegex?.trim() || DEFAULT_SPLIT_REGEX, customRegex?.trim() ? "gm" : "gmi");
   } catch {
     throw new ApiError("章节分割正则无效", 400);
   }
@@ -90,20 +90,21 @@ export function splitChapters(text: string, customRegex?: string, fallbackTitle 
     }
   }
 
-  if (headings.length === 0) return [{ title: fallbackTitle, content: source }];
+  const latinSource = !/[\u3400-\u4e00\u9fff]/.test(source);
+  if (headings.length === 0) return [{ title: latinSource ? "Body" : fallbackTitle, content: source }];
 
   const drafts: ImportChapterDraft[] = [];
   const prelude = source.slice(0, headings[0].index).trim();
-  if (prelude) drafts.push({ title: "前言", content: prelude });
+  if (prelude) drafts.push({ title: latinSource ? "Front matter" : "前言", content: prelude });
 
   headings.forEach((heading, index) => {
     const nextIndex = index + 1 < headings.length ? headings[index + 1].index : source.length;
     const content = source.slice(heading.end, nextIndex).trim();
     if (!content) return;
-    drafts.push({ title: heading.title || `第 ${drafts.length + 1} 章`, content });
+    drafts.push({ title: heading.title || (latinSource ? `Chapter ${drafts.length + 1}` : `第 ${drafts.length + 1} 章`), content });
   });
 
-  if (drafts.length === 0) return [{ title: fallbackTitle, content: source }];
+  if (drafts.length === 0) return [{ title: latinSource ? "Body" : fallbackTitle, content: source }];
   if (drafts.length > MAX_IMPORT_CHAPTERS) {
     throw new ApiError(`章节数超过上限（${MAX_IMPORT_CHAPTERS}，含前言），请拆分文件后导入`, 400);
   }

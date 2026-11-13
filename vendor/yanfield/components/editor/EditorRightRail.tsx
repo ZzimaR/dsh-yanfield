@@ -3,6 +3,7 @@
 import * as React from "react";
 import { AiPanelSlot } from "./AiPanelSlot";
 import { EditorErrorBoundary } from "./EditorErrorBoundary";
+import { useT } from "@/lib/i18n";
 
 interface EditorRightRailProps {
   novelId: string;
@@ -18,13 +19,14 @@ export function EditorRightRail({
   chapterTitle,
   onClose,
 }: EditorRightRailProps) {
+  const tr = useT();
   // w-full + min-w-0：右栏宽度由外层 aside 的 style.width 决定，
   // 不给内层面板按内容撑破容器的机会（否则 AI 面板会把关闭按钮挤出视口）
   return (
     <aside className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-l border-line bg-surface">
       <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
         {/* AI 面板来自 components/ai，用错误边界隔离：面板异常不拖垮整个编辑器 */}
-        <EditorErrorBoundary resetKey={`${novelId}:${chapterId ?? "none"}`} title="AI 面板">
+        <EditorErrorBoundary resetKey={`${novelId}:${chapterId ?? "none"}`} title={tr("AI 面板")}>
           <AiPanelSlot
             novelId={novelId}
             chapterId={chapterId}

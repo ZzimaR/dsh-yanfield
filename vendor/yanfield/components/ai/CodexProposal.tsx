@@ -6,6 +6,7 @@ import { Button, useToast } from "@/components/ui/kit";
 import { codexParentId, orderedCodexItems, setCodexPicked, type CodexItem } from "@/lib/ai/codex";
 import { apiGet, apiPatch, apiPost, notifyDataChanged } from "@/lib/client/api";
 import { cn } from "@/lib/ui/cn";
+import { useT } from "@/lib/i18n";
 import type { Character, Foreshadow, WorldSetting } from "@/lib/types";
 import { CHARACTER_ROLE_LABEL, FORESHADOW_STATUS_LABEL, WORLD_CATEGORY_LABEL } from "@/lib/types";
 
@@ -26,6 +27,7 @@ export function CodexProposal({
   onApplied: () => void;
 }) {
   const { toast } = useToast();
+  const tr = useT();
   const [saving, setSaving] = React.useState(false);
   /** 上一轮写入是否中断过（即使一张都没成功，重试按钮也要提示剩余数量） */
   const [interrupted, setInterrupted] = React.useState(false);
@@ -78,8 +80,8 @@ export function CodexProposal({
       if (dropped.length > 0) setDroppedParents((prev) => Array.from(new Set([...prev, ...dropped])));
       const remainingTodo = todo.length - done;
       toast({
-        title: done > 0 ? `已写入 ${done} 张，还有 ${remainingTodo} 张待重试` : "写入中断",
-        description: `${err instanceof Error ? err.message : "请再试一次"}。重试只补写剩余 ${remainingTodo} 张，已成功的不重复创建。`,
+        title: done > 0 ? tr("已写入 {done} 张，还有 {remaining} 张待重试", { done, remaining: remainingTodo }) : tr("写入中断"),
+        description: tr("{reason}。重试只补写剩余 {remaining} 张，已成功的不重复创建。", { reason: err instanceof Error ? err.message : tr("请再试一次"), remaining: remainingTodo }),
         tone: "error",
       });
       return;
@@ -91,10 +93,10 @@ export function CodexProposal({
     notifyDataChanged();
     onApplied();
     toast({
-      title: `已写入 ${chosen.length} 张卡`,
+      title: tr("已写入 {count} 张卡", { count: chosen.length }),
       description:
         dropped.length > 0
-          ? `${dropped.length} 张卡的父级无法确认：新建卡已按无父级写入、已有卡保留原父级（${dropped.join("、")}）`
+          ? tr("{count} 张卡的父级无法确认：新建卡已按无父级写入、已有卡保留原父级（{titles}）", { count: dropped.length, titles: dropped.join(tr("、")) })
           : undefined,
       tone: "success",
     });
@@ -132,14 +134,14 @@ export function CodexProposal({
           ))}
         </ul>
       ) : null}
-      {applied ? <p className="mt-2 text-[12px] text-jade">已写入</p> : null}
-      {superseded ? <p className="mt-2 text-[12px] text-ink-4">已被下一条清单替换</p> : null}
+      {applied ? <p className="mt-2 text-[12px] text-jade">{tr("已写入")}</p> : null}
+      {superseded ? <p className="mt-2 text-[12px] text-ink-4">{tr("已被下一条清单替换")}</p> : null}
       {droppedParents.length > 0 ? (
-        <p className="mt-2 text-[12px] text-gold">父级无法确认，新建卡已按无父级写入、已有卡保留原父级：{droppedParents.join("、")}</p>
+        <p className="mt-2 text-[12px] text-gold">{tr("父级无法确认，新建卡已按无父级写入、已有卡保留原父级：{titles}", { titles: droppedParents.join(tr("、")) })}</p>
       ) : null}
       {retryable && !applied ? (
         <p className="mt-2 text-[12px] text-ink-3">
-          已写入 {writtenCount} 张，剩余 {remaining} 张待重试（已成功的不重复写入）
+          {tr("已写入 {written} 张，剩余 {remaining} 张待重试（已成功的不重复写入）", { written: writtenCount, remaining })}
         </p>
       ) : null}
       {applied ? null : (
@@ -152,7 +154,7 @@ export function CodexProposal({
           disabled={picked === 0 || readOnly}
           onClick={() => void commit()}
         >
-          {retryable ? `重试剩余 ${remaining} 张` : "写入选中的"}
+          {retryable ? tr("重试剩余 {remaining} 张", { remaining }) : tr("写入选中的")}
         </Button>
       )}
     </div>
@@ -190,18 +192,19 @@ function ProposalNode({
 }
 
 function ProposalRow({ item, disabled, onPick }: { item: CodexItem; disabled: boolean; onPick: (picked: boolean) => void }) {
+  const tr = useT();
   const kind =
     item.kind === "character"
       ? item.role
-        ? `角色 · ${CHARACTER_ROLE_LABEL[item.role]}`
-        : "角色"
+        ? tr("角色 · {role}", { role: tr(CHARACTER_ROLE_LABEL[item.role]) })
+        : tr("角色")
       : item.kind === "foreshadow"
         ? item.status
-          ? `伏笔 · ${FORESHADOW_STATUS_LABEL[item.status]}`
-          : "伏笔"
+          ? tr("伏笔 · {status}", { status: tr(FORESHADOW_STATUS_LABEL[item.status]) })
+          : tr("伏笔")
         : item.category
-          ? WORLD_CATEGORY_LABEL[item.category]
-          : "设定";
+          ? tr(WORLD_CATEGORY_LABEL[item.category])
+          : tr("设定");
   return (
     <label className="flex items-start gap-2 px-1 py-0.5">
       <input type="checkbox" className="mt-1" checked={item.picked} disabled={disabled} onChange={(event) => onPick(event.target.checked)} />
@@ -209,7 +212,7 @@ function ProposalRow({ item, disabled, onPick }: { item: CodexItem; disabled: bo
         <span className="block text-[13px] font-medium text-ink">{item.title}</span>
         <span className="block text-[11px] text-ink-3">
           {kind}
-          {item.op === "update" ? " · 修改已有" : " · 新建"}
+          {item.op === "update" ? tr(" · 修改已有") : tr(" · 新建")}
           {item.relation ? ` · ${item.relation}` : ""}
         </span>
       </span>

@@ -27,7 +27,6 @@ import { cn } from "@/lib/ui/cn";
 import type { Chapter, Foreshadow, NovelOutline, Volume } from "@/lib/types";
 import { useBlueprintIndex } from "@/components/outline/use-blueprint-index";
 import {
-  chapterRefLabel,
   reindexChaptersByVolume,
   stripChapterNumber,
   useErrorToast,
@@ -36,6 +35,7 @@ import { BlueprintEditor } from "@/components/outline/BlueprintEditor";
 import { NovelOutlinePanel } from "@/components/outline/NovelOutlinePanel";
 import { VolumePanel } from "@/components/outline/VolumePanel";
 import { FloatWindow } from "@/components/editor/FloatWindow";
+import { useT, type Translate } from "@/lib/i18n";
 
 export interface OutlineInlinePanelProps {
   novelId: string;
@@ -44,6 +44,11 @@ export interface OutlineInlinePanelProps {
 }
 
 type EditorKind = "novel" | "volume" | "blueprint";
+
+/** 章节引用标签（form-kit 的 chapterRefLabel 固定输出中文，这里按当前语言渲染） */
+function chapterRefText(chapter: Pick<Chapter, "orderIndex" | "title">, tr: Translate): string {
+  return tr("第 {n} 章 · {title}", { n: chapter.orderIndex + 1, title: stripChapterNumber(chapter.title) });
+}
 
 /* ============================== 小组件 ============================== */
 
@@ -79,12 +84,14 @@ function Muted({ children }: { children: React.ReactNode }) {
 function EditButton({
   onClick,
   disabled = false,
-  label = "编辑",
+  label,
 }: {
   onClick: () => void;
   disabled?: boolean;
   label?: string;
 }) {
+  const tr = useT();
+  const text = tr(label ?? "编辑");
   return (
     <Button
       variant="ghost"
@@ -92,9 +99,9 @@ function EditButton({
       disabled={disabled}
       onClick={onClick}
       className="h-6 shrink-0 px-1.5 text-[11.5px] text-accent hover:bg-accent-soft"
-      aria-label={label}
+      aria-label={text}
     >
-      {label}
+      {text}
     </Button>
   );
 }
@@ -114,6 +121,7 @@ function ChapterRow({
   onEdit: () => void;
   rowRef?: React.Ref<HTMLDivElement>;
 }) {
+  const tr = useT();
   return (
     <div
       ref={rowRef}
@@ -126,7 +134,7 @@ function ChapterRow({
         type="button"
         onClick={onSelect}
         aria-current={active ? "true" : undefined}
-        title={`切换到${chapterRefLabel(chapter)}`}
+        title={tr("切换到 {ref}", { ref: chapterRefText(chapter, tr) })}
         className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1.5 py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       >
         <span
@@ -140,7 +148,7 @@ function ChapterRow({
         <span
           aria-hidden
           className={cn("size-1.5 shrink-0 rounded-full", filled ? "bg-jade" : "bg-ink-4/50")}
-          title={filled ? "已有章纲" : "还没有章纲"}
+          title={filled ? tr("已有章纲") : tr("还没有章纲")}
         />
         <span
           className={cn(
@@ -152,7 +160,7 @@ function ChapterRow({
         </span>
       </button>
       <IconButton
-        label="编辑本章章纲"
+        label={tr("编辑本章章纲")}
         size="sm"
         onClick={onEdit}
         className={cn(
@@ -169,6 +177,7 @@ function ChapterRow({
 /* ============================== 主组件 ============================== */
 
 export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: OutlineInlinePanelProps) {
+  const tr = useT();
   const encodedNovelId = encodeURIComponent(novelId);
 
   const outlineApi = useApi<unknown>(`/api/outlines/novel/${encodedNovelId}`);
@@ -277,8 +286,10 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
     blueprintIndex.total === 0
       ? undefined
       : blueprintIndex.loading
-        ? `统计中 ${blueprintIndex.loaded}/${blueprintIndex.total}`
-        : `${blueprintIndex.filled.size}/${blueprintIndex.total} 章纲${blueprintIndex.partial ? "（长书只统计前 80 章）" : ""}`;
+        ? tr("统计中 {loaded}/{total}", { loaded: blueprintIndex.loaded, total: blueprintIndex.total })
+        : blueprintIndex.partial
+          ? tr("{filled}/{total} 章纲（长书只统计前 80 章）", { filled: blueprintIndex.filled.size, total: blueprintIndex.total })
+          : tr("{filled}/{total} 章纲", { filled: blueprintIndex.filled.size, total: blueprintIndex.total });
 
   /* ---------- 效果 ---------- */
 
@@ -410,14 +421,14 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
   const floatOpen = editor !== null && (editor !== "blueprint" || editingChapter !== null);
   const floatTitle =
     editor === "novel"
-      ? "总纲"
+      ? tr("总纲")
       : editor === "volume"
         ? editingVolume
-          ? `卷纲 · ${editingVolume.title}`
-          : "卷纲"
+          ? tr("卷纲 · {title}", { title: editingVolume.title })
+          : tr("卷纲")
         : editingChapter
-          ? `章纲 · ${chapterRefLabel(editingChapter)}`
-          : "章纲";
+          ? tr("章纲 · {ref}", { ref: chapterRefText(editingChapter, tr) })
+          : tr("章纲");
 
   const volumeChapterRefs = React.useMemo(
     () => chapters.map((chapter) => ({ id: chapter.id, volumeId: chapter.volumeId })),
@@ -429,7 +440,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
       {/* 1. 本章章纲摘要卡 */}
       <Card padded={false} className="mx-2.5 mt-2.5 shrink-0 px-2.5 py-2">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">本章章纲</h3>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">{tr("本章章纲")}</h3>
           <EditButton
             label="编辑"
             disabled={!currentChapter}
@@ -440,12 +451,12 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
         </div>
         <div className="mt-1 min-w-0">
           {chapterId === null ? (
-            <Muted>先选一个章节，再写这一章的章纲。</Muted>
+            <Muted>{tr("先选一个章节，再写这一章的章纲。")}</Muted>
           ) : !currentChapter ? (
             chaptersApi.loading ? (
               <Skeleton className="h-4 w-3/4" />
             ) : (
-              <Muted>当前章节不在列表里，可能已被删除。</Muted>
+              <Muted>{tr("当前章节不在列表里，可能已被删除。")}</Muted>
             )
           ) : (
             <div className="flex items-center gap-1.5">
@@ -455,14 +466,14 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
               />
               <span
                 className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-ink-2"
-                title={chapterRefLabel(currentChapter)}
+                title={chapterRefText(currentChapter, tr)}
               >
                 {stripChapterNumber(currentChapter.title)}
               </span>
               {currentBlueprintFilled ? (
-                <Badge tone="jade">已有章纲</Badge>
+                <Badge tone="jade">{tr("已有章纲")}</Badge>
               ) : (
-                <span className="shrink-0 text-[10.5px] text-ink-4">待写</span>
+                <span className="shrink-0 text-[10.5px] text-ink-4">{tr("待写")}</span>
               )}
             </div>
           )}
@@ -470,7 +481,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
       </Card>
 
       {/* 2. 总纲一行摘要 */}
-      <PanelSection title="总纲" action={<EditButton onClick={openNovelEditor} />}>
+      <PanelSection title={tr("总纲")} action={<EditButton onClick={openNovelEditor} />}>
         {outlineApi.loading && !outline ? (
           <Skeleton className="h-3.5 w-full" />
         ) : outlinePreview ? (
@@ -478,7 +489,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
             {outlinePreview}
           </p>
         ) : (
-          <Muted>还没有总纲，先定下这本书的一句话故事。</Muted>
+          <Muted>{tr("还没有总纲，先定下这本书的一句话故事。")}</Muted>
         )}
       </PanelSection>
 
@@ -486,11 +497,11 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
         <div className="px-2.5 py-2.5">
           <div className="mb-1.5 flex items-baseline justify-between gap-2">
-            <h3 className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-ink-3">分卷与章节</h3>
+            <h3 className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-ink-3">{tr("分卷与章节")}</h3>
             {coverageHint ? (
               <span
                 className="min-w-0 truncate text-[10.5px] tabular-nums text-ink-4"
-                title="已有章纲的章节数 / 全书章节数"
+                title={tr("已有章纲的章节数 / 全书章节数")}
               >
                 {coverageHint}
               </span>
@@ -506,8 +517,8 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
           ) : chapters.length === 0 ? (
             <EmptyState
               icon={<FileText className="size-5" />}
-              title="这本书还没有章节"
-              description="先在目录里新建章节，再来这里写章纲。"
+              title={tr("这本书还没有章节")}
+              description={tr("先在目录里新建章节，再来这里写章纲。")}
               className="px-2 py-8"
             />
           ) : (
@@ -526,7 +537,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
                         type="button"
                         onClick={() => toggleVolume(volume.id)}
                         aria-expanded={expanded}
-                        title={expanded ? "收起本卷章节" : "展开本卷章节"}
+                        title={expanded ? tr("收起本卷章节") : tr("展开本卷章节")}
                         className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                       >
                         {expanded ? (
@@ -539,9 +550,9 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
                         </span>
                         <span
                           className="shrink-0 text-[10.5px] tabular-nums text-ink-4"
-                          title={`本卷 ${list.length} 章，其中 ${volumeFilled} 章已有章纲`}
+                          title={tr("本卷 {n} 章，其中 {filled} 章已有章纲", { n: list.length, filled: volumeFilled })}
                         >
-                          {list.length} 章
+                          {tr("{n} 章", { n: list.length, count: list.length })}
                         </span>
                       </button>
                       <Button
@@ -550,12 +561,12 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
                         className="h-6 shrink-0 px-1.5 text-[11px] text-ink-3 hover:text-accent"
                         onClick={() => openVolumeEditor(volume.id)}
                       >
-                        卷纲
+                        {tr("卷纲")}
                       </Button>
                     </div>
                     {expanded ? (
                       list.length === 0 ? (
-                        <p className="px-3 py-1 text-[11px] text-ink-4">本卷还没有章节。</p>
+                        <p className="px-3 py-1 text-[11px] text-ink-4">{tr("本卷还没有章节。")}</p>
                       ) : (
                         <div className="mt-0.5 space-y-px">
                           {list.map((chapter) => (
@@ -580,12 +591,12 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
                 <section>
                   <div className="flex items-center gap-1.5 rounded-md pl-1 pr-0.5 py-1 transition-colors hover:bg-surface-2">
                     <Layers className="size-3 shrink-0 text-ink-4" />
-                    <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink-2">未分卷</span>
+                    <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink-2">{tr("未分卷")}</span>
                     <span
                       className="shrink-0 text-[10.5px] tabular-nums text-ink-4"
-                      title={`未分卷 ${groups.loose.length} 章，其中 ${looseFilled} 章已有章纲`}
+                      title={tr("未分卷 {n} 章，其中 {filled} 章已有章纲", { n: groups.loose.length, filled: looseFilled })}
                     >
-                      {groups.loose.length} 章
+                      {tr("{n} 章", { n: groups.loose.length, count: groups.loose.length })}
                     </span>
                     <Button
                       variant="ghost"
@@ -593,7 +604,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
                       className="h-6 shrink-0 px-1.5 text-[11px] text-ink-3 hover:text-accent"
                       onClick={() => openVolumeEditor(null)}
                     >
-                      分卷
+                      {tr("分卷")}
                     </Button>
                   </div>
                   <div className="mt-0.5 space-y-px">
@@ -614,7 +625,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
 
               {volumes.length === 0 && groups.loose.length > 0 ? (
                 <p className="px-1 text-[10.5px] leading-relaxed text-ink-4">
-                  还没有分卷；可以在「分卷」里新建卷，把章节归到卷下。
+                  {tr("还没有分卷；可以在“分卷”里新建卷，把章节归到卷下。")}
                 </p>
               ) : null}
             </div>
@@ -683,10 +694,10 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
 
       <ConfirmDialog
         open={discardOpen}
-        title="放弃未保存的修改？"
-        description="当前编辑器里还有没保存的内容，继续操作会丢失这些修改。"
-        confirmText="放弃修改"
-        cancelText="继续编辑"
+        title={tr("放弃未保存的修改？")}
+        description={tr("当前编辑器里还有没保存的内容，继续操作会丢失这些修改。")}
+        confirmText={tr("放弃修改")}
+        cancelText={tr("继续编辑")}
         danger
         onConfirm={confirmDiscard}
         onClose={cancelDiscard}

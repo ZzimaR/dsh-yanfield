@@ -3,7 +3,7 @@
 ## 一、环境
 
 - Node.js ≥ 22.19（构建、自检用；运行时不依赖它，Harness 自带运行时）。
-- 一个可用的 DeepSeek Harness 安装（`>=0.2.1-rc.5 <0.3.0`），最好有两个 profile：
+- 一个可用的 DeepSeek Harness 安装（`>=0.2.1-rc.5`），最好有两个 profile：
   - 一个正式用的（如 `desktop`），装稳定版本；
   - 一个开发用的（如 `yanfield-dev`），用 DSH CLI 链接本仓库，修改后重新构建。
 
