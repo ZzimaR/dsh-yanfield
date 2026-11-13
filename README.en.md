@@ -21,9 +21,9 @@ Your book stays local, the model is the DeepSeek you already configured, and eve
 > [!NOTE]
 > Yanfield is still being polished; UI and behavior will keep changing. Bugs and ideas are welcome in [Issues](https://github.com/ZzimaR/dsh-yanfield/issues) — the Bug report / Feature request forms (with environment and steps) get fixed faster. Pull requests are welcome too.
 
-[![Yanfield inside DeepSeek Harness: open the bookshelf from the host sidebar, switch between outline and notes, preview AI context, and review a prose edit](docs/screenshots/yanfield-in-dsh.gif)](docs/screenshots/yanfield-in-dsh.gif)
+[![Yanfield inside DeepSeek Harness: chapters on the left, prose in the middle, AI assistant on the right](docs/screenshots/en-editor.png)](docs/screenshots/en-editor.png)
 
-24-second walkthrough of a sample novel in DSH, recorded in the Chinese interface (the interface is bilingual now; the screenshots below show English). The review uses a prepared example edit.
+The three-pane writing desk in DeepSeek Harness — chapter tree, prose, and the AI assistant side by side. All screenshots in this README use the English interface.
 
 <p align="center"><sub>Three-column writing desk · sample manuscript · click for full size</sub></p>
 
@@ -79,7 +79,7 @@ Both real routes can be switched in Settings; an unavailable route explains why 
 
 ## Features
 
-![Shelf](docs/screenshots/library.png)
+![Shelf](docs/screenshots/en-library.png)
 
 **Writing**
 
@@ -105,7 +105,6 @@ Both real routes can be switched in Settings; an unavailable route explains why 
 - After writing, the assistant proposes note candidates backed by the text — it only fills blanks, never overwrites your facts
 - Save frequently used instructions as prompt presets; the toolbar AI menu collects quick tasks
 
-![Reviewing prose: green insertions, red deletions, keep or revert paragraph by paragraph](docs/screenshots/review-light.png)
 
 ## AI and cost
 
