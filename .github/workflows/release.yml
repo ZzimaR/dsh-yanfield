@@ -12,7 +12,7 @@ jobs:
   pack:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: actions/setup-node@v6
@@ -37,7 +37,7 @@ jobs:
           for entry in package.json cordis.patch.yml dist/host.js dist/client.js icon.svg; do
             tar -xOzf - "package/$entry" < "$archive" > /dev/null
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: dsh-yanfield-package
           path: ${{ runner.temp }}/dsh-yanfield.tgz
@@ -49,7 +49,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: dsh-yanfield-package
       - name: 发布 GitHub Release
@@ -73,7 +73,7 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: dsh-yanfield-package
       - name: 使用 Trusted Publishing 发布 npm 包
