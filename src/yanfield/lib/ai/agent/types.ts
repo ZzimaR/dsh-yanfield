@@ -10,7 +10,7 @@ export interface AgentChange {
   targetId: string | null;
   title: string;
   reason: string;
-  evidence?: {sourceId:string;title:string;quote:string;candidate:boolean}[];
+  evidence?: {field?:string;sourceId:string;title:string;quote:string;candidate:boolean}[];
   before: Fields | null;
   after: Fields;
   /** Full saved entity used for optimistic concurrency and safe undo. */

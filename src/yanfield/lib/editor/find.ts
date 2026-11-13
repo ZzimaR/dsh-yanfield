@@ -3,9 +3,8 @@
  *
  * 职责只有两件事：
  * 1. 把 ProseMirror 文档里的「文本块」摊平成 { from, to, text } 段：from / to 是
- *    文档位置（position），text 是块内纯文本。ProseMirror 里文本块的 nodeSize 与
- *    JS 字符串的 length（UTF-16 码元数）一致，所以段内下标可以直接映射回文档位置，
- *    中文、emoji 都无需额外换算。
+ *    文档位置（position），text 是相邻文本节点的纯文本。文本节点的长度与 JS
+ *    字符串的 UTF-16 码元数一致，中文、emoji 无需额外换算。
  * 2. 在这些段里找纯文本命中，返回可以交给 editor.chain().setTextSelection 的区间。
  *
  * 刻意「逐段匹配、不跨段」：跨段命中（例如跨标题与正文）即使命中，中间也可能夹着
@@ -44,7 +43,7 @@ export interface TraversableDocument {
 
 export interface TraversableNode {
   isTextblock: boolean;
-  textContent: string;
+  forEach(callback: (node: { text?: string }, offset: number) => void): void;
 }
 
 /**
@@ -57,9 +56,22 @@ export function collectTextSegments(doc: TraversableDocument): TextSegment[] {
   const segments: TextSegment[] = [];
   doc.descendants((node, pos) => {
     if (!node.isTextblock) return;
-    const text = typeof node.textContent === "string" ? node.textContent : "";
-    if (text.length === 0) return;
-    segments.push({ from: pos + 1, to: pos + 1 + text.length, text });
+    let from = pos + 1;
+    let text = "";
+    const flush = () => {
+      if (text) segments.push({ from, to: from + text.length, text });
+      text = "";
+    };
+    node.forEach((child, offset) => {
+      if (child.text === undefined) {
+        flush();
+      } else {
+        if (!text) from = pos + 1 + offset;
+        text += child.text;
+      }
+    });
+    flush();
+    return false;
   });
   return segments;
 }

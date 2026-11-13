@@ -89,6 +89,7 @@ export const outline: Record<string, TranslateValue> = {
   "地点": "Place",
   "情绪": "Mood",
   "场景目的：为什么保留这一场": "Purpose: why keep this scene",
+  "场景目的": "Purpose",
   "场景里发生了什么": "What happens in the scene",
   "出场角色（逗号分隔）": "Characters (comma separated)",
   "情节要点": "Plot points",

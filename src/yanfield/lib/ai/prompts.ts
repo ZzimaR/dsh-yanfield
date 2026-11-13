@@ -96,7 +96,7 @@ const LANGUAGE_DIRECTIVE =
 const LANGUAGE_DIRECTIVE_EN =
   "\n\nLanguage: always write and reply in the language of the author's last message. If the author writes in English, answer in English; if in Chinese, answer in Chinese. Do not translate into a third language.";
 
-function withLanguageDirective(prompt: string, locale: "zh" | "en"): string {
+export function withLanguageDirective(prompt: string, locale: "zh" | "en"): string {
   if (locale === "en") return prompt.includes("Language: always write") ? prompt : prompt + LANGUAGE_DIRECTIVE_EN;
   return prompt.includes("语言要求：") ? prompt : prompt + LANGUAGE_DIRECTIVE;
 }

@@ -5,15 +5,16 @@ import { chapterDirectoryWindow, writerMessages, candidateContext } from "./cont
 import { z } from "zod";
 import { parseAgentDecision, supportsDecisionJson, usesDecisionTool, DECISION_TOOLS, nativeDecisionSystem } from "./decision";
 import { protocolDiagnostic } from "./diagnostics";
+import { displayAgentReply } from "./reply";
 import * as repo from "@/lib/repo";
 import { resolveTarget, mergeContextConfig } from "@/lib/ai/engine";
 import { isOutputLimitError, streamCompletion, type AiMessage, type ProviderChunk } from "@/lib/ai/provider";
 import { historyLimitsFor, trimChatHistory } from "@/lib/ai/history";
-import { agentPreamble, extractJson } from "@/lib/ai/prompts";
+import { agentPreamble, extractJson, withLanguageDirective } from "@/lib/ai/prompts";
 import { countWords, estimateTokens, stripHtml, uid } from "@/lib/ui/cn";
 import { ApiError } from "@/lib/api-utils";
 import { getRun, propose, proposeDelete, readEntity, saveRun, visibleEntity } from "./store";
-import { patchSchemas, proseHtml, sameFields } from "./schema";
+import { patchSchemas, proseHtml } from "./schema";
 import { ENTITY_LABEL, type AgentRequest, type AgentRun, type AgentStep, type EntityKind, type Fields } from "./types";
 import type { AiStreamEvent } from "@/lib/types";
 import { MATERIAL_PROMPT, materialResultSchema, prepareMaterial, type ExistingMaterial, type MaterialSource } from "./materials";
@@ -83,7 +84,7 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
   const material=new Map<string,unknown>();
   const appendBases=new Map<string,string>();
   const history=trimChatHistory(request.history??[],historyLimitsFor(effectiveBudget));
-  const messages:AiMessage[]=[{role:"system",content:(usesDecisionTool(target.provider,target.model)?nativeDecisionSystem(SYSTEM):SYSTEM)+"\n"+agentPreamble(request.agentId,repo.getSettings())+`\n作品id=${novel.id}。作者文风与约束：${config.includeStyleGuide?novel.styleGuide:""}\n${config.customInstruction||""}\n禁用词：${novel.forbiddenWords.join("、")}\n尚未揭示的资料默认不可读取；只有作者本轮明确引用的卡片可例外读取，且不得提前写入正文。`} ,...history.kept.map(m=>m.role==="assistant"?{...m,content:JSON.stringify({message:m.content,calls:[],done:true}),...(deepThinking?{reasoning_content:""}:{})}:m),{role:"user",content:JSON.stringify({request:request.message,currentChapterId:request.chapterId||null,mentions:request.mentions,selection,snapshot:request.snapshot,historyOmitted:history.trimmed})}];
+  const messages:AiMessage[]=[{role:"system",content:(usesDecisionTool(target.provider,target.model)?nativeDecisionSystem(SYSTEM):SYSTEM)+"\n"+agentPreamble(request.agentId,repo.getSettings())+`\n作品id=${novel.id}。作者文风与约束：${config.includeStyleGuide?novel.styleGuide:""}\n${config.customInstruction||""}\n禁用词：${novel.forbiddenWords.join("、")}\n尚未揭示的资料默认不可读取；只有作者本轮明确引用的卡片可例外读取，且不得提前写入正文。`} ,...history.kept.map(m=>m.role==="assistant"?{...m,content:JSON.stringify({message:displayAgentReply(m.content),calls:[],done:true}),...(deepThinking?{reasoning_content:""}:{})}:m),{role:"user",content:JSON.stringify({request:request.message,currentChapterId:request.chapterId||null,mentions:request.mentions,selection,snapshot:request.snapshot,historyOmitted:history.trimmed})}];
   let previous:AgentRun|undefined;
   if(request.previousRunId) {
     previous=getRun(request.previousRunId);
@@ -114,6 +115,7 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
   // 一旦真的被截断，就放宽本轮上限重试一次，并在本次任务后续决策轮保持放宽。
   let decisionCapRelaxed=false;
   async function* complete(input:AiMessage[],decisionOutput=false,materialOutput=false,shortWrite=false):AsyncGenerator<string> {
+    input=input.map(message=>message.role==="system"?{...message,content:withLanguageDirective(message.content,"zh")}:message);
     const thinkingOptions = thinkingProfile(target.provider, target.model).options;
     const canOff = thinkingOptions.some((option) => option.value === "off");
     const canLow = thinkingOptions.some((option) => option.value === "low");
@@ -229,7 +231,7 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
         // 模型偶尔直接回一段自然语言当收尾（不是 JSON）：只要像正常答复且已有候选，就当作最终说明，
         // 不要把「已经做完」的任务报成协议错误——那会让作者以为失败，还可能再点一次重跑。
         const textOnly=raw.trim();
-        if(textOnly && textOnly.length<=2000 && !textOnly.includes("<") && run.changes.length>0) {
+        if(textOnly && textOnly.length<=2000 && parseAgentDecision(textOnly)===null && !/^(?:```|[\[{])/.test(textOnly) && !textOnly.includes("<") && run.changes.length>0) {
           decision={message:textOnly,calls:[],done:true};
           messages.push({role:"assistant",content:JSON.stringify(decision)});
           finished=true;run.summary=textOnly;break;
@@ -239,8 +241,8 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
         throw new Error(`模型两次返回均未通过工具指令校验${detail?`（${detail.path}: ${detail.message}）`:""}。${run.changes.length?"本轮已完成的候选已保留":"本轮尚未生成新候选，上一轮候选不受影响"}。可展开调试详情查看原因。`);
       }
       messages.push({role:"assistant",content:JSON.stringify(decision),...(deepThinking?{reasoning_content:lastDecisionReasoning}:{})});
-      run.summary=decision.message;
-      const progressText=decision.message.trim();
+      run.summary=displayAgentReply(decision.message);
+      const progressText=run.summary.trim();
       run.progress??=[];
       if(progressText && run.progress.at(-1)?.text!==progressText) {
         run.progress.push({id:uid("progress"),text:progressText,stepIndex:run.steps.length});
@@ -317,11 +319,6 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
             const explicitlyReferenced=request.mentions?.some(mention=>mention.type===kind&&mention.id===id)??false;
             const c=propose(run,kind,id,args.fields,String(args.reason||"按作者要求修改"),typeof args.title==="string"?args.title:prior?.title,{chapterIndex,explicitlyReferenced});
             if(id&&observed.has(`${kind}:${id}`)) c.before=observed.get(`${kind}:${id}`)!;
-            if(request.snapshot?.id===id&&request.snapshot.kind===kind&&c.before) {
-              for(const [key,value] of Object.entries(request.snapshot.fields)) {
-                if(Object.hasOwn(patchSchemas[kind].shape,key)&&!Object.hasOwn(c.after,key)&&!sameFields(c.before[key],value))c.after[key]=value;
-              }
-            }
             if(prior&&previous){prior.state="rejected";const parent=previous.changes.find(x=>x.id===prior.targetId&&x.state==="pending");if(parent)parent.state="rejected";saveRun(previous);}
             result=proposalReceipt(c);
           } else if(call.name==="delete") {
@@ -337,20 +334,32 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
             c.state="rejected";result={rejected:true};
           } else {
             if(++writes>3) throw new Error("已达到三版写作上限，请审阅现有候选");
-            const id=typeof args.id==="string"?args.id:null;
+            const id=typeof args.id==="string"?args.id:selection?(request.chapterId??null):null;
             let candidate=id?run.changes.find(c=>c.kind==="chapter"&&c.state==="pending"&&(c.id===id||c.targetId===id)):undefined;
-            const prior=id?previous?.changes.find(c=>c.kind==="chapter"&&c.state==="pending"&&(c.id===id||c.targetId===id)):undefined;
+            const prior=id&&!selection?previous?.changes.find(c=>c.kind==="chapter"&&c.state==="pending"&&(c.id===id||c.targetId===id)):undefined;
             if(!candidate&&prior) {candidate={...prior,id:uid("change"),after:{...prior.after}};run.changes.push(candidate);}
             const actualId=candidate?candidate.targetId:id;
             if(id&&!candidate&&!observed.has(`chapter:${id}`)) throw new Error("改正文前请先读取目标章节");
-            const source=candidate?candidateContext(candidate):id?read("chapter",id):null;
-            const mode=z.enum(["rewrite","append","selection"]).parse(args.mode??"rewrite");
+            const source=candidate?(selection?candidate.before:candidateContext(candidate)):id?read("chapter",id):null;
+            const mode=selection?"selection":z.enum(["rewrite","append","selection"]).parse(args.mode??"rewrite");
             const words=z.number().int().min(mode==="selection"?1:100).max(8000).parse(args.words??(mode==="selection"?Math.max(1,countWords(selection||"")):2000));
             const instruction=z.string().min(1).parse(args.instruction);
             if(mode==="selection"&&(!selection||actualId!==request.chapterId)) throw new Error("当前没有对应章节的选区，请选择后重试");
+            const selectionHtml=String(source?.content??"");
+            const selectedText=selection?.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")??"";
+            let selectedAt=-1;
             if(mode==="selection") {
-              const html=String(source?.content||""),selectedText=selection!;
-              if(!html.includes(selectedText)||html.indexOf(selectedText)!==html.lastIndexOf(selectedText))throw new Error("选区跨格式或在章内重复，请改为整章修改或选取唯一完整段落");
+              for(const span of selectionHtml.matchAll(/<[^>]*>|[^<]+/g)) {
+                if(span[0].startsWith("<"))continue;
+                const entities=[...span[0].matchAll(/&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/gi)];
+                for(let index=span[0].indexOf(selectedText);index>=0;index=span[0].indexOf(selectedText,index+1)) {
+                  const end=index+selectedText.length;
+                  if(entities.some(entity=>[index,end].some(point=>point>entity.index&&point<entity.index+entity[0].length)))continue;
+                  if(selectedAt>=0)throw new Error("选区跨格式或在章内重复，请改为整章修改或选取唯一完整段落");
+                  selectedAt=span.index+index;
+                }
+              }
+              if(selectedAt<0)throw new Error("选区跨格式或在章内重复，请改为整章修改或选取唯一完整段落");
             }
             const appendBase=mode==="append"?(appendBases.get(candidate?.id||"")??String(source?.content||"")):"";
             const appendDraft=mode==="append"&&candidate&&appendBases.has(candidate.id)?String(candidate.after.content||"").slice(appendBase.length):undefined;
@@ -367,20 +376,17 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
             let content=proseHtml(run.preview);
             if(mode==="append") content=appendBase+content;
             if(mode==="selection") {
-              const html=String(source?.content||"");
-              const selectedText=selection!;
-              // Refuse ambiguous or formatted spans rather than replacing the current cursor selection.
-              if(!html.includes(selectedText)||html.indexOf(selectedText)!==html.lastIndexOf(selectedText)) throw new Error("选区跨格式或在章内重复，请改为整章修改或选取唯一完整段落");
               const escaped=run.preview.trim().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n+/g,"<br>");
-              content=html.replace(selectedText,escaped);
+              content=selectionHtml.slice(0,selectedAt)+escaped+selectionHtml.slice(selectedAt+selectedText.length);
             }
             if(candidate&&appendBases.has(candidate.id)&&!content.startsWith(appendBases.get(candidate.id)!))throw new Error("本轮为追加任务，不能改动原文，请只修订新增段落");
             const proposedNewCount=run.changes.filter(c=>c.kind==="chapter"&&!c.targetId&&c.state==="pending"&&c.id!==candidate?.id).length;
-            const title=String(args.title||source?.title||candidate?.title||`第 ${repo.listChapters(novel.id,false).length+proposedNewCount+1} 章`);
+            const title=String((mode!=="selection"&&args.title)||source?.title||candidate?.title||`第 ${repo.listChapters(novel.id,false).length+proposedNewCount+1} 章`);
             let change;
             if(candidate) {candidate.after={...candidate.after,content};change=candidate;}
             else {
-              change=propose(run,"chapter",actualId,{title,content,...(!actualId?{volumeId:typeof args.volumeId==="string"?args.volumeId:null}: {})},instruction,title);
+              const fields=mode==="selection"?{content}:{title,content,...(!actualId?{volumeId:typeof args.volumeId==="string"?args.volumeId:null}: {})};
+              change=propose(run,"chapter",actualId,fields,instruction,title);
               if(actualId&&observed.has(`chapter:${actualId}`)) change.before=observed.get(`chapter:${actualId}`)!;
             }
             if(mode==="append")appendBases.set(change.id,appendBase);
@@ -481,7 +487,7 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
         for(let attempt=0;attempt<2;attempt++) {
           let raw="";for await(const delta of complete(input,false,true))raw+=delta;
           const result=materialResultSchema.safeParse(extractJson(raw));if(result.success){parsed=result.data;break;}
-          input.push({role:"user",content:"请按cards、kind、fields、evidence约定返回有效JSON。"});
+          input.push({role:"user",content:"请按cards、kind、fields、evidence约定返回有效JSON，每条evidence含field、sourceId、quote。"});
         }
         if(!parsed)throw new Error("资料整理未返回有效结构，正文候选已保留");
         const preparedIds=new Set<string>();let skipped=0;
@@ -490,8 +496,11 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
             permitted(item.kind);
             const prepared=prepareMaterial(item,sources,existing);
             if(!Object.keys(prepared.fields).length)continue;
-            const change=propose(run,prepared.kind,prepared.targetId,prepared.fields,"依据正文整理，仅补充有依据的资料",prepared.title);
-            change.evidence=prepared.evidence;
+            const pending=run.changes.find(c=>c.kind===prepared.kind&&c.targetId===prepared.targetId&&c.state==="pending"&&(prepared.targetId||c.title===prepared.title));
+            if(pending&&!preparedIds.has(pending.id))continue;
+            const explicitlyReferenced=request.mentions?.some(mention=>mention.type===prepared.kind&&mention.id===prepared.targetId)??false;
+            const change=propose(run,prepared.kind,prepared.targetId,prepared.fields,"依据正文整理，仅补充有依据的资料",prepared.title,{chapterIndex,explicitlyReferenced});
+            change.evidence=[...(change.evidence??[]),...prepared.evidence];
             const row=existing.find(x=>x.kind===prepared.kind&&(prepared.targetId?x.id===prepared.targetId:String(x.fields.name||x.fields.title)===prepared.title));
             if(row)row.fields={...row.fields,...prepared.fields};else existing.push({kind:prepared.kind,id:null,fields:prepared.fields});
             preparedIds.add(change.id);

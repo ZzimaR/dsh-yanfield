@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import type { Editor } from "@tiptap/react";
+import { closeHistory } from "@tiptap/pm/history";
 import { ChevronDown, ChevronUp, Replace, Search, X } from "lucide-react";
 import { Button, IconButton, Tooltip } from "@/components/ui/kit";
 import { cn } from "@/lib/ui/cn";
@@ -14,6 +15,7 @@ import {
   type FindMatch,
 } from "@/lib/editor/find";
 import { useT } from "@/lib/i18n";
+import { findHighlightKey, revealProsePosition } from "@/lib/editor/find-highlight";
 
 interface FindReplaceBarProps {
   editor: Editor | null;
@@ -33,7 +35,7 @@ const INPUT_CLASS =
  * 查找 / 替换浮条（Ctrl/⌘+F 打开，Esc 关闭）。
  *
  * 只做「单段内纯文本」匹配（见 lib/editor/find.ts）：跨段查询会被忽略而不是报错。
- * 命中点的选中用 setTextSelection（不抢焦点），替换用 insertContentAt / 单事务批量替换，
+ * 命中通过编辑器装饰高亮，查找不会改变光标或正文选区。
  * 「全部替换」按文档位置从后往前，避免前面替换导致后面位置偏移。
  * 替换后查找条保持打开，方便继续替换下一处。
  */
@@ -43,11 +45,14 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
   const [replacement, setReplacement] = React.useState("");
   const [matches, setMatches] = React.useState<FindMatch[]>([]);
   const [activeIndex, setActiveIndex] = React.useState(0);
+  const [scrollRequest, requestScroll] = React.useReducer((value: number) => value + 1, 0);
+  const handledScroll = React.useRef(0);
 
   const findInputRef = React.useRef<HTMLInputElement | null>(null);
   const replaceInputRef = React.useRef<HTMLInputElement | null>(null);
   /** 记住最后聚焦的是查找还是替换框，替换后把焦点还回去 */
   const lastFocusRef = React.useRef<"find" | "replace">("find");
+  const replacedRef = React.useRef(false);
 
   const recompute = React.useCallback(() => {
     if (!editor) {
@@ -83,23 +88,41 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
   // 正文被外部修改（自动保存、AI 应用、撤销…）时刷新命中数，保持序号合法
   React.useEffect(() => {
     if (!open || !editor) return;
-    const onUpdate = () => {
+    const onTransaction = ({ transaction }: { transaction: { docChanged: boolean } }) => {
+      if (!transaction.docChanged) return;
       const next = findMatches(collectTextSegments(editor.state.doc), query);
       setMatches(next);
       setActiveIndex((prev) => clampMatchIndex(prev, next.length));
     };
-    editor.on("update", onUpdate);
+    editor.on("transaction", onTransaction);
     return () => {
-      editor.off("update", onUpdate);
+      editor.off("transaction", onTransaction);
     };
   }, [open, editor, query]);
 
-  // 把当前命中选中并滚进视野（不 focus 编辑器，焦点留在查找框里继续输入）
   React.useEffect(() => {
-    if (!open || !editor || matches.length === 0) return;
-    const match = matches[clampMatchIndex(activeIndex, matches.length)];
-    editor.chain().setTextSelection({ from: match.from, to: match.to }).scrollIntoView().run();
+    if (!open || !editor || editor.isDestroyed) return;
+    editor.view.dispatch(editor.state.tr.setMeta(findHighlightKey, {
+      matches,
+      activeIndex: clampMatchIndex(activeIndex, matches.length),
+    }));
   }, [open, editor, matches, activeIndex]);
+
+  React.useEffect(() => {
+    if (!open || !editor || scrollRequest === handledScroll.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      handledScroll.current = scrollRequest;
+      if (!editor.isDestroyed) editor.view.dom.querySelector(".yf-find-active")?.scrollIntoView({ block: "center" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, editor, scrollRequest]);
+
+  React.useEffect(() => {
+    if (!open || !editor) return;
+    return () => {
+      if (!editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(findHighlightKey, { matches: [], activeIndex: 0 }));
+    };
+  }, [open, editor]);
 
   const close = () => {
     onClose();
@@ -109,6 +132,7 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
   const move = (step: 1 | -1) => {
     if (matches.length === 0) return;
     setActiveIndex((prev) => stepMatchIndex(prev, matches.length, step));
+    requestScroll();
   };
 
   const refocusLastInput = () => {
@@ -117,37 +141,39 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
   };
 
   const replaceCurrent = () => {
-    if (!editor || matches.length === 0) return;
+    if (!editor?.isEditable || matches.length === 0) return;
     const index = clampMatchIndex(activeIndex, matches.length);
     const match = matches[index];
-    const chain = editor.chain();
-    if (replacement.length > 0) {
-      chain.insertContentAt({ from: match.from, to: match.to }, { type: "text", text: replacement });
-    } else {
-      chain.deleteRange({ from: match.from, to: match.to });
-    }
-    chain.run();
-    const next = findMatches(collectTextSegments(editor.state.doc), query);
-    setMatches(next);
-    setActiveIndex(clampMatchIndex(index, next.length));
+    editor.view.dispatch(closeHistory(editor.state.tr.insertText(replacement, match.from, match.to)));
+    revealProsePosition(editor.view, match.from);
+    replacedRef.current = true;
     refocusLastInput();
   };
 
   const replaceAll = () => {
-    if (!editor || matches.length === 0) return;
+    if (!editor?.isEditable || matches.length === 0) return;
     const transaction = editor.state.tr;
     for (const match of sortMatchesForReplacement(matches)) {
-      if (replacement.length > 0) transaction.replaceWith(match.from, match.to, editor.schema.text(replacement));
-      else transaction.delete(match.from, match.to);
+      transaction.insertText(replacement, match.from, match.to);
     }
-    editor.view.dispatch(transaction);
-    setMatches(findMatches(collectTextSegments(editor.state.doc), query));
+    editor.view.dispatch(closeHistory(transaction));
     setActiveIndex(0);
+    replacedRef.current = true;
     refocusLastInput();
+  };
+
+  const undoReplacement = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!editor?.isEditable || !replacedRef.current || !(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== "z") return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.shiftKey) editor.commands.redo();
+    else editor.commands.undo();
+    return true;
   };
 
   const onFindKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.nativeEvent.isComposing) return;
+    if (undoReplacement(event)) return;
     if (event.key === "Enter") {
       event.preventDefault();
       move(event.shiftKey ? -1 : 1);
@@ -162,6 +188,7 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
 
   const onReplaceKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.nativeEvent.isComposing) return;
+    if (undoReplacement(event)) return;
     if (event.key === "Enter") {
       event.preventDefault();
       replaceCurrent();
@@ -184,7 +211,7 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
       role="dialog"
       aria-label={tr("查找与替换")}
       className={cn(
-        "absolute right-3 top-3 z-30 flex w-[360px] max-w-[calc(100%_-_1.5rem)] flex-col gap-1.5 rounded-lg border border-line bg-surface/95 p-2 shadow-float backdrop-blur",
+        "ml-auto mr-3 mt-2 flex w-[360px] max-w-[calc(100%_-_1.5rem)] shrink-0 flex-col gap-1.5 rounded-lg border border-line bg-surface p-2",
         className,
       )}
     >
@@ -193,7 +220,10 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
         <input
           ref={findInputRef}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            replacedRef.current = false;
+            setQuery(event.target.value);
+          }}
           onKeyDown={onFindKeyDown}
           onFocus={() => {
             lastFocusRef.current = "find";
@@ -241,7 +271,10 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
         <input
           ref={replaceInputRef}
           value={replacement}
-          onChange={(event) => setReplacement(event.target.value)}
+          onChange={(event) => {
+            replacedRef.current = false;
+            setReplacement(event.target.value);
+          }}
           onKeyDown={onReplaceKeyDown}
           onFocus={() => {
             lastFocusRef.current = "replace";
@@ -255,7 +288,7 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
         <Button
           variant="ghost"
           size="sm"
-          disabled={matches.length === 0}
+          disabled={!editor.isEditable || matches.length === 0}
           onClick={replaceCurrent}
           title={tr("替换当前命中 (Enter)")}
           className="h-7 shrink-0 px-2 text-[12px]"
@@ -265,7 +298,7 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
         <Button
           variant="ghost"
           size="sm"
-          disabled={matches.length === 0}
+          disabled={!editor.isEditable || matches.length === 0}
           onClick={replaceAll}
           title={tr("替换全部命中")}
           className="h-7 shrink-0 px-2 text-[12px]"
