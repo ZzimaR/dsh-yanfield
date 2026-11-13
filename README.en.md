@@ -127,6 +127,7 @@ More: [model services](docs/screenshots/en-settings.png) · [Chinese screenshots
 - Manuscripts live in `$DSH_HOME/yanfield/yanfield.db` (plus `-wal` / `-shm`). `Settings → Data` shows the real path and can open the folder.
 - Set `YANFIELD_DB_PATH` to select a database file. If the profile's `cordis.patch.yml` sets the plugin's `dataDir`, its `yanfield.db` takes precedence.
 - Backup: quit Harness first, then copy the whole directory (copying SQLite while it runs can give an inconsistent snapshot).
+- Before upgrading the database schema, Yanfield creates a full snapshot in the same folder. If the backup fails, the upgrade stops. After a successful upgrade, Yanfield keeps the three most recent automatic upgrade backups.
 - Removing the plugin does not delete your manuscript; the database stays where it is.
 
 ## Troubleshooting
@@ -183,7 +184,7 @@ npm test    # build dist/, check the manifest and run smoke tests
 ```bash
 client/     plugin half: Shadow DOM mount, slot registration, style entry
 src/host.ts host half: REST/SSE routes under /yanfield, model and account bridge
-vendor/yanfield/  the desk itself (React components, domain logic, SQLite access)
+src/yanfield/  the desk itself (React components, domain logic, SQLite access)
 scripts/    build, check, smoke, reinstall
 docs/       features, AI and cost, architecture, development, FAQ
 ```

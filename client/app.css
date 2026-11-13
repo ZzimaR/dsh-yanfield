@@ -1,7 +1,7 @@
 @import "tailwindcss";
-@source "../vendor/yanfield";
+@source "../src/yanfield";
 @source ".";
-@import "../vendor/yanfield/app/globals.css";
+@import "../src/yanfield/app/globals.css";
 
 :host {
   display: flex;
@@ -22,7 +22,7 @@
   color: var(--ink);
 }
 
-/* 注意：不要在这里再套一层 .yf-app —— vendor 的 globals.css 用 `.yf-app` 作为浅色
+/* 注意：不要在这里再套一层 .yf-app —— 写作台的 globals.css 用 `.yf-app` 作为浅色
    token 的作用域，嵌套的 .yf-app 会把暗色变量重新写成浅色，导致宿主深色下插件仍是浅色。 */
 .yf-content {
   flex: 1;

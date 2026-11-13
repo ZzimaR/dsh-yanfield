@@ -23,7 +23,7 @@ Everything the Yanfield plugin can do, by area. The interface follows the Harnes
 
 Three columns:
 
-- **Left rail**: outline (volume / chapter tree), chapter blueprints, notes (characters / world / foreshadowing), archives. All four tabs edit in place in a floating panel, without leaving the prose.
+- **Left rail**: outline (volume / chapter tree), chapter blueprints, notes (characters / places / world / foreshadowing), archives. On narrow panels, the left rail opens as a drawer. Archive details open above it in a floating window you can move, resize, or minimize.
 - **Middle**: prose editor (Tiptap). Toolbar has undo/redo, heading levels, bold / italic / underline / strike, quote, lists, divider, a formatting toolbar and an AI menu.
 - **Right**: AI assistant panel (section 6).
 
@@ -37,8 +37,9 @@ Writing features:
 
 ## 4. Notes
 
-- **Outline**: book outline, volume outlines, chapter blueprints (goal, conflict, emotional arc, scene beats, plot points, hooks, target words).
+- **Outline**: book outline, volume outlines, chapter blueprints (goal, conflict, emotional arc, scene beats, plot points, hooks, target words, suspense level, and twist level).
 - **Characters**: name, aliases, role, age, personality, goals, relationships, appearance, secrets, appearance chapter, AI visibility.
+- **Place cards**: name, aliases, type, parent place, sensory details, and layout. Browse by hierarchy and set AI visibility and reveal chapters.
 - **World settings**: name, category, importance, description, related characters, reveal chapter, AI visibility.
 - **Foreshadowing**: content, planted chapter, payoff chapter, status, importance.
 - **Story archive**: chapter summary, character states, setting changes, ledger, timeline, unresolved conflicts; marked stale after prose edits, manual corrections are kept on re-extraction.
@@ -63,7 +64,7 @@ Capabilities:
 
 - Continue, expand, polish, remove AI flavour, diagnose a chapter, draft blueprints, create character / world cards, extract story archives.
 - Edit prose (paragraph-by-paragraph review), edit notes (field-level comparison), create notes, tidy blueprints, record foreshadowing.
-- `@` reference chapters, characters, settings, foreshadowing, archives; context budget (unlimited by default; 96k / 128k / 256k / 512k presets) with per-section preview.
+- `@` reference chapters, characters, places, settings, foreshadowing, archives; context budget (unlimited by default; 96k / 128k / 256k / 512k presets) with per-section preview.
 - Prompt presets: 20 built in; create, edit, disable, restore defaults.
 - Persona: name, role, description, greeting, extra requirements, restorable.
 

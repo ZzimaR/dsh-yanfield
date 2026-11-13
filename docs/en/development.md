@@ -28,12 +28,12 @@ Build dependencies only (esbuild, Tailwind CLI, React types). Published packages
 
 `scripts/build.mjs` does four things:
 
-1. **Routes**: scan `vendor/yanfield/app/api/**/route.ts` and emit `src/generated/routes.js` (`{ path: { GET, POST, … } }`). Generated, git-ignored.
-2. **Styles**: `client/app.css` imports Tailwind, `@source`s `vendor/yanfield`, then imports the vendored `globals.css`; `@tailwindcss/cli --minify` writes `client/styles.generated.css` and the module CSS is appended.
+1. **Routes**: scan `src/yanfield/app/api/**/route.ts` and emit `src/generated/routes.js` (`{ path: { GET, POST, … } }`). Generated, git-ignored.
+2. **Styles**: `client/app.css` imports Tailwind, `@source`s `src/yanfield`, then imports the the writing desk's `globals.css`; `@tailwindcss/cli --minify` writes `client/styles.generated.css` and the module CSS is appended.
 3. **Browser bundle**: esbuild `client/index.tsx` → `dist/client.js` (CJS, `platform=browser`, React external, `.css` as text loader, banner `window.__ModuleLoader__.load(...)`). The build stamp is injected via `define.__YANFIELD_BUILD__` and shown in Settings → About.
 4. **Host bundle**: esbuild `src/host.ts` → `dist/host.js` (ESM, node22).
 
-The alias `@/` → `vendor/yanfield/` keeps vendored imports untouched.
+The alias `@/` points to `src/yanfield/`. The build resolves `@/package.json` to the root manifest.
 
 ## 4. Two traps
 
@@ -118,7 +118,7 @@ Builds generate `dist/` and ship it in the archive. Developers link the checkout
 client/            plugin half: shadow DOM mount, slot registration, styles
 src/host.ts        host half: /yanfield routes, model and account bridge
 scripts/           build / check / smoke / reinstall
-vendor/yanfield/
+src/yanfield/
   app/             pages and API routes (Next-style, reused inside the plugin)
   components/      UI: editor / ai / library / settings / ui(kit)
   lib/             domain types, SQLite, repo, AI provider / agent / diff

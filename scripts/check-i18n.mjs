@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const dictDir = path.join(root, "vendor/yanfield/lib/i18n/en");
+const dictDir = path.join(root, "src/yanfield/lib/i18n/en");
 const keys = new Map(); // key -> file
 const duplicates = [];
 for (const f of fs.readdirSync(dictDir)) {
@@ -19,7 +19,7 @@ for (const f of fs.readdirSync(dictDir)) {
   }
 }
 
-const roots = ["vendor/yanfield/components", "vendor/yanfield/app", "client", "vendor/yanfield/lib"];
+const roots = ["src/yanfield/components", "src/yanfield/app", "client", "src/yanfield/lib"];
 const files = [];
 function walk(d) {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {

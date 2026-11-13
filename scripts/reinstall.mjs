@@ -33,7 +33,7 @@ if (!existsSync(profileDir)) {
 run("build.mjs");
 run("check.mjs");
 
-const files = ["package.json", "README.md", "LICENSE", "icon.svg", "cordis.patch.yml", "client", "dist", "src", "vendor"];
+const files = ["package.json", "README.md", "LICENSE", "icon.svg", "cordis.patch.yml", "client", "dist", "src"];
 rmSync(dest, { recursive: true, force: true });
 mkdirSync(dest, { recursive: true });
 for (const entry of files) {

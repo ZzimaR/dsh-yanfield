@@ -9,7 +9,7 @@ dsh-yanfield
 ├── dist/host.js     宿主半区（Node / ESM）：注册 /yanfield 下的 HTTP 路由，桥接 Harness 的模型与账号服务
 ├── dist/client.js   浏览器半区（CJS bundle）：注册左侧导航、主面板、右侧标签，接管面板渲染
 ├── cordis.patch.yml 让 Harness 把插件以 id=yanfield 插入组合配置
-└── vendor/yanfield/ 写作台本体源码（React + 领域逻辑 + SQLite 访问）
+└── src/yanfield/ 写作台本体源码（React + 领域逻辑 + SQLite 访问）
 ```
 
 宿主侧入口 `src/host.ts` 导出 `{ name, apply }`：
@@ -42,12 +42,12 @@ Shadow DOM 还会让 `event.target` 在 document 级监听里被重定向到宿�
 
 ## 三、路由与构建
 
-`vendor/yanfield/app/api/**/route.ts` 是 Next.js 风格的路由文件（导出 `GET` / `POST` / `PATCH` / `DELETE`）。构建脚本 `scripts/build.mjs` 会：
+`src/yanfield/app/api/**/route.ts` 是 Next.js 风格的路由文件（导出 `GET` / `POST` / `PATCH` / `DELETE`）。构建脚本 `scripts/build.mjs` 会：
 
-1. 扫描这些文件，生成 `src/generated/routes.js`（一张 `路径 → handler` 表，当前 48 条）；
-2. 用 `@tailwindcss/cli` 把 `client/app.css`（Tailwind + vendor 的 globals.css）编译成 `client/styles.generated.css`，并追加少量 module CSS；
+1. 扫描这些文件，生成 `src/generated/routes.js`（一张 `路径 → handler` 表）；
+2. 用 `@tailwindcss/cli` 把 `client/app.css`（Tailwind + 写作台的 globals.css）编译成 `client/styles.generated.css`，并追加少量 module CSS；
 3. 用 esbuild 打两个包：`dist/client.js`（CJS、browser、CSS 以文本内联、注入 `__YANFIELD_BUILD__` 构建时间）与 `dist/host.js`（ESM、node22）；
-4. 别名 `@/` 指向 `vendor/yanfield/`，所以 vendor 里的代码可以原样使用。
+4. 别名 `@/` 指向 `src/yanfield/`，供写作台和插件入口导入业务模块。
 
 宿主半区把 `/yanfield/api/*` 映射到生成的表，并统一处理鉴权（沿用 Harness 的会话）、错误包装与 SSE 输出。
 

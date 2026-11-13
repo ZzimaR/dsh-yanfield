@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url"
 import { spawn } from "node:child_process"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-const vendor = path.join(root, "vendor", "yanfield")
-const apiRoot = path.join(vendor, "app", "api")
+const deskRoot = path.join(root, "src", "yanfield")
+const apiRoot = path.join(deskRoot, "app", "api")
 
 function cssModulePlugin() {
   return {
@@ -36,7 +36,7 @@ function atAliasPlugin() {
     setup(build) {
       build.onResolve({ filter: /^@\// }, (args) => {
         if (args.path === "@/package.json") return { path: path.join(root, "package.json") }
-        const base = path.join(vendor, args.path.slice(2))
+        const base = path.join(deskRoot, args.path.slice(2))
         const candidates = [
           base,
           ...[".tsx", ".ts", ".jsx", ".js", ".mjs", ".css"].map((ext) => base + ext),
@@ -96,7 +96,7 @@ const buildStamp = new Date().toISOString().replace(/\.\d{3}Z$/, "Z")
 
 await generateRoutes()
 await run("npx", ["@tailwindcss/cli", "-i", "client/app.css", "-o", "client/styles.generated.css", "--minify"])
-const statusBarCss = await readFile(path.join(vendor, "components", "editor", "EditorStatusBar.module.css"), "utf8")
+const statusBarCss = await readFile(path.join(deskRoot, "components", "editor", "EditorStatusBar.module.css"), "utf8")
 await writeFile(path.join(root, "client", "styles.generated.css"), `\n${statusBarCss}`, { flag: "a" })
 
 await build({

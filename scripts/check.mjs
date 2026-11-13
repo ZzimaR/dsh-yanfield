@@ -59,7 +59,7 @@ for (const file of ["locale/zh.json", "locale/en.json"]) {
     fail(`缺少或无法解析 ${file}`)
   }
 }
-const enDir = path.join(root, "vendor/yanfield/lib/i18n/en")
+const enDir = path.join(root, "src/yanfield/lib/i18n/en")
 try {
   const modules = (await readdir(enDir)).filter((file) => file.endsWith(".ts"))
   if (modules.length < 10) fail("en/ 字典模块不完整")
@@ -72,7 +72,7 @@ try {
     }
   }
 } catch {
-  fail("缺少 vendor/yanfield/lib/i18n/en/")
+  fail("缺少 src/yanfield/lib/i18n/en/")
 }
 
 const client = await readFile(path.join(root, "dist", "client.js"), "utf8")
