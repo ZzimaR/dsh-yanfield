@@ -16,14 +16,14 @@ See "Models and balance" below.
 
 ## Models and balance
 
-**`no API key for provider route "deepseek-official"`.**
-The active route is the official API key one but no key is available. Switch to "DeepSeek account" in `Yanfield → Settings → Model services`, or store `DEEPSEEK_API_KEY` on Harness' model page. The account route is preferred by default; the key route is only used when you switch to it.
+**"No DeepSeek API key yet" / the official route shows "Not ready".**
+The official API key route is selected but no key is configured. Add one under Model services in DSH, or set `DEEPSEEK_API_KEY`, then switch back to the official route. The account route is preferred by default; the key route is only used when you switch to it.
 
 **`deepseek-v4-pro` is missing from the picker.**
 Opening `Settings → Model services` triggers a catalog sync. If it is still missing, the DeepSeek adapter in your Harness only advertises one model; add the model ID manually.
 
 **Balance shows a dash or "not signed in".**
-Balance comes from the DeepSeek account signed in to Harness. Sign in there first, then press "Query balance".
+Balance comes from the DeepSeek account signed in to Harness. Sign in there first, then press **Balance**.
 
 **Balance differs from the DeepSeek website.**
 The official site is authoritative; the plugin reads whatever the account service returns (credit notes and vouchers can differ).
@@ -31,7 +31,7 @@ The official site is authoritative; the plugin reads whatever the account servic
 ## Cost
 
 **Cost always says unknown.**
-Either the request returned no usage (interrupted, failed), or the model is not in the built-in price table and no unit price is configured. Fill the three prices in `Settings → AI and context → Usage and cost`.
+Either the request returned no usage (interrupted, failed), or the model is not in the built-in price table and no unit price is configured. Fill the three prices in `Settings → AI & context → Usage and cost`.
 
 **The numbers look huge.**
 The footer is **today's cumulative** tokens and cost, not one task. Open it for per-message details; a single task is usually a few cents.

@@ -91,14 +91,24 @@ chrome --headless=new --no-sandbox --disable-gpu --disable-crash-reporter \
 
 ## 七、发布检查清单
 
-日常 push 和 PR 只运行 CI。准备交付一批修复时，先提交代码并通过 `npm test`，然后从干净的 `main` 执行：
+日常 push 和 PR 只运行 CI。版本号在 PR 里改好（不要在合并后的 `main` 上补）：
 
 ```bash
-npm version patch
-git push origin main --follow-tags
+npm version patch --no-git-tag-version   # 只改 package.json 与 lockfile，不打 tag
 ```
 
-`npm version patch` 会更新根清单和锁文件并创建版本提交和标签。按需要将 `patch` 换为 `minor` 或 `major`。推送 `v*` 标签后，[发布工作流](../.github/workflows/release.yml) 核对标签与包版本，只构建、测试并打包一次。同一个 `dsh-yanfield.tgz` 随 GitHub Release 交付，也通过 npm Trusted Publishing 发布。稳定版发布到 npm 的 `latest`，预发布版发布到 `next`。
+PR 合并后再给合并提交打 tag：
+
+```bash
+git checkout main
+git pull origin main
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+**只有推 tag 才会触发发布**；PR 合并本身不会发包。
+
+推送 `v*` 标签后，[发布工作流](../.github/workflows/release.yml) 会核对标签与包版本，只构建、测试并打包一次。同一个 `dsh-yanfield.tgz` 随 GitHub Release 交付，也通过 npm Trusted Publishing 发布。稳定版发布到 npm 的 `latest`，预发布版发布到 `next`。版本号按需用 `patch` / `minor` / `major`。
 
 npm 的 Trusted Publisher 绑定 `ZzimaR/dsh-yanfield` 的 `release.yml`，并允许 `npm publish`。工作流使用 OIDC，无需仓库 Token。可在隔离 profile 安装产物验证新建作品、模型连接和 AI 审阅。
 

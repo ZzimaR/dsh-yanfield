@@ -91,14 +91,22 @@ For interaction (clicks, waiting on streaming output) drive CDP directly: connec
 
 ## 7. Release checklist
 
-Branch pushes and PRs run CI. Once the changes are committed and `npm test` passes, run from a clean `main`:
+Branch pushes and PRs run CI. Bump the version in the PR itself (never on `main` after the fact):
 
 ```bash
-npm version patch
-git push origin main --follow-tags
+npm version patch --no-git-tag-version   # updates package.json and the lockfile only
 ```
 
-`npm version patch` updates the root manifest and lockfile, then creates the version commit and tag. Use `minor` or `major` as appropriate. The [release workflow](../../.github/workflows/release.yml) checks that the tag matches the package version, then builds, tests, and packs once. GitHub Releases and npm receive the same `dsh-yanfield.tgz`. Stable npm versions use `latest`, and prereleases use `next`.
+Merge the PR first, then tag the merged commit:
+
+```bash
+git checkout main
+git pull origin main
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+Pushing the tag is what triggers the [release workflow](../../.github/workflows/release.yml): it checks that the tag matches the package version, then builds, tests, and packs once. **A PR merge alone does not publish.** GitHub Releases and npm receive the same `dsh-yanfield.tgz`. Stable npm versions use `latest`, and prereleases use `next`.
 
 The npm Trusted Publisher binds `release.yml` in `ZzimaR/dsh-yanfield` and permits `npm publish`. The workflow authenticates with OIDC. Test the package in an isolated profile by creating a novel, connecting a model, and reviewing an AI edit.
 

@@ -5,9 +5,9 @@ Everything the Yanfield plugin can do, by area. The interface follows the Harnes
 ## 1. Shelf
 
 - Novel cards: cover color (eight presets), status (draft / serializing / finished), genre, volume and chapter counts, word count, last updated.
-- New novel: title, genre, one-line pitch, cover color, synopsis, optional first volume.
+- New book: title, genre, one-line pitch, cover color, synopsis, optional first volume.
 - Search (title / synopsis), filter by genre, sort by recent update or word count.
-- "Sample novel" creates a demo manuscript for trying the UI.
+- "Sample book" creates a demo manuscript for trying the UI.
 - Card menu: rename, change status, copy synopsis, delete (with confirmation).
 
 ## 2. Novel overview
@@ -80,7 +80,7 @@ Review flow:
 - **Model services**: add / edit / enable / delete services, switch model route (DSH account / official API key), query balance, default model, sync model list.
 - **Prompt presets**: built-in and custom presets.
 - **Persona**: assistant identity and limits.
-- **AI and context**: context section toggles, context budget, max output, usage and cost (three unit prices, one-click official prices, daily and total stats), custom instructions.
+- **AI & context**: context section toggles, context budget, max output, usage and cost (three unit prices, one-click official prices, daily and total stats), custom instructions.
 - **Editor**: font, size, line height, letter spacing, paragraph spacing, margins, max line width, live preview.
 - **Appearance**: theme (rice paper / night sail / follow system), autosave, typewriter mode, focus mode, autosave delay, daily word target.
 - **Data**: database path, open folder, copy path, export everything, import TXT, danger zone (regenerate sample novel).

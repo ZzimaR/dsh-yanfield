@@ -19,7 +19,7 @@ Your book stays local, the model is the DeepSeek you already configured, and eve
 </div>
 
 > [!NOTE]
-> Yanfield is still being polished; UI and behavior will keep changing. Bugs and ideas are welcome in [Issues](https://github.com/ZzimaR/dsh-yanfield/issues) — the Bug report / Feature request forms (with environment and steps) get fixed faster. Pull requests are welcome too.
+> Yanfield is still being polished; UI and behavior will keep changing. Bugs and ideas are welcome in [Issues](https://github.com/ZzimaR/dsh-yanfield/issues/new/choose) — the Bug report / Feature request forms (with environment and steps) get fixed faster. Pull requests are welcome too.
 
 [![Yanfield inside DeepSeek Harness: chapters on the left, prose in the middle, AI assistant on the right](docs/screenshots/en-editor.png)](docs/screenshots/en-editor.png)
 
@@ -62,7 +62,7 @@ To update, run `dsh plugin --profile <profile> add dsh-yanfield@latest` in the s
 
 ## First run
 
-1. Open **Yanfield** from the sidebar and click **New novel** on the shelf (title, genre, cover color, one-line pitch).
+1. Open **Yanfield** from the sidebar and click **New book** on the shelf (title, genre, cover color, one-line pitch).
 2. Open the novel and click **Write** to enter the three-column desk.
 3. Type into the AI box on the right, e.g. "make the first paragraph more vivid, only the first paragraph", "draft a blueprint for the next chapter", "create a character card for Zhou Wan".
 4. Prose edits open in a review view: keep or revert each paragraph, then press **Confirm review** — only kept paragraphs are written. Note changes are confirmed item by item in the task card.
@@ -146,13 +146,13 @@ The active route is the official API key route but no key is stored. Switch the 
 <details>
 <summary>Balance shows a dash or says not signed in</summary>
 
-Balance comes from the DeepSeek account signed in to Harness. Sign in there first, then press "Query balance" again.
+Balance comes from the DeepSeek account signed in to Harness. Sign in there first, then press **Balance** again.
 </details>
 
 <details>
 <summary>Cost always says unknown</summary>
 
-That request returned no usage (for example it was interrupted), or the model is not in the built-in price table and no unit price is configured in `Settings → AI and context`. Fill in the three prices to get an estimate.
+That request returned no usage (for example it was interrupted), or the model is not in the built-in price table and no unit price is configured in `Settings → AI & context`. Fill in the three prices to get an estimate.
 </details>
 
 <details>

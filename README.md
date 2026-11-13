@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> 砚田还在打磨中，界面与行为会继续调整。遇到问题、有想法，欢迎在 [Issues](https://github.com/ZzimaR/dsh-yanfield/issues) 里说——用「Bug 报告 / 功能建议」模板带上环境与复现步骤会快很多；也欢迎直接提 PR。
+> 砚田还在打磨中，界面与行为会继续调整。遇到问题、有想法，欢迎在 [Issues](https://github.com/ZzimaR/dsh-yanfield/issues/new/choose) 里说——用「Bug 报告 / 功能建议」模板带上环境与复现步骤会快很多；也欢迎直接提 PR。
 
 [![砚田在 DeepSeek Harness 中的操作演示：从宿主侧栏进入书架，切换章纲与档案，预览 AI 上下文并审阅正文改动](docs/screenshots/yanfield-in-dsh.gif)](docs/screenshots/yanfield-in-dsh.gif)
 

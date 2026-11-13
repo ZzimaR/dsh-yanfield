@@ -14,7 +14,7 @@ body:
     attributes:
       label: What happened
       description: "One or two sentences: what went wrong, and what were you trying to do?"
-      placeholder: The title field in the New novel dialog has no visible border, so it is unclear that it can be typed into.
+      placeholder: The title field in the New book dialog has no visible border, so it is unclear that it can be typed into.
     validations:
       required: true
 

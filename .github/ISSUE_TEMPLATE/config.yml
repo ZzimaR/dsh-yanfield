@@ -20,6 +20,6 @@ contact_links:
   - name: "🔐 Security issue (do not file publicly)"
     url: "https://github.com/ZzimaR/dsh-yanfield/security/advisories/new"
     about: "Leaked keys, unauthorized access, script injection — report privately, not in a public issue."
-  - name: "中文文档"
+  - name: "中文文档 (Chinese docs)"
     url: "https://github.com/ZzimaR/dsh-yanfield/blob/main/README.md"
-    about: "中文使用说明、常见问题与开发文档。"
+    about: "Chinese README: usage, FAQ, and development docs."
