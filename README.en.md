@@ -23,7 +23,7 @@ Your book stays local, the model is the DeepSeek you already configured, and eve
 
 [![Yanfield inside DeepSeek Harness: chapters on the left, prose in the middle, AI assistant on the right](docs/screenshots/en-editor.png)](docs/screenshots/en-editor.png)
 
-The three-pane writing desk in DeepSeek Harness — chapter tree, prose, and the AI assistant side by side. All screenshots in this README use the English interface.
+The three-pane writing desk in DeepSeek Harness — chapter tree, prose, and the AI assistant side by side. All UI labels in these screenshots are English; the manuscripts shown are the bundled Chinese demo books (create a new book to write in English).
 
 <p align="center"><sub>Three-column writing desk · sample manuscript · click for full size</sub></p>
 
