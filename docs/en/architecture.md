@@ -9,7 +9,7 @@ dsh-yanfield
 ├── dist/host.js     host half (Node / ESM): HTTP routes under /yanfield, bridge to Harness models and account
 ├── dist/client.js   browser half (CJS bundle): sidebar entry, main panel, right-hand tabs, panel rendering
 ├── cordis.patch.yml inserts the plugin into the Harness composition with id=yanfield
-└── vendor/yanfield/ the desk itself (React + domain logic + SQLite access)
+└── src/yanfield/ the desk itself (React + domain logic + SQLite access)
 ```
 
 Host entry `src/host.ts` exports `{ name, apply }`:
@@ -42,12 +42,12 @@ Shadow DOM also retargets `event.target` for document-level listeners, so "click
 
 ## 3. Routes and build
 
-`vendor/yanfield/app/api/**/route.ts` are Next.js-style route files exporting `GET` / `POST` / `PATCH` / `DELETE`. `scripts/build.mjs`:
+`src/yanfield/app/api/**/route.ts` are Next.js-style route files exporting `GET` / `POST` / `PATCH` / `DELETE`. `scripts/build.mjs`:
 
-1. scans them and generates `src/generated/routes.js` (a `path → handlers` table, currently 48 routes);
-2. compiles `client/app.css` (Tailwind + vendored `globals.css`) with `@tailwindcss/cli` into `client/styles.generated.css` and appends a small module CSS file;
+1. scans them and generates `src/generated/routes.js` (a `path → handlers` table);
+2. compiles `client/app.css` (Tailwind + the writing desk's `globals.css`) with `@tailwindcss/cli` into `client/styles.generated.css` and appends a small module CSS file;
 3. bundles with esbuild: `dist/client.js` (CJS, browser, CSS as text, `__YANFIELD_BUILD__` build stamp) and `dist/host.js` (ESM, node22);
-4. aliases `@/` to `vendor/yanfield/`, so vendored code keeps its imports.
+4. aliases `@/` to `src/yanfield/`, for imports from the writing desk and plugin entry points.
 
 The host half maps `/yanfield/api/*` onto that table, reusing Harness' session auth, error wrapping and SSE streaming.
 

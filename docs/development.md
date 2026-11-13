@@ -28,12 +28,12 @@ npm ci
 
 `scripts/build.mjs` 依次做四件事：
 
-1. **路由表**：扫描 `vendor/yanfield/app/api/**/route.ts`，生成 `src/generated/routes.js`（`{ 路径: { GET, POST, … } }`）。这个文件是构建产物，不入库（见 `.gitignore`）。
-2. **样式**：`client/app.css` 里 `@import "tailwindcss"` + `@source` 扫描 `vendor/yanfield`，再 `@import "../vendor/yanfield/app/globals.css"`；用 `@tailwindcss/cli --minify` 输出 `client/styles.generated.css`，并追加 `EditorStatusBar.module.css`。
+1. **路由表**：扫描 `src/yanfield/app/api/**/route.ts`，生成 `src/generated/routes.js`（`{ 路径: { GET, POST, … } }`）。这个文件是构建产物，不入库（见 `.gitignore`）。
+2. **样式**：`client/app.css` 里 `@import "tailwindcss"` + `@source` 扫描 `src/yanfield`，再 `@import "../src/yanfield/app/globals.css"`；用 `@tailwindcss/cli --minify` 输出 `client/styles.generated.css`，并追加 `EditorStatusBar.module.css`。
 3. **浏览器包**：esbuild 打包 `client/index.tsx` → `dist/client.js`（CJS、`platform=browser`、React 外置、`.css` 用 text loader、banner 为 `window.__ModuleLoader__.load(...)`）。构建时间通过 `define.__YANFIELD_BUILD__` 打进包里，显示在「设置 → 关于」。
 4. **宿主包**：esbuild 打包 `src/host.ts` → `dist/host.js`（ESM、node22）。
 
-别名 `@/` 指向 `vendor/yanfield/`。`@/package.json` 在打包时指向仓库根清单，使安装包、API 与「关于」页共用一个版本号。
+别名 `@/` 指向 `src/yanfield/`。`@/package.json` 在打包时指向仓库根清单，使安装包、API 与「关于」页共用一个版本号。
 
 ## 四、两个容易踩的坑
 
@@ -120,7 +120,7 @@ npm 的 Trusted Publisher 绑定 `ZzimaR/dsh-yanfield` 的 `release.yml`，并�
 client/            插件半区：shadow DOM 挂载、插槽注册、样式入口
 src/host.ts        宿主半区：/yanfield 路由、模型与账号桥
 scripts/           build / check / smoke / reinstall
-vendor/yanfield/
+src/yanfield/
   app/             页面与 API 路由（Next 风格，插件内复用）
   components/      UI：editor / ai / library / settings / ui(kit)
   lib/             领域类型、SQLite、repo、AI provider / agent / diff

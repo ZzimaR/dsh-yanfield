@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import css from "./styles.generated.css"
-import { setThemeRoots, syncSurfaceTheme } from "@/lib/ui/theme"
+import { applyUiFont, getStoredUiFont, setThemeRoots, syncSurfaceTheme } from "@/lib/ui/theme"
 import { setYanfieldPortal } from "@/lib/ui/portal"
 import {
   installLocaleBridge,
@@ -112,6 +112,7 @@ function Desk() {
     // 用户切换 Harness 的浅色/深色时插件要立刻跟着变。
     const syncTheme = () => syncSurfaceTheme()
     syncTheme()
+    applyUiFont(getStoredUiFont(), false)
     const themeObserver = new MutationObserver(syncTheme)
     try {
       themeObserver.observe(document.body, {

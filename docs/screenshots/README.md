@@ -4,6 +4,8 @@ Screenshots in this directory are used by the READMEs and docs. The `en-*` files
 
 | File | Content |
 | --- | --- |
+| `archive-window.png` | Story archive floating window in the Chinese dark theme |
+| `en-chapter-outline.png` | Chapter outline coverage and pacing indicators in the English light theme |
 | `en-library.png` | Bookshelf in English: book cards, covers, genres, word counts |
 | `en-editor.png` | Three-column writing desk in English: contents, prose, AI panel |
 | `en-settings.png` | Settings → Model services in English |

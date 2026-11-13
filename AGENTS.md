@@ -21,23 +21,23 @@ src/
   host.ts               Host half: plugin manifest, /yanfield router, model/account bridge
   http.ts               HTTP plumbing: auth, JSON, errors, SSE
   generated/routes.js   Generated route table (git-ignored, do not edit)
-vendor/yanfield/
-  app/                  Next.js-style pages and API route files
-    api/**/route.ts     GET/POST/PATCH/DELETE handlers, discovered at build time
-    library/            Shelf page
-    novel/[novelId]/    Book overview
-    editor/[novelId]/   Three-column editor
-    settings/           Settings page
-  components/           UI by domain: ai, editor, library, outline, cards, archives,
-                        settings, layout, ui (shared kit), brand, diff, landing, home
-  lib/                  Domain logic; no JSX except a few helpers
-    ai/                 Agent loop, prompts, providers, presets, cost, errors
-    db/                 SQLite schema and repositories
-    i18n/               Runtime + English dictionaries (see §5.4)
-    client/api.ts       Browser API client (REST + SSE, ApiError)
-    types.ts            Shared domain types
-    defaults.ts         Built-in presets, demo data, provider defaults
-    seed.ts             Demo books
+  yanfield/
+    app/                  Next.js-style pages and API route files
+      api/**/route.ts     GET/POST/PATCH/DELETE handlers, discovered at build time
+      library/            Shelf page
+      novel/[novelId]/    Book overview
+      editor/[novelId]/   Three-column editor
+      settings/           Settings page
+    components/           UI by domain: ai, editor, library, outline, cards, archives,
+                          settings, layout, ui (shared kit), brand, diff, landing, home
+    lib/                  Domain logic; no JSX except a few helpers
+      ai/                 Agent loop, prompts, providers, presets, cost, errors
+      db/                 SQLite schema and repositories
+      i18n/               Runtime + English dictionaries (see §5.4)
+      client/api.ts       Browser API client (REST + SSE, ApiError)
+      types.ts            Shared domain types
+      defaults.ts         Built-in presets, demo data, provider defaults
+      seed.ts             Demo books
 scripts/                build.mjs, check.mjs, check-i18n.mjs, smoke.mjs, reinstall.mjs
 locale/{en,zh}.json     Plugin-market metadata (title/description)
 docs/                   Chinese docs; docs/en/ English docs; docs/screenshots/
@@ -45,13 +45,13 @@ dist/                   Build output (git-ignored, never edit by hand)
 cordis.patch.yml        DSH composition patch (plugin id: yanfield)
 ```
 
-Path alias: `@/` means `vendor/yanfield/`. Keep vendored imports unchanged.
+Path alias: `@/` means `src/yanfield/`. Use this alias for imports from the writing desk.
 
 ## 3. How it runs
 
 - **Browser half** (`client/index.tsx`): attaches an open Shadow DOM to the host element, injects compiled CSS, mounts React, and registers the `main`, `sidebar.panellist`, and right-pane tab slots. Menus, dialogs, and toasts render into a portal inside the shadow root. Clicks outside overlays use `composedPath()` because Shadow DOM retargets `event.target`.
 - **Host half** (`src/host.ts`): exports `{ name, apply }`; mounts `/yanfield/*` on the DSH `webServer`, reuses Harness session auth, and bridges models/account lazily via `ctx.inject(["llm"], …)`.
-- **Routes**: `vendor/yanfield/app/api/**/route.ts` are scanned by `scripts/build.mjs` into `src/generated/routes.js` (about 48 routes). `src/http.ts` dispatches to them.
+- **Routes**: `src/yanfield/app/api/**/route.ts` are scanned by `scripts/build.mjs` into `src/generated/routes.js`. `src/http.ts` dispatches to them.
 - **Database**: SQLite, default `$DSH_HOME/yanfield/yanfield.db` (override with `YANFIELD_DB_PATH` or the plugin `dataDir` config). The database is the source of truth; the UI does not keep a separate draft copy.
 - **AI flow**: SSE endpoint → `runAgent` decision loop (max 12 rounds) → read notes / propose changes → candidates streamed to the UI → the author keeps or reverts each prose block or note change. Accepted changes are written by explicit API calls.
 
@@ -69,7 +69,7 @@ npm test           # build + check + smoke (use this before handing work back)
 
 - `npm run build` writes `src/generated/routes.js`, `client/styles.generated.css`, and `dist/`. These are generated; never edit or commit them.
 - The DSH dev server caches the loaded client bundle. After `npm run build`, restart the dev instance and disable the browser cache before judging UI changes.
-- `npm run check-i18n.mjs` is part of `npm run check`. It fails on missing English entries and duplicate keys in one dictionary file.
+- `node scripts/check-i18n.mjs` is part of `npm run check`. It fails on missing English entries and duplicate keys in one dictionary file.
 - When patching files with Python, always write `newline="\n"`. Python text mode otherwise flips files to CRLF and creates huge diffs.
 - Keep pure helpers free of `node:sqlite`/server imports, or the browser bundle fails with `Could not resolve "node:sqlite"`.
 
@@ -79,7 +79,7 @@ npm test           # build + check + smoke (use this before handing work back)
 
 - Match the surrounding style: TypeScript, two-space indentation, double quotes, no semicolons, `function` declarations for components where the file does so.
 - Client components start with `"use client"`. Server-only code must not leak into the browser bundle.
-- Use the shared primitives in `vendor/yanfield/components/ui/kit.tsx` (Button, IconButton, Dialog, Sheet, Select, Toast, ConfirmDialog, Spinner, Tooltip) instead of ad-hoc overlays.
+- Use the shared primitives in `src/yanfield/components/ui/kit.tsx` (Button, IconButton, Dialog, Sheet, Select, Toast, ConfirmDialog, Spinner, Tooltip) instead of ad-hoc overlays.
 - Keep components accessible: every icon-only control needs an `aria-label`, every dialog a title, every destructive action a confirmation.
 - Do not rename domain fields or database columns casually; they cross the host/client boundary and existing databases.
 
@@ -92,7 +92,7 @@ npm test           # build + check + smoke (use this before handing work back)
 
 ### 5.3 Data and HTTP
 
-- Put SQL in `vendor/yanfield/lib/db/` repositories, not in components or route files.
+- Put SQL in `src/yanfield/lib/db/` repositories, not in components or route files.
 - Route handlers return JSON and throw `ApiError` / `notFound()` / `bad()`; `src/http.ts` wraps them into `{ error }`.
 - Server error strings are Chinese source strings today. When you add one, also add an English entry in `lib/i18n/en/server.ts`; the client translates at display time (`parseResponse` → `t(message)`). Use `{name}` placeholders, not string concatenation.
 - Never expose secrets, API keys, or absolute user paths in errors, logs, or telemetry.
@@ -102,7 +102,7 @@ npm test           # build + check + smoke (use this before handing work back)
 
 Every user-visible string must exist in both languages.
 
-- **Dictionary keys are the Chinese source strings.** English values live in `vendor/yanfield/lib/i18n/en/<domain>.ts` (`common`, `library`, `editor`, `ai`, `settings`, `cards`, `outline`, `archives`, `landing`, `presets`, `server`). `en.ts` merges them; a later module overrides an earlier one, so do not duplicate a key across domains without checking `node scripts/check-i18n.mjs`.
+- **Dictionary keys are the Chinese source strings.** English values live in `src/yanfield/lib/i18n/en/<domain>.ts` (`common`, `library`, `editor`, `ai`, `settings`, `cards`, `outline`, `archives`, `landing`, `presets`, `server`). `en.ts` merges them; a later module overrides an earlier one, so do not duplicate a key across domains without checking `node scripts/check-i18n.mjs`.
 - In React: `import { useT } from "@/lib/i18n"`, then `const tr = useT()` at the top of the component and `tr("中文原文")` in JSX. Call `tr` during render.
 - Outside React (helpers, API client): `import { t } from "@/lib/i18n/core"` and call `t("中文原文")` at the call site. **Never call `t()` at module top level** — it freezes the language at import time.
 - Module-level constants (nav items, sort options, help text) keep their Chinese `label`; translate when rendering: `tr(item.label)`.

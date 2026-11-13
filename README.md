@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> 砚田还在打磨中，界面与行为会继续调整。遇到问题、有想法，欢迎在 [Issues](https://github.com/ZzimaR/dsh-yanfield/issues/new/choose) 里说——用「Bug 报告 / 功能建议」模板带上环境与复现步骤会快很多；也欢迎直接提 PR。
+> 砚田还在打磨中，界面与行为会继续调整。遇到问题、有想法，欢迎在 [Issues](https://github.com/ZzimaR/dsh-yanfield/issues/new/choose) 里说——用「Bug 报告 / 功能建议」模板带上环境与复现步骤会快很多；也欢迎直接提 PR。目前项目由我一人维护，难免有疏漏，感谢你的理解与包涵~ 也欢迎随时反馈问题。
 
 [![砚田在 DeepSeek Harness 中的操作演示：从宿主侧栏进入书架，切换章纲与档案，预览 AI 上下文并审阅正文改动](docs/screenshots/yanfield-in-dsh.gif)](docs/screenshots/yanfield-in-dsh.gif)
 
@@ -129,6 +129,7 @@ dsh plugin --profile desktop add dsh-yanfield
 - 书稿默认在 `$DSH_HOME/yanfield/yanfield.db`（含 `-wal` / `-shm` 附属文件）。`设置 → 数据` 会显示实际路径并能一键打开所在文件夹。
 - 用环境变量 `YANFIELD_DB_PATH` 可指定数据库文件。若 profile 的 `cordis.patch.yml` 配置了插件的 `dataDir`，优先使用该目录里的 `yanfield.db`。
 - 备份：先退出 Harness，再复制整个目录（运行中直接复制 SQLite 可能拿到不一致的快照）。
+- 数据库结构升级前，砚田会在同一目录创建整库快照。备份失败时会停止升级。升级成功后保留最近三份自动升级备份。
 - 卸载插件不会删除书稿；数据库仍在上面那个路径里。
 
 ## 排障
@@ -185,7 +186,7 @@ npm test    # 构建 dist/，再运行清单检查与冒烟测试
 ```bash
 client/     插件半区：Shadow DOM 挂载、插槽注册、样式入口
 src/host.ts 宿主半区：/yanfield 下的 REST/SSE 路由、模型与账号桥接
-vendor/yanfield/  写作台本体（React 组件、领域逻辑、SQLite 访问）
+src/yanfield/  写作台本体（React 组件、领域逻辑、SQLite 访问）
 scripts/    构建、自检、冒烟、重装
 docs/       功能、AI 与费用、架构、开发、常见问题
 ```
