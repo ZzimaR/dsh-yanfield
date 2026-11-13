@@ -33,7 +33,9 @@ Writing features:
 - Word / paragraph / reading-time stats; chapter status (draft, final, …).
 - Focus mode (hide side rails), typewriter mode (caret stays vertically centered).
 - Typography: serif or sans, size, weight, line height, letter spacing, paragraph spacing, margins, max line width, with a live preview.
-- Find in chapter; `Alt + 1` collapses the outline; `Alt + J` focuses the AI box.
+- Find and replace in the chapter. Typing highlights matches in place. Use Previous or Next to jump. Press `Ctrl / ⌘ + Z` to undo a replacement and return to the edited passage.
+- The formatting toolbar stays at the top while you scroll the manuscript. `Alt + 1` toggles the outline and `Alt + J` focuses the AI composer.
+- Returning to a chapter in the workbench restores its caret and scroll position. Switching chapters starts a fresh undo history.
 
 ## 4. Notes
 
@@ -75,6 +77,8 @@ Review flow:
 3. For each paragraph press **Keep** or **Revert**; **Revert all** / **Keep all** are also available.
 4. Press **Confirm review** — only kept paragraphs are written; undecided paragraphs keep the original text.
 5. After applying you can **Undo this round** or open the **change history**.
+
+When prose is selected, a revision replaces only the selected text in the current chapter. Automatically suggested note changes start unchecked, with a quotation for each suggested field. If a quotation comes from a draft, save the cited passage first or apply the prose and note together. You can request separate edits to personality, speech style, and long-term goals.
 
 ## 7. Settings
 

@@ -1,9 +1,13 @@
 import { extractJson } from "@/lib/ai/prompts";
+import { terminalReply } from "./reply";
 
 /** Normalize the observed DeepSeek tool envelope; the caller still validates every tool and argument. */
 export function parseAgentDecision(raw: string): unknown {
   const json=extractJson(raw);
-  if(json!==null && (!raw.includes("DSML") || (typeof json==="object" && "calls" in json)))return json;
+  if(json!==null && (!raw.includes("DSML") || (typeof json==="object" && "calls" in json))) {
+    const reply=terminalReply(json);
+    return reply===undefined?json:{message:reply,calls:[],done:true};
+  }
   const marker="｜{1,2}DSML｜{1,2}";
   const envelope=new RegExp(`^([\\s\\S]*?)<${marker} calls>([\\s\\S]*?)<\\/${marker} calls>\\s*$`).exec(raw);
   if(!envelope)return null;
@@ -19,7 +23,8 @@ export function parseAgentDecision(raw: string): unknown {
     cursor=(match.index??0)+match[0].length;
   }
   if(!calls.length||envelope[2].slice(cursor).trim())return null;
-  return {message:envelope[1].trim(),calls,done:false};
+  const reply=terminalReply({calls});
+  return reply===undefined?{message:envelope[1].trim(),calls,done:false}:{message:reply,calls:[],done:true};
 }
 
 /** DeepSeek 官方兼容接口支持 response_format=json_object；离线演示不参与规划。 */

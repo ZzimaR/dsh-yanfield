@@ -19,6 +19,7 @@ if (plugin.name !== "dsh-yanfield" || typeof plugin.apply !== "function") {
 }
 
 let modelWindow = 32000
+const scriptedReplies = []
 const outputLimits = []
 const ctx = {
   get(name) {
@@ -30,7 +31,13 @@ const ctx = {
   llm: {
     listProviders: () => [{ id: "deepseek-account" }, { id: "deepseek-official" }],
     listModels: async () => [{ id: "deepseek-flash", label: "烟测模型", contextWindow: modelWindow }],
-    async *stream({ maxTokens }) {
+    async *stream({ maxTokens, messages }) {
+      const scripted = scriptedReplies.shift()
+      if (scripted !== undefined) {
+        yield { type: "text-delta", text: typeof scripted === "function" ? scripted(messages) : scripted }
+        yield { type: "finish", reason: { kind: "stop" } }
+        return
+      }
       outputLimits.push(maxTokens)
       if (outputLimits.length === 1) {
         yield { type: "usage", usage: { inputTokens: 2000, outputTokens: 1400 } }
@@ -125,7 +132,85 @@ try {
   assert.equal(usage.totalTokens, 5600, "输出截断的第一次调用也应计入用量")
   await runAgent(1000)
   assert.deepEqual(outputLimits, [1400, 3000, 1000])
-  console.log(`[dsh-yanfield] smoke ok (${payload.items.length} novels, settings restart, model sync, AI retry)`)
+
+  const novelId = novel.id
+  const decision = (name, args) => JSON.stringify({ message: "", calls: [{ name, args }], done: false })
+  const reply = JSON.stringify({ message: "Done", calls: [{ name: "respond", args: { message: "Done" } }], done: true })
+  async function agentRun(message, replies, context = {}) {
+    scriptedReplies.push(...replies)
+    const result = await call("POST", "/yanfield/api/ai/agent", JSON.stringify({ novelId, message, ...context }))
+    assert.equal(result.status, 200)
+    assert.equal(scriptedReplies.length, 0)
+    return result.body.split(/\r?\n/).filter((line) => line.startsWith("data: "))
+      .map((line) => JSON.parse(line.slice(6))).findLast((event) => event.type === "agent").run
+  }
+  const apply = (run, changes) => api("POST", `/ai/agent/${run.id}/apply`, { novelId, selections: changes.map(({ id }) => ({ id })) })
+  const chapter = (await api("POST", "/chapters", { novelId, title: "Test chapter", content: "<p>Before</p><p>Chosen</p><p>After</p>" })).data
+  const selectionRun = await agentRun("Only replace the selected text", [
+    decision("read", { kind: "chapter", id: chapter.id }),
+    decision("write_chapter", { id: chapter.id, mode: "rewrite", title: "Unrequested title", instruction: "Rewrite" }),
+    "Revised $&", reply,
+  ], { chapterId: chapter.id, selection: "Chosen", context: { includeSelection: true } })
+  assert.equal(selectionRun.summary, "Done")
+  assert.deepEqual(selectionRun.changes[0].after, { content: "<p>Before</p><p>Revised $&amp;</p><p>After</p>" })
+  assert.equal((await apply(selectionRun, selectionRun.changes)).status, 200)
+
+  const character = (await api("POST", "/characters", { novelId, name: "Gu", identity: "teacher" })).data
+  const snapshotRun = await agentRun("Only edit the speaking style", [
+    decision("read", { kind: "character", id: character.id }),
+    decision("propose", { kind: "character", id: character.id, fields: { speechStyle: "Plain" } }), reply,
+  ], { snapshot: { kind: "character", id: character.id, fields: { identity: "unsaved draft" } } })
+  assert.deepEqual(snapshotRun.changes[0].after, { speechStyle: "Plain" })
+  assert.equal((await apply(snapshotRun, snapshotRun.changes)).status, 200)
+  assert.equal((await api("GET", `/characters/${character.id}`)).data.identity, "teacher")
+
+  async function draft(title) {
+    const quote = "Gu wears a black coat."
+    return agentRun("Draft a chapter", [
+      decision("write_chapter", { title, instruction: "Continue" }),
+      `${quote}\nA child asked a question.`, reply,
+      (messages) => {
+        const [{ id: sourceId }] = JSON.parse(messages.at(-1).content[0].text).sources
+        return JSON.stringify({ cards: [{
+          kind: "character", fields: { name: "Gu", appearance: "Black coat", personality: "Patient", age: "Forty" },
+          evidence: [
+            { field: "appearance", sourceId, quote },
+            { field: "personality", sourceId, quote },
+            { field: "age", sourceId, quote: "A child asked a question." },
+          ],
+        }] })
+      },
+    ], { context: { includeCharacters: true } })
+  }
+  const discarded = await draft("Discarded chapter")
+  const [discardedChapter, discardedNote] = discarded.changes
+  assert.deepEqual(discardedNote.after, { appearance: "Black coat" })
+  assert.equal((await apply(discarded, [discardedNote])).status, 409)
+  assert.equal((await api("PATCH", `/ai/agent/${discarded.id}`, { novelId, op: "reject", changeId: discardedChapter.id })).status, 200)
+  assert.equal((await apply(discarded, [discardedNote])).status, 409)
+  const partial = await draft("Partially accepted chapter")
+  const [partialChapter, partialNote] = partial.changes
+  const { build } = await import("esbuild")
+  const diffBundle = await build({ entryPoints: [path.join(root, "src/yanfield/lib/diff/blocks.ts")], bundle: true, platform: "node", format: "esm", write: false })
+  const { diffBlocks, applyBlockDiff } = await import(`data:text/javascript;base64,${Buffer.from(diffBundle.outputFiles[0].text).toString("base64")}`)
+  const onlyQuestion = diffBlocks("", partialChapter.after.content).items.find((item) => item.afterText === "A child asked a question.").id
+  const partialApply = await api("POST", `/ai/agent/${partial.id}/apply`, {
+    novelId, selections: [{ id: partialChapter.id, blocks: [onlyQuestion] }, { id: partialNote.id }],
+  })
+  assert.equal(partialApply.status, 409)
+  assert.equal((await api("GET", `/ai/agent/${partial.id}?novelId=${novelId}`)).data.changes[0].state, "pending")
+  const accepted = await draft("Accepted chapter")
+  assert.equal((await apply(accepted, [...accepted.changes].reverse())).status, 200)
+  assert.equal((await api("GET", `/characters/${character.id}`)).data.appearance, "Black coat")
+
+  const richText = '<ul><li><p>One</p><ul><li><p>Nested</p></li></ul></li></ul><blockquote><p>Quote</p></blockquote><hr>'
+  const original = richText + "<p>She  paused.</p><p>End.</p>"
+  const revised = richText + "<p>She paused.</p><p>New ending.</p>"
+  const diff = diffBlocks(original, revised)
+  assert.equal(diff.items.length, 2)
+  assert.equal(applyBlockDiff(original, diff, [diff.items[0].id]), richText + "<p>She paused.</p><p>End.</p>")
+
+  console.log(`[dsh-yanfield] smoke ok (${payload.items.length} novels, settings restart, model sync, AI retry, selection, field scope, source evidence, rich-text review)`)
 } finally {
   try {
     await rm(dir, { recursive: true, force: true })

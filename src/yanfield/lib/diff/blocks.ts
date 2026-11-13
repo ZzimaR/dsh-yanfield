@@ -42,19 +42,18 @@ export interface BlockDiff {
   changed: number;
 }
 
-const BLOCK_TAGS = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "li", "pre", "hr", "div"];
+const VOID_TAGS = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
 
 function stripTags(html: string): string {
   return html
-    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<br\s*\/?>|<\/(?:p|li|h[1-6]|pre)>\s*(?=<(?:li|p|h[1-6]|pre)\b)/gi, "\n")
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .trim();
+    .replace(/&amp;/g, "&");
 }
 
 function hash(text: string): string {
@@ -63,46 +62,44 @@ function hash(text: string): string {
   return Math.abs(h).toString(36).slice(0, 6);
 }
 
-const BLOCK_RE = new RegExp(`<(${BLOCK_TAGS.join("|")})\\b[^>]*>[\\s\\S]*?<\\/\\1>`, "gi");
-
-/** 把正文 HTML 拆成块（保留顶层块标签；无法识别的剩余文本包成段落） */
+/** Split editor HTML at top-level tag boundaries, preserving nested elements verbatim. */
 export function splitBlocks(html: string): Block[] {
   const source = (html ?? "").trim();
   if (!source) return [];
   const blocks: Block[] = [];
   let cursor = 0;
-  let index = 0;
+  const openTags: string[] = [];
 
   const push = (raw: string) => {
-    const node = raw.trim();
-    if (!node) return;
-    const text = stripTags(node);
-    blocks.push({ id: `b${index}_${hash(text)}`, html: node, text });
-    index += 1;
+    if (!raw.trim()) return;
+    const text = stripTags(raw);
+    blocks.push({ id: `b${blocks.length}_${hash(text.trim())}`, html: raw, text });
   };
 
-  for (const match of source.matchAll(BLOCK_RE)) {
-    const start = match.index ?? 0;
-    if (start > cursor) {
-      const leftover = source.slice(cursor, start).trim();
-      if (leftover) push(`<p>${leftover}</p>`);
+  const tags = /<!--[\s\S]*?-->|<(\/?)([a-z][\w:-]*)(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi;
+  for (const match of source.matchAll(tags)) {
+    if (!openTags.length && source.slice(cursor, match.index).trim()) {
+      push(source.slice(cursor, match.index));
+      cursor = match.index;
     }
-    push(match[0]);
-    cursor = start + match[0].length;
+    const [, closing, name] = match;
+    if (name) {
+      const tag = name.toLowerCase();
+      if (closing) {
+        const index = openTags.lastIndexOf(tag);
+        if (index >= 0) openTags.length = index;
+      } else if (!VOID_TAGS.has(tag) && !match[0].endsWith("/>")) {
+        openTags.push(tag);
+      }
+    }
+    if (!openTags.length) {
+      const end = match.index + match[0].length;
+      push(source.slice(cursor, end));
+      cursor = end;
+    }
   }
-  if (cursor < source.length) {
-    const leftover = source.slice(cursor).trim();
-    if (leftover) push(`<p>${leftover}</p>`);
-  }
-  if (blocks.length === 0) {
-    const text = stripTags(source);
-    if (text) blocks.push({ id: `b0_${hash(text)}`, html: `<p>${source}</p>`, text });
-  }
+  push(source.slice(cursor));
   return blocks;
-}
-
-function normalize(s: string): string {
-  return s.replace(/\s+/g, "");
 }
 
 /** 逐字/逐词 diff：先裁掉公共前后缀，再对中间段做 LCS */
@@ -172,10 +169,8 @@ export function diffBlocks(beforeHtml: string, afterHtml: string): BlockDiff {
   const items: BlockChange[] = [];
   const counts = { added: 0, removed: 0, changed: 0 };
 
-  // 块级 LCS（按归一化文本比较）
-  const aText = a.map((block) => normalize(block.text));
-  const bText = b.map((block) => normalize(block.text));
-  const eq = (i: number, j: number) => aText[i] === bText[j];
+  // Compare prose exactly, including spaces. Keep existing formatting for unchanged text.
+  const eq = (i: number, j: number) => a[i].text === b[j].text && (a[i].text !== "" || a[i].html === b[j].html);
   type Pair = { i: number; j: number };
   const samePairs: Pair[] = [];
   let start = 0;

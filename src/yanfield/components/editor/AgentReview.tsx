@@ -32,10 +32,10 @@ export function AgentReview({initial,changeId,onClose}:{initial:AgentRun;changeI
     const next=(index+units.length)%units.length;setActive(next);
     root.current?.querySelector(`[data-change-index="${next}"]`)?.scrollIntoView({behavior:"smooth",block:"center"});
   };
-  const finish=async(decisions:Record<string,boolean>)=>{
+  const finish=async(mode:"reviewed"|"all"|"none")=>{
     if(!change||busyRef.current||!pending)return;
     busyRef.current=true;setBusy(true);setError("");
-    const blocks=units.filter(unit=>decisions[unit.id]!==false).flatMap(unit=>unit.ids);
+    const blocks=units.filter(unit=>mode==="all" || (mode==="reviewed" && choices[unit.id]===true)).flatMap(unit=>unit.ids);
     try {
       if(blocks.length){
         const result=await commitAgent(run,{selections:[{id:change.id,blocks}]},bridge);
@@ -91,7 +91,7 @@ export function AgentReview({initial,changeId,onClose}:{initial:AgentRun;changeI
       </div>
       <div className="flex flex-wrap items-center gap-1 px-3 pb-3 pt-3">
         {units.length>1?<div className="mr-auto flex items-center gap-1"><Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" icon={<ArrowUp className="size-3"/>} onClick={()=>jump(active-1)}>{tr("上一处")}</Button><span className="px-1 font-mono text-[10px] tabular-nums text-ink-4">{active+1}/{units.length}</span><Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" icon={<ArrowDown className="size-3"/>} onClick={()=>jump(active+1)}>{tr("下一处")}</Button></div>:null}
-        {pending?<><Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" disabled={busy} onClick={()=>void finish(Object.fromEntries(units.map(unit=>[unit.id,false])))}>{tr("全部还原")}</Button><Button size="sm" variant="secondary" className="ml-auto h-7 border-accent/20 bg-accent/10 px-3 text-[11px] text-accent shadow-none hover:bg-accent/20" loading={busy} disabled={!units.length} icon={<Check className="size-3"/>} onClick={()=>void finish(choices)}>{Object.keys(choices).length?tr("确认审阅结果"):tr("全部保留")}</Button></>:null}
+        {pending?<><Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" disabled={busy} onClick={()=>void finish("none")}>{tr("全部还原")}</Button><Button size="sm" variant="secondary" className="ml-auto h-7 border-accent/20 bg-accent/10 px-3 text-[11px] text-accent shadow-none hover:bg-accent/20" loading={busy} disabled={!units.length} icon={<Check className="size-3"/>} onClick={()=>void finish(Object.keys(choices).length?"reviewed":"all")}>{Object.keys(choices).length?tr("确认审阅结果"):tr("全部保留")}</Button></>:null}
       </div>
       <div className="border-t border-line/60 bg-paper/40 px-4 py-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] leading-relaxed text-ink-4">

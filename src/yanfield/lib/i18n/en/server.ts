@@ -145,6 +145,7 @@ export const server: Record<string, TranslateValue> = {
   "改动不存在": "Change not found",
   "改动选择无效": "The change selection is invalid",
   "待确认改动不存在": "That pending change does not exist",
+  "资料引用的段落尚未保存或已改变，请先保留相关正文，或取消勾选这项资料改动": "The cited passage has changed or has yet to be saved. Keep the relevant prose first, or deselect this note change.",
   "这项改动已结束": "This change is already finished",
   "请先应用新章，再应用它的章纲": "Apply the new chapter first, then its outline",
   "「{title}」已经不存在，无需再删除": "“{title}” no longer exists; there is nothing to delete",

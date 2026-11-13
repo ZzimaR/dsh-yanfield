@@ -51,6 +51,7 @@ import { ChatMessageView } from "./ChatMessageView";
 import { ContextDrawer } from "./ContextDrawer";
 import { useContextPreview } from "./ContextMeter";
 import type { AgentRun } from "@/lib/ai/agent/types";
+import { displayAgentReply } from "@/lib/ai/agent/reply";
 import { ModelPicker } from "./ModelPicker";
 import { WelcomePanel } from "./WelcomePanel";
 import { MAX_SESSION_TABS, useAiChat } from "./use-ai-chat";
@@ -590,7 +591,8 @@ export function AiPanel({
   const handleCopy = React.useCallback(
     async (message: UIMessage) => {
       try {
-        await copyText([message.content, message.error].filter(Boolean).join("\n\n"));
+        const content=message.actions.some(action=>action.type==="agent-run")?displayAgentReply(message.content):message.content;
+        await copyText([content, message.error].filter(Boolean).join("\n\n"));
         toast({ title: tr("已复制"), tone: "success" });
       } catch {
         toast({ title: tr("复制失败"), description: tr("请手动选中内容复制。"), tone: "error" });

@@ -19,13 +19,21 @@ import { SaveButton } from "./SaveButton";
 import { StatusMenu } from "./StatusMenu";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { FindReplaceBar } from "./FindReplaceBar";
+import { FindHighlight, revealProsePosition } from "@/lib/editor/find-highlight";
+import { isHistoryTransaction } from "@tiptap/pm/history";
 import { FormatToolbar } from "./FormatToolbar";
 import { AgentReview } from "./AgentReview";
 import type { AgentRun } from "@/lib/ai/agent/types";
 import { EditorStatusBar } from "./EditorStatusBar";
 
+export interface ChapterEditorPosition {
+  head: number;
+  scrollTop: number;
+}
+
 interface EditorCanvasProps {
   chapterId: string | null;
+  chapterPositions?: Map<string, ChapterEditorPosition>;
   /** 初始正文 HTML（切章时同步进编辑器） */
   initialContent: string;
   title: string;
@@ -125,6 +133,7 @@ function findFocusBlockDom(editor: Editor): HTMLElement | null {
 export function EditorCanvas(props: EditorCanvasProps) {
   const {
     chapterId,
+    chapterPositions,
     initialContent,
     title,
     status,
@@ -188,6 +197,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Placeholder.configure({ placeholder: tr("在这里落笔……写成段落，别写成 PPT。") }),
       Highlight.configure({ multicolor: false }),
+      FindHighlight,
       CharacterCount,
     ],
     [tr],
@@ -196,7 +206,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions,
-    content: initialContent,
+    content: initialContent || "<p></p>",
     editorProps: {
       attributes: {
         class: "prose-paper min-h-[56vh] max-w-none outline-none",
@@ -207,6 +217,16 @@ export function EditorCanvas(props: EditorCanvasProps) {
     onUpdate: ({ editor: instance }) => {
       const html = instance.getHTML();
       handlersRef.current.onContentChange(html, countWords(html));
+    },
+    onTransaction: ({ editor: instance, transaction }) => {
+      if (!isHistoryTransaction(transaction)) return;
+      const position = transaction.before.content.findDiffStart(transaction.doc.content);
+      if (position === null) return;
+      window.requestAnimationFrame(() => {
+        if (!instance.isDestroyed && instance.state.doc === transaction.doc) {
+          revealProsePosition(instance.view, position);
+        }
+      });
     },
     onSelectionUpdate: ({ editor: instance }) => {
       const info = readSelection(instance);
@@ -224,24 +244,23 @@ export function EditorCanvas(props: EditorCanvasProps) {
     };
   }, [editor]);
 
-  // 切章：把新章节内容灌进编辑器；首次加载不抢焦点
-  const loadedChapterIdRef = React.useRef<string | null>(null);
-  const previousChapterIdRef = React.useRef<string | null>(null);
-  React.useEffect(() => {
-    if (!editor) return;
-    const nextId = chapterId;
-    if (loadedChapterIdRef.current === nextId) return;
-    previousChapterIdRef.current = loadedChapterIdRef.current;
-    loadedChapterIdRef.current = nextId;
-    editor.commands.setContent(initialContent || "<p></p>", { emitUpdate: false });
+  // EditorWorkbench mounts a fresh editor per chapter so history cannot cross chapters.
+  React.useLayoutEffect(() => {
+    if (!editor || !chapterId) return;
+    const scroller = scrollRef.current;
+    const saved = chapterPositions?.get(chapterId);
+    if (saved) {
+      editor.commands.setTextSelection(Math.min(saved.head, editor.state.doc.content.size));
+      if (scroller) scroller.scrollTop = saved.scrollTop;
+    }
     selectionSetterRef.current(EMPTY_SELECTION);
     handlersRef.current.onSelectionChange(EMPTY_SELECTION);
-    emitSelection({ ...EMPTY_SELECTION, chapterId: nextId });
-    // 切换章节（非首次加载）后把光标放到文首，方便直接写
-    if (previousChapterIdRef.current !== null) {
-      editor.commands.focus("start");
-    }
-  }, [editor, chapterId, initialContent]);
+    emitSelection({ ...EMPTY_SELECTION, chapterId });
+    return () => {
+      if (editor.isDestroyed || !scroller) return;
+      chapterPositions?.set(chapterId, { head: editor.state.selection.head, scrollTop: scroller.scrollTop });
+    };
+  }, [editor, chapterId, chapterPositions]);
 
   // 段落数：随正文更新刷新；切章时 setContent 不派发 update，所以依赖 chapterId 兜底重算
   React.useEffect(() => {
@@ -366,7 +385,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
           open
           focusRequest={findRequest}
           onClose={() => setFindOpen(false)}
-          className={immersive ? "top-14" : undefined}
+          className={immersive ? "mt-14" : undefined}
         />
       ) : null}
       {immersive ? (
@@ -388,7 +407,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
           </Tooltip>
         </div>
       ) : null}
-      <div ref={scrollRef} className="scroll-thin min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} data-prose-scroll className="scroll-thin min-h-0 flex-1 overflow-y-auto">
         <div
           className="mx-auto w-full pb-24 sm:pb-32"
           style={pageStyle}
@@ -424,7 +443,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
           )}
 
           {/* AI 任务收进格式工具栏的一个下拉入口。 */}
-          {!immersive ? <FormatToolbar editor={editor} className="mb-6 border-b border-line/70 pb-2">{aiBar}</FormatToolbar> : null}
+          {!immersive ? <FormatToolbar editor={editor} className={cn("mb-6 border-b border-line/70 bg-paper py-2", !pendingReview && "sticky top-0 z-20")}>{aiBar}</FormatToolbar> : null}
 
           {editor ? (
             <>

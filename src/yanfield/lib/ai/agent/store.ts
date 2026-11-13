@@ -1,7 +1,7 @@
 import * as repo from "@/lib/repo";
 import { all, get, run as sql, tx } from "@/lib/db";
 import { ApiError } from "@/lib/api-utils";
-import { countWords, uid } from "@/lib/ui/cn";
+import { countWords, stripHtml, uid } from "@/lib/ui/cn";
 import { sameFields, validatePatch } from "./schema";
 import { applyBlockDiff, diffBlocks } from "@/lib/diff/blocks";
 import type { AgentChange, AgentRun, EntityKind, Fields } from "./types";
@@ -211,13 +211,13 @@ export function applyChanges(id: string, selections: {id:string; fields?:string[
     const value = getRun(id);
     if (value.status==="running") throw new ApiError("任务还在运行",409);
     const seen = new Set<string>();
-    const depth = (choice: {id:string}) => {
+    // Save prose before its dependent notes. Run deletions after edits, deepest settings first.
+    const ordered = selections.map(choice=>{
       const change = value.changes.find(c=>c.id===choice.id);
-      return change?.op==="delete" ? 1 + (change.kind==="world" ? worldDepth(change.targetId,value.novelId) : 0) : 0;
-    };
-    // Edits first, then deletions with the deepest settings first so parents never cascade over pending children.
-    const ordered = selections.map((choice,index)=>({choice,index,depth:depth(choice)}))
-      .sort((a,b)=>(a.depth===0?0:1)-(b.depth===0?0:1) || b.depth-a.depth || a.index-b.index).map(x=>x.choice);
+      const deleting = change?.op==="delete";
+      const depth = deleting && change.kind==="world" ? worldDepth(change.targetId,value.novelId) : 0;
+      return {choice,priority:deleting?0:change?.kind==="chapter"?2:1,depth};
+    }).sort((a,b)=>b.priority-a.priority || b.depth-a.depth).map(x=>x.choice);
     for (const choice of ordered) {
       if (seen.has(choice.id)) throw new ApiError("改动重复",400);
       seen.add(choice.id);
@@ -241,6 +241,15 @@ export function applyChanges(id: string, selections: {id:string; fields?:string[
       const keys = choice.fields ?? Object.keys(change.after);
       if (!keys.length || keys.some(k=>!Object.hasOwn(change.after,k))) throw new ApiError("所选字段无效",400);
       const patch: Fields = Object.fromEntries(keys.map(k=>[k,change.after[k]]));
+      for (const evidence of change.evidence ?? []) {
+        if (evidence.field && !Object.hasOwn(patch,evidence.field)) continue;
+        const source = evidence.candidate ? value.changes.find(c=>c.id===evidence.sourceId && c.kind==="chapter") : undefined;
+        const chapterId = evidence.candidate ? (source?.state==="applied" ? source.appliedId : undefined) : evidence.sourceId;
+        const chapter = chapterId ? repo.getChapter(chapterId) : undefined;
+        if (!chapter || chapter.novelId!==value.novelId || !stripHtml(chapter.content).includes(evidence.quote)) {
+          throw new ApiError("资料引用的段落尚未保存或已改变，请先保留相关正文，或取消勾选这项资料改动",409);
+        }
+      }
       // Content overrides can only be an exact subset of this proposal's block changes.
       if (choice.blocks!==undefined) {
         if(change.kind!=="chapter"||typeof patch.content!=="string") throw new ApiError("只有正文支持逐块审阅",400);

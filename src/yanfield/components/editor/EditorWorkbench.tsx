@@ -34,7 +34,7 @@ import {
 } from "@/lib/editor/agent-review";
 import { AGENT_UPDATED } from "@/lib/ai/agent/client";
 import type { AgentRun } from "@/lib/ai/agent/types";
-import { EditorCanvas } from "./EditorCanvas";
+import { EditorCanvas, type ChapterEditorPosition } from "./EditorCanvas";
 import { EditorHeader, type EditorTheme } from "./EditorHeader";
 import { EditorRightRail } from "./EditorRightRail";
 import { EditorErrorBoundary } from "./EditorErrorBoundary";
@@ -307,6 +307,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   }, [chapter, activeRecovery, saveGuard, adoptSaved, actions, discardRecovery, toast, tr]);
 
   const chapterSelection = React.useRef(0);
+  const chapterPositions = React.useRef(new Map<string, ChapterEditorPosition>());
   const selectChapter = React.useCallback(async (nextId: string): Promise<boolean> => {
     const selection = ++chapterSelection.current;
     try {
@@ -799,7 +800,9 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
               </div>
             ) : chapter && activeDraft ? (
               <EditorCanvas
+                key={chapter.id}
                 chapterId={chapter.id}
+                chapterPositions={chapterPositions.current}
                 initialContent={activeDraft.content}
                 title={title}
                 status={status}
