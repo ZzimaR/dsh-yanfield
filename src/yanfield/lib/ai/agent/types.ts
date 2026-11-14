@@ -29,11 +29,15 @@ export interface AgentDiagnostic {
 export interface AgentRun {
   id: string; novelId: string; chapterId: string | null; request: string;
   sessionId?:string; messageId?:string;
+  requestContext?: Pick<AgentRequest, "chapterId" | "agentId" | "context" | "mentions" | "selection" | "selectionReference" | "snapshot">;
   status: "running" | "ready" | "complete" | "aborted" | "error";
   errorCode?:string; diagnostics?:AgentDiagnostic[];
   progress?: {id:string;text:string;stepIndex:number}[];
   materialPolicy?: "auto" | "skip";
   summary: string; error: string; steps: AgentStep[]; changes: AgentChange[];
+  recap?: boolean;
+  stoppedOnValidation?: boolean;
+  answering?: boolean;
   references: AgentReference[]; usage: AiUsage; model: string; provider: string;
   preview: string; createdAt: string; updatedAt: string;
 }
@@ -47,6 +51,7 @@ export interface AgentRequest {
   snapshot?:{kind:"world"|"character"|"location"|"foreshadow";id:string|null;fields:Fields};
   mentions?: { type: string; id: string; label: string }[];
   selection?: string;
+  selectionReference?: import("@/lib/editor/selection-reference").SelectionReference;
 }
 export const ENTITY_LABEL: Record<EntityKind, string> = {
   chapter: "正文", blueprint: "章纲", character: "角色", world: "设定", location: "地点", foreshadow: "伏笔", outline: "总纲", "volume-outline": "卷纲",

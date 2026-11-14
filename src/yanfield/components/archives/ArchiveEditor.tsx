@@ -69,7 +69,7 @@ function RowsEditor<T>({
     <div className="space-y-2">
       {rows.length === 0 ? <p className="text-[11.5px] text-ink-3">{emptyText}</p> : null}
       {rows.map((row, index) => (
-        <div key={index} className="space-y-1.5 rounded-md border border-line bg-surface-2 px-2.5 py-2">
+        <div key={index} className="yf-document-section space-y-1.5 rounded-md border border-line bg-surface-2 px-2.5 py-2">
           <div className="flex items-center justify-between">
             <span className="text-[10.5px] tabular-nums text-ink-3">#{index + 1}</span>
             <button
@@ -107,12 +107,14 @@ export function ArchiveEditor({
   archive,
   onClose,
   onSaved,
+  inline = false,
 }: {
   open: boolean;
   novelId: string;
   archive: StoryArchive | null;
   onClose: () => void;
   onSaved: (saved: StoryArchive) => void;
+  inline?: boolean;
 }) {
   const { toast } = useToast();
   const tr = useT();
@@ -158,152 +160,157 @@ export function ArchiveEditor({
     }
   };
 
+  const footer = (
+    <div className="flex items-center justify-end gap-2">
+      <Button variant="ghost" size="sm" onClick={onClose}>
+        {tr("取消")}
+      </Button>
+      <Button variant="primary" size="sm" loading={saving} disabled={!draft} onClick={save}>
+        {tr("保存档案")}
+      </Button>
+    </div>
+  );
+  const content = !draft ? (
+    <p className="py-10 text-center text-[12.5px] text-ink-3">{tr("没有可编辑的档案。")}</p>
+  ) : (
+    <div className="space-y-5 [&_a:focus-visible]:outline-none [&_a:focus-visible]:ring-2 [&_a:focus-visible]:ring-accent/60 [&_button:focus-visible]:outline-none [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-accent/60">
+      <div className="yf-document-section rounded-md border border-line bg-surface-2 px-3 py-2 text-[11.5px] leading-relaxed text-ink-3">
+        {tr("手动修正只改档案本身，不会改动正文；保存后该章档案不再标记为过期。")}
+      </div>
+
+      <Textarea
+        label={tr("本章档案（事实摘要）")}
+        rows={4}
+        value={draft.chapterSummary}
+        onChange={(event) => setDraft({ ...draft, chapterSummary: event.target.value })}
+        hint={tr("只记录正文里写过的事实，不要补充推断。")}
+      />
+
+      <section className="space-y-2">
+        <div>
+          <h4 className="text-[14px] font-medium text-ink">{tr("角色档案")}</h4>
+          <p className="text-[11px] text-ink-3">{tr("角色名 · 本章结束时的状态 · 本章发生的变化")}</p>
+        </div>
+        <RowsEditor<CharacterState>
+          rows={draft.characterStates}
+          onChange={(characterStates) => setDraft({ ...draft, characterStates })}
+          fields={[
+            { key: "name", label: tr("角色名") },
+            { key: "state", label: tr("状态"), placeholder: tr("位置/伤势/心态") },
+            { key: "changes", label: tr("变化"), placeholder: tr("本章发生了什么") },
+          ]}
+          createRow={() => ({ name: "", state: "", changes: "" })}
+          addLabel={tr("添加角色状态")}
+          emptyText={tr("本章没有角色状态记录。")}
+        />
+      </section>
+
+      <section className="space-y-2">
+        <div>
+          <h4 className="text-[14px] font-medium text-ink">{tr("设定档案")}</h4>
+          <p className="text-[11px] text-ink-3">{tr("设定名 · 本章被推进或改变的部分")}</p>
+        </div>
+        <RowsEditor<{ title: string; state: string }>
+          rows={draft.settingStates}
+          onChange={(settingStates) => setDraft({ ...draft, settingStates })}
+          fields={[
+            { key: "title", label: tr("设定名") },
+            { key: "state", label: tr("本章状态") },
+          ]}
+          createRow={() => ({ title: "", state: "" })}
+          addLabel={tr("添加设定状态")}
+          emptyText={tr("本章没有设定变动记录。")}
+        />
+      </section>
+
+      <section className="space-y-2">
+        <div>
+          <h4 className="text-[14px] font-medium text-ink">{tr("人物总账")}</h4>
+          <p className="text-[11px] text-ink-3">{tr("项目 · 本章变化 · 结余 · 备注（如渡钱、人情债）")}</p>
+        </div>
+        <RowsEditor<LedgerEntry>
+          rows={draft.ledger}
+          onChange={(ledger) => setDraft({ ...draft, ledger })}
+          fields={[
+            { key: "name", label: tr("项目") },
+            { key: "delta", label: tr("变化"), placeholder: "+2" },
+            { key: "balance", label: tr("结余"), placeholder: "7" },
+            { key: "note", label: tr("备注") },
+          ]}
+          createRow={() => ({ name: "", delta: "", balance: "", note: "" })}
+          addLabel={tr("添加账目")}
+          emptyText={tr("本章没有账目变化。")}
+        />
+      </section>
+
+      <section className="space-y-2">
+        <div>
+          <h4 className="text-[14px] font-medium text-ink">{tr("时间线")}</h4>
+          <p className="text-[11px] text-ink-3">{tr("故事内时间 · 发生的事")}</p>
+        </div>
+        <RowsEditor<TimelineEntry>
+          rows={draft.timeline}
+          onChange={(timeline) => setDraft({ ...draft, timeline })}
+          fields={[
+            { key: "storyTime", label: tr("时间点"), placeholder: tr("如：入夜后两刻") },
+            { key: "event", label: tr("事件") },
+          ]}
+          createRow={() => ({ storyTime: "", event: "" })}
+          addLabel={tr("添加时间线")}
+          emptyText={tr("本章没有时间线记录。")}
+        />
+      </section>
+
+      <section className="space-y-2">
+        <div>
+          <h4 className="text-[14px] font-medium text-ink">{tr("伏笔状态")}</h4>
+          <p className="text-[11px] text-ink-3">{tr("伏笔 · 本章状态 · 说明")}</p>
+        </div>
+        <RowsEditor<{ title: string; status: string; note: string }>
+          rows={draft.foreshadows}
+          onChange={(foreshadows) => setDraft({ ...draft, foreshadows })}
+          fields={[
+            { key: "title", label: tr("伏笔") },
+            { key: "status", label: tr("状态") },
+            { key: "note", label: tr("说明") },
+          ]}
+          createRow={() => ({ title: "", status: "", note: "" })}
+          addLabel={tr("添加伏笔记录")}
+          emptyText={tr("本章没有伏笔记录。")}
+        />
+      </section>
+
+      <section className="space-y-2">
+        <div>
+          <h4 className="text-[14px] font-medium text-ink">{tr("待确认冲突")}</h4>
+          <p className="text-[11px] text-ink-3">{tr("主题 · 冲突说明；保存后仍以 API 数据为准。")}</p>
+        </div>
+        <RowsEditor<ArchiveConflict>
+          rows={draft.conflicts}
+          onChange={(conflicts) => setDraft({ ...draft, conflicts })}
+          fields={[
+            { key: "topic", label: tr("冲突主题") },
+            { key: "detail", label: tr("说明") },
+          ]}
+          createRow={() => ({ topic: "", detail: "", status: "pending" })}
+          addLabel={tr("添加冲突项")}
+          emptyText={tr("本章没有待确认冲突。")}
+        />
+      </section>
+    </div>
+  );
+  if (inline) {
+    return open ? (
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium text-ink">{tr("手动编辑本章档案")}</h3>
+        {content}
+        {footer}
+      </div>
+    ) : null;
+  }
   return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title={tr("手动编辑本章档案")}
-      width={760}
-      footer={
-        <div className="flex items-center justify-end gap-2 [&_a:focus-visible]:outline-none [&_a:focus-visible]:ring-2 [&_a:focus-visible]:ring-accent/60 [&_button:focus-visible]:outline-none [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-accent/60">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {tr("取消")}
-          </Button>
-          <Button variant="primary" size="sm" loading={saving} disabled={!draft} onClick={save}>
-            {tr("保存档案")}
-          </Button>
-        </div>
-      }
-    >
-      {!draft ? (
-        <p className="py-10 text-center text-[12.5px] text-ink-3">{tr("没有可编辑的档案。")}</p>
-      ) : (
-        <div className="space-y-5 [&_a:focus-visible]:outline-none [&_a:focus-visible]:ring-2 [&_a:focus-visible]:ring-accent/60 [&_button:focus-visible]:outline-none [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-accent/60">
-          <div className="rounded-md border border-line bg-surface-2 px-3 py-2 text-[11.5px] leading-relaxed text-ink-3">
-            {tr("手动修正只改档案本身，不会改动正文；保存后该章档案不再标记为过期。")}
-          </div>
-
-          <Textarea
-            label={tr("本章档案（事实摘要）")}
-            rows={4}
-            value={draft.chapterSummary}
-            onChange={(event) => setDraft({ ...draft, chapterSummary: event.target.value })}
-            hint={tr("只记录正文里写过的事实，不要补充推断。")}
-          />
-
-          <section className="space-y-2">
-            <div>
-              <h4 className="text-[14px] font-medium text-ink">{tr("角色档案")}</h4>
-              <p className="text-[11px] text-ink-3">{tr("角色名 · 本章结束时的状态 · 本章发生的变化")}</p>
-            </div>
-            <RowsEditor<CharacterState>
-              rows={draft.characterStates}
-              onChange={(characterStates) => setDraft({ ...draft, characterStates })}
-              fields={[
-                { key: "name", label: tr("角色名") },
-                { key: "state", label: tr("状态"), placeholder: tr("位置/伤势/心态") },
-                { key: "changes", label: tr("变化"), placeholder: tr("本章发生了什么") },
-              ]}
-              createRow={() => ({ name: "", state: "", changes: "" })}
-              addLabel={tr("添加角色状态")}
-              emptyText={tr("本章没有角色状态记录。")}
-            />
-          </section>
-
-          <section className="space-y-2">
-            <div>
-              <h4 className="text-[14px] font-medium text-ink">{tr("设定档案")}</h4>
-              <p className="text-[11px] text-ink-3">{tr("设定名 · 本章被推进或改变的部分")}</p>
-            </div>
-            <RowsEditor<{ title: string; state: string }>
-              rows={draft.settingStates}
-              onChange={(settingStates) => setDraft({ ...draft, settingStates })}
-              fields={[
-                { key: "title", label: tr("设定名") },
-                { key: "state", label: tr("本章状态") },
-              ]}
-              createRow={() => ({ title: "", state: "" })}
-              addLabel={tr("添加设定状态")}
-              emptyText={tr("本章没有设定变动记录。")}
-            />
-          </section>
-
-          <section className="space-y-2">
-            <div>
-              <h4 className="text-[14px] font-medium text-ink">{tr("人物总账")}</h4>
-              <p className="text-[11px] text-ink-3">{tr("项目 · 本章变化 · 结余 · 备注（如渡钱、人情债）")}</p>
-            </div>
-            <RowsEditor<LedgerEntry>
-              rows={draft.ledger}
-              onChange={(ledger) => setDraft({ ...draft, ledger })}
-              fields={[
-                { key: "name", label: tr("项目") },
-                { key: "delta", label: tr("变化"), placeholder: "+2" },
-                { key: "balance", label: tr("结余"), placeholder: "7" },
-                { key: "note", label: tr("备注") },
-              ]}
-              createRow={() => ({ name: "", delta: "", balance: "", note: "" })}
-              addLabel={tr("添加账目")}
-              emptyText={tr("本章没有账目变化。")}
-            />
-          </section>
-
-          <section className="space-y-2">
-            <div>
-              <h4 className="text-[14px] font-medium text-ink">{tr("时间线")}</h4>
-              <p className="text-[11px] text-ink-3">{tr("故事内时间 · 发生的事")}</p>
-            </div>
-            <RowsEditor<TimelineEntry>
-              rows={draft.timeline}
-              onChange={(timeline) => setDraft({ ...draft, timeline })}
-              fields={[
-                { key: "storyTime", label: tr("时间点"), placeholder: tr("如：入夜后两刻") },
-                { key: "event", label: tr("事件") },
-              ]}
-              createRow={() => ({ storyTime: "", event: "" })}
-              addLabel={tr("添加时间线")}
-              emptyText={tr("本章没有时间线记录。")}
-            />
-          </section>
-
-          <section className="space-y-2">
-            <div>
-              <h4 className="text-[14px] font-medium text-ink">{tr("伏笔状态")}</h4>
-              <p className="text-[11px] text-ink-3">{tr("伏笔 · 本章状态 · 说明")}</p>
-            </div>
-            <RowsEditor<{ title: string; status: string; note: string }>
-              rows={draft.foreshadows}
-              onChange={(foreshadows) => setDraft({ ...draft, foreshadows })}
-              fields={[
-                { key: "title", label: tr("伏笔") },
-                { key: "status", label: tr("状态") },
-                { key: "note", label: tr("说明") },
-              ]}
-              createRow={() => ({ title: "", status: "", note: "" })}
-              addLabel={tr("添加伏笔记录")}
-              emptyText={tr("本章没有伏笔记录。")}
-            />
-          </section>
-
-          <section className="space-y-2">
-            <div>
-              <h4 className="text-[14px] font-medium text-ink">{tr("待确认冲突")}</h4>
-              <p className="text-[11px] text-ink-3">{tr("主题 · 冲突说明；保存后仍以 API 数据为准。")}</p>
-            </div>
-            <RowsEditor<ArchiveConflict>
-              rows={draft.conflicts}
-              onChange={(conflicts) => setDraft({ ...draft, conflicts })}
-              fields={[
-                { key: "topic", label: tr("冲突主题") },
-                { key: "detail", label: tr("说明") },
-              ]}
-              createRow={() => ({ topic: "", detail: "", status: "pending" })}
-              addLabel={tr("添加冲突项")}
-              emptyText={tr("本章没有待确认冲突。")}
-            />
-          </section>
-        </div>
-      )}
+    <Sheet open={open} onClose={onClose} title={tr("手动编辑本章档案")} width={760} footer={footer}>
+      {content}
     </Sheet>
   );
 }

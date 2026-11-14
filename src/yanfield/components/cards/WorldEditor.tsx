@@ -220,10 +220,12 @@ export function WorldEditor({
         <ModelKeyHint />
 
         <EditorSection title="基本信息" hint={tr("先给这条设定一个能搜到的名字与归属，AI 会按分类理解它的约束力；重要程度高的设定会优先进入 AI 上下文。")}>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 @min-[440px]:grid-cols-3">
             <Select label={tr("分类")} value={draft.category} onChange={event=>update("category",event.target.value as WorldCategory)} options={Object.entries(WORLD_CATEGORY_LABEL).map(([value,label])=>({value,label:tr(label)}))}/>
             <Select label={tr("重要程度")} value={draft.importance} onChange={event=>update("importance",event.target.value as WorldImportance)} options={Object.entries(WORLD_IMPORTANCE_LABEL).map(([value,label])=>({value,label:tr(label)}))}/>
-            <Select label={tr("归属")} value={draft.parentId??""} onChange={event=>update("parentId",event.target.value||null)} options={parentOptions}/>
+            <div className="col-span-2 @min-[440px]:col-span-1">
+              <Select label={tr("归属")} value={draft.parentId??""} onChange={event=>update("parentId",event.target.value||null)} options={parentOptions}/>
+            </div>
           </div>
         </EditorSection>
 

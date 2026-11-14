@@ -58,6 +58,7 @@ interface PendingExchange {
   tabKey: string;
   agentId: AgentId;
   userText: string;
+  reference?: AiAction;
 }
 
 /** 落库用的一问一答内容（content 必需，其余字段可缺省）。 */
@@ -96,7 +97,7 @@ export interface UseAiChatResult {
   openSession: (session: ChatSession) => Promise<OpenSessionResult>;
   loadOlderMessages: (tabKey: string) => Promise<boolean>;
   /** 在当前会话里先放下一问一答，供设定任务自己接流。返回 assistant 消息 id。 */
-  beginExchange: (userText: string, replaceId?: string) => string;
+  beginExchange: (userText: string, replaceId?: string, reference?: AiAction) => string;
   prepareSession:()=>Promise<string|null>;
   /** 按 assistantId 精确更新回复（流式期间切 tab 也不会写错）。 */
   patchExchange: (assistantId: string, patch: Partial<UIMessage>) => void;
@@ -195,14 +196,9 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
   const exchangeRef = React.useRef<PendingExchange | null>(null);
   /** 当前轮次已应用的 patch；endExchange 落库时取最终正文/状态/用量 */
   const exchangePatchesRef = React.useRef<Map<string, Partial<UIMessage>>>(new Map());
-  const contextRef = React.useRef({ novelId, chapterId });
-  const previousContextRef = React.useRef({ novelId, chapterId });
-  contextRef.current = { novelId, chapterId };
-  /**
-   * useLocalStorageState 首屏把章节留成 null，effect 里才读出上次的章节。
-   * 那一次 null → 章节号不是作者换章；当成换章会把刚接回来的会话换成空标签，草稿也对不上。
-   */
-  const chapterSettledRef = React.useRef(chapterId != null);
+  const contextRef = React.useRef({ novelId });
+  const previousNovelIdRef = React.useRef(novelId);
+  contextRef.current = { novelId };
 
   // 只写内存引用、不序列化、不落盘：卸载后仍能接上，DSH 退出即随进程消失。
   React.useEffect(() => {
@@ -210,15 +206,8 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
   }, [sessionKey, tabs, activeKey]);
 
   React.useEffect(() => {
-    const previous = previousContextRef.current;
-    if (previous.novelId === novelId && previous.chapterId === chapterId) return;
-    const firstChapter = !chapterSettledRef.current
-      && previous.novelId === novelId
-      && previous.chapterId == null
-      && chapterId != null;
-    if (chapterId != null) chapterSettledRef.current = true;
-    previousContextRef.current = { novelId, chapterId };
-    if (firstChapter) return;
+    if (previousNovelIdRef.current === novelId) return;
+    previousNovelIdRef.current = novelId;
     abortRef.current?.abort();
     abortRef.current = null;
     streamingRef.current = false;
@@ -230,7 +219,7 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
     const tab = createTab(defaultAgentId);
     setTabs([tab]);
     setActiveKey(tab.key);
-  }, [novelId, chapterId, defaultAgentId]);
+  }, [novelId, defaultAgentId]);
 
   React.useEffect(
     () => {
@@ -321,7 +310,7 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
 
   /** 把一问一答写入服务端会话；接口不可用时降级（本页面内不再尝试）。 */
   const persistMessages = React.useCallback(
-    async (sessionId: string, userContent: string, reply: ExchangeReply): Promise<boolean> => {
+    async (sessionId: string, userContent: string, reply: ExchangeReply, reference?: AiAction): Promise<boolean> => {
       if (serverSessionRef.current === false) return false;
       try {
         await Promise.all([
@@ -329,6 +318,7 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
             novelId: contextRef.current.novelId,
             role: "user",
             content: userContent,
+            actions: reference ? [reference] : [],
           }),
           apiPost(`/api/chat/sessions/${encodeURIComponent(sessionId)}/messages`, {
             novelId,
@@ -662,7 +652,6 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
       }
       if (current.tabs.length >= MAX_SESSION_TABS) return { ok: false, reason: "max-tabs" };
       const requestedNovelId = contextRef.current.novelId;
-      const requestedChapterId = contextRef.current.chapterId;
       if (session.novelId !== requestedNovelId) return { ok: false, reason: "context-changed" };
 
       let page: MessagePage;
@@ -672,17 +661,13 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
         );
         page = pickMessages(data);
       } catch {
-        if (
-          contextRef.current.novelId !== requestedNovelId
-          || contextRef.current.chapterId !== requestedChapterId
-        ) return { ok: false, reason: "context-changed" };
+        if (contextRef.current.novelId !== requestedNovelId) return { ok: false, reason: "context-changed" };
         return { ok: false, reason: "load-failed" };
       }
 
       if (
         !mountedRef.current ||
-        contextRef.current.novelId !== requestedNovelId ||
-        contextRef.current.chapterId !== requestedChapterId
+        contextRef.current.novelId !== requestedNovelId
       ) {
         return { ok: false, reason: "context-changed" };
       }
@@ -747,10 +732,11 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
       agentId: AgentId,
       userText: string,
       reply: ExchangeReply,
+      reference?: AiAction,
     ): Promise<boolean> => {
       const target = await ensureSession(tabKey, agentId, sessionId);
       if (!target) return false;
-      return persistMessages(target, userText, reply);
+      return persistMessages(target, userText, reply, reference);
     },
     [ensureSession, persistMessages],
   );
@@ -758,7 +744,7 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
   /* ---------------- 资料助手（外部接流） ---------------- */
 
   const beginExchange = React.useCallback(
-    (userText: string, replaceId?: string): string => {
+    (userText: string, replaceId?: string, reference?: AiAction): string => {
       const current = stateRef.current;
       const tab = current.tabs.find((item) => item.key === current.activeKey) ?? current.tabs[0];
       const tabKey = tab?.key ?? current.activeKey;
@@ -767,12 +753,13 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
       if (replaceId) {
         assistant.id = replaceId;
         setTabs(prev => prev.map(t => t.key === tabKey ? {...t, messages: t.messages.map(m => m.id === replaceId ? assistant : m)} : t));
-      } else appendMessages(tabKey, [createMessage("user", userText), assistant]);
+      } else appendMessages(tabKey, [{ ...createMessage("user", userText), actions: reference ? [reference] : [] }, assistant]);
       exchangeRef.current = {
         assistantId: assistant.id,
         tabKey,
         agentId: tab?.agentId ?? defaultAgentId,
         userText,
+        reference,
       };
       exchangePatchesRef.current.clear();
       streamingRef.current = true;
@@ -837,7 +824,7 @@ export function useAiChat({ novelId, chapterId, defaultAgentId }: UseAiChatOptio
         model: patch.model,
         usage: patch.usage ?? null,
         error: patch.error ?? "",
-      });
+      }, exchange.reference);
     },
     [findTabByMessage, patchMessage, persistExchange],
   );

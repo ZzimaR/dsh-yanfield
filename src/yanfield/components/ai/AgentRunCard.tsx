@@ -1,16 +1,17 @@
 "use client";
 import * as React from "react";
-import { BookOpen, User, MapPin, MapPinned, Bookmark, FolderOpen, Layers3, Check, ChevronDown, CircleAlert, FilePenLine, Loader2, RotateCcw } from "lucide-react";
+import { BookOpen, User, MapPin, MapPinned, Bookmark, FolderOpen, Layers3, Check, ChevronDown, CircleAlert, Loader2, RotateCcw } from "lucide-react";
 import { copyText } from "@/lib/ui/clipboard";
 import { entityTone } from "@/lib/ui/entity-tone";
 import { AgentProgress } from "./AgentProgress";
+import { AgentReply, useAgentReplyReveal } from "./AgentReply";
 import { MaterialPreview } from "@/components/cards/MaterialPreview";
-import { Button, Markdown, useToast } from "@/components/ui/kit";
+import { Button, Markdown, Sheet, useToast } from "@/components/ui/kit";
 import { apiGet, apiPatch, useDataChanged } from "@/lib/client/api";
 import { useEditorBridge } from "@/lib/editor/bridge";
 import { countWords, stripHtml } from "@/lib/ui/cn";
 import { diffInline } from "@/lib/diff/blocks";
-import { AGENT_UPDATED,broadcastRun,commitAgent,openAgentReview } from "@/lib/ai/agent/client";
+import { AGENT_COMMIT_CHANGED, AGENT_UPDATED,broadcastRun,commitAgent,isAgentCommitting,openAgentReview } from "@/lib/ai/agent/client";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
 import { ENTITY_LABEL, FIELD_LABEL, type AgentChange, type AgentRun, type AgentReference } from "@/lib/ai/agent/types";
 import { t, useT } from "@/lib/i18n";
@@ -37,9 +38,10 @@ function displayScenes(value:unknown):string {
 function evidenceLabel(run:AgentRun,e:NonNullable<AgentChange["evidence"]>[number]):string {
   if(!e.candidate)return t("已有正文");
   const source=run.changes.find(c=>c.id===e.sourceId);
+  if(source?.state==="applied")return stripHtml(String(source.saved?.content??source.after.content??"")).includes(e.quote)?t("本轮正文"):t("未采用的候选正文");
+  if(stripHtml(String(source?.before?.content??"")).includes(e.quote))return t("已有正文");
   if(source?.state==="reverted")return t("已撤回正文");
   if(source?.state==="rejected")return t("已丢弃正文");
-  if(source?.state==="applied")return stripHtml(String(source.after.content||"")).includes(e.quote)?t("本轮正文"):t("未采用的候选正文");
   return t("待确认正文");
 }
 export function FieldChange({before,after,format=display}:{before:unknown;after:unknown;format?:(value:unknown)=>string}) {
@@ -57,9 +59,22 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
   const materialNodes=React.useRef<Record<string,HTMLDivElement|null>>({});
   const [picked,setPicked]=React.useState<Record<string,boolean>>({});
   const [fields,setFields]=React.useState<Record<string,string[]>>({});
-  const [busy,setBusy]=React.useState(false);
+  const [localBusy,setBusy]=React.useState(false);
+  const [saving,setSaving]=React.useState(()=>isAgentCommitting(runId));
+  const [recordOpen,setRecordOpen]=React.useState(false);
+  const [recordTab,setRecordTab]=React.useState<"steps"|"sources">("steps");
+  const busy=localBusy||saving;
   const bridge=useEditorBridge(),{toast}=useToast();
   const tr=useT();
+  const liveRunRef=React.useRef<string | null>(null);
+  if(run?.status==="running") liveRunRef.current=run.id;
+  const running=run?.status==="running";
+  const validationStopped=run?.stoppedOnValidation || run?.summary.startsWith("同一条改动连续两次没有通过校验");
+  const summary=displayAgentReply(validationStopped ? "" : run?.summary??"").split("\n").map(line=>tr(line)).join("\n");
+  const showReply=Boolean(summary.trim() && (!running || run?.answering));
+  const replyLength=useAgentReplyReveal(runId,showReply?summary:"",liveRunRef.current===runId);
+  const revealing=showReply && replyLength<summary.length;
+  const settled=!running && !revealing;
   const receive=React.useCallback((value:AgentRun)=>setRun(current=>!current||current.id!==value.id||value.updatedAt>=current.updatedAt?{...value}:current),[]);
   const refresh=React.useCallback(()=>{void apiGet<AgentRun>(`/api/ai/agent/${runId}?novelId=${encodeURIComponent(novelId)}`).then(receive).catch(e=>setError(e.message));},[runId,novelId,receive]);
   React.useEffect(()=>{if(initial)receive(initial);else refresh();},[initial,refresh,receive]);
@@ -67,6 +82,12 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
     const listen=(event:Event)=>{const value=(event as CustomEvent<AgentRun>).detail;if(value.id===runId)receive(value);};
     window.addEventListener(AGENT_UPDATED,listen);return()=>window.removeEventListener(AGENT_UPDATED,listen);
   },[runId,receive]);
+  React.useEffect(()=>{
+    const listen=()=>setSaving(isAgentCommitting(runId));
+    listen();
+    window.addEventListener(AGENT_COMMIT_CHANGED,listen);
+    return()=>window.removeEventListener(AGENT_COMMIT_CHANGED,listen);
+  },[runId]);
   // 任务一进入 ready 且带待确认正文候选就广播一次；写作区收到后自动打开内联 diff 审阅。
   // 只广播「刚就绪」的转换，避免刷新页面或回看旧会话时把历史候选自动弹出来。
   const readyBroadcastRef=React.useRef(new Set<string>());
@@ -95,12 +116,10 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
   if(!run)return <div className="mt-3 text-[12px] text-ink-3">{error||tr("正在读取任务…")}{error?<Button size="sm" onClick={refresh}>{tr("重试")}</Button>:null}</div>;
   const pending=run.changes.filter(c=>c.state==="pending");
   const applied=run.changes.filter(c=>c.state==="applied");
-  const running=run.status==="running";
   const live=run.changes.filter(c=>c.state!=="rejected"&&c.state!=="reverted");
   const materials=live.filter(c=>c.kind!=="chapter");
   const chapters=live.filter(c=>c.kind==="chapter");
-  const chapterCount=chapters.length;
-  const summary=displayAgentReply(run.summary);
+  const discussion = run.status==="complete" && !run.changes.length && !run.error;
   const isPicked=(change:AgentChange)=>picked[change.id]??!change.evidence?.length;
   const apply=(changes:AgentChange[])=>mutate(async()=>{
     const result=await commitAgent(run,{selections:changes.map(c=>({id:c.id,fields:fields[c.id]}))},bridge);
@@ -175,13 +194,29 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
     {target.kind==="character"?<User className="size-3 shrink-0"/>:target.kind==="location"?<MapPinned className="size-3 shrink-0"/>:target.kind==="world"?<MapPin className="size-3 shrink-0"/>:target.kind==="foreshadow"?<Bookmark className="size-3 shrink-0"/>:<BookOpen className="size-3 shrink-0"/>}
     <span className="truncate">{target.title}</span><span className="shrink-0 text-[9px] opacity-70">{tr(ENTITY_LABEL[target.kind])}</span>
   </button>;
-  return <div className="my-4 min-w-0 overflow-hidden rounded-lg border border-line/80 bg-surface" data-testid="agent-run-card">
-    <div className="flex items-center gap-2 border-b border-line/70 px-4 py-3.5 text-[12px]">
-      {running?<Loader2 className="size-3.5 animate-spin text-accent"/>:applied.length?<Check className="size-3.5 text-jade"/>:<FilePenLine className="size-3.5 text-accent"/>}
-      <span className="font-medium text-ink">{running?tr("助手正在处理"):pending.length?tr("待确认改动"):applied.length?tr("已应用"):tr("任务记录")}</span>
-      <span className="ml-auto text-[10px] text-ink-4">{[chapterCount?tr("正文 · {count}",{count:chapterCount}):"",materials.length?tr("资料 · {count}",{count:materials.length}):""].filter(Boolean).join(tr("　"))}</span>
-    </div>
-    <AgentProgress run={run} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
+  return <div className="min-w-0" data-testid="agent-run-card">
+    <AgentProgress run={run} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
+    {(running || revealing) && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}
+    {showReply?<AgentReply text={summary} length={replyLength}/>:null}
+    {settled && validationStopped?<p className="px-1 py-1 text-[13px] leading-relaxed text-ink-2" role="status">{
+      applied.length ? tr("已应用 {count} 项改动。", { count:applied.length })
+        : pending.length ? tr("已准备 {count} 项候选，等待你确认。", { count:pending.length })
+          : tr("本轮未生成可审阅的改动。可在执行记录里查看原因。")
+    }</p>:null}
+    {settled && run.recap && pending.length && !validationStopped ? <div className="space-y-2 px-4 py-3 text-[13px] leading-relaxed text-ink-2">
+      <p>{tr("已准备 {count} 项候选，等待你确认。", { count: pending.length })}</p>
+      <ul className="list-disc space-y-1 pl-4">
+        {pending.slice(0, 4).map(change => {
+          const fields = Object.keys(change.after).map(key => FIELD_LABEL[key]).filter(Boolean).map(key => tr(key));
+          return <li key={change.id}>
+            {tr(change.op === "delete" ? "删除" : change.before ? "修改" : "新建")} · {tr(ENTITY_LABEL[change.kind])}
+            {change.title ? ` · ${change.title}` : ""}
+            {fields.length ? `（${fields.join("、")}）` : ""}
+          </li>;
+        })}
+      </ul>
+    </div> : null}
+    {settled && (chapters.length || materials.length) ? <div className="mt-3 overflow-hidden rounded-lg border border-line/80 bg-surface fade-in">
     {chapters.length?<div>{chapters.map(chapterCard)}</div>:null}
     {materials.length?<div className="border-t border-line/70">
       <div className="flex flex-wrap items-center gap-2 bg-paper/25 px-4 py-2.5 text-[11px] text-ink-3">
@@ -191,20 +226,30 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
       </div>
       {materials.map(materialCard)}
     </div>:null}
-    <div className="px-4 py-2.5">
-      {run.steps.length ? <details className="text-[11px] text-ink-3">
-        <summary className="cursor-pointer py-1">{tr("执行过程 · {count} 步",{count:run.steps.length})}</summary>
+    </div> : null}
+    {settled && (run.steps.length || run.references.length || applied.length) ? <div className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1">
+      {run.steps.length || run.references.length ? <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" onClick={()=>{setRecordTab(run.steps.length?"steps":"sources");setRecordOpen(true);}}>
+        {tr("执行记录")}<span className="tabular-nums text-ink-4">{run.steps.length || run.references.length}</span>
+      </Button>:null}
+      {applied.length?<Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" disabled={disabled||busy} icon={<RotateCcw className="size-3"/>} onClick={()=>void mutate(()=>commitAgent(run,{op:"undo"},bridge))}>{tr("撤回本轮")}</Button>:null}
+    </div>:null}
+    {recordOpen?<Sheet open onClose={()=>setRecordOpen(false)} title={tr("执行记录")} width={440}>
+      <div className="px-4 py-3">
+        <div role="group" aria-label={tr("执行记录")} className="mb-4 flex gap-2 border-b border-line">
+          <Button variant="ghost" size="sm" aria-pressed={recordTab==="steps"} onClick={()=>setRecordTab("steps")}>{tr("工具状态")} · {run.steps.length}</Button>
+          <Button variant="ghost" size="sm" aria-pressed={recordTab==="sources"} onClick={()=>setRecordTab("sources")}>{tr("已读取资料 · {count}",{count:run.references.length})}</Button>
+        </div>
+        {recordTab==="steps" ?
         <ol className="my-2 space-y-3 border-l border-line pl-3">{run.steps.map((step,index)=><li key={step.id}>
-          <div className={`flex items-center gap-1.5 ${step.status==="error"?"text-danger":"text-ink-3"}`}>
+          <div className={`flex items-center gap-1.5 text-[12px] ${step.status==="error"?"text-danger":"text-ink-3"}`}>
             {step.status==="running"?<Loader2 className="size-3 animate-spin"/>:step.status==="error"?<CircleAlert className="size-3"/>:<Check className="size-3"/>}
-            <span>{step.label}</span>
+            <span>{tr(step.label)}</span>
           </div>
           {step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}
-          {step.detail && (step.status==="error" || step.detail!==run.steps[index-1]?.detail)?<p className="mt-1 leading-relaxed text-ink-4">{step.detail}</p>:null}
-        </li>)}</ol>
-      </details> : null}
-      {run.references.length?<details className="text-[11px] text-ink-3"><summary className="cursor-pointer py-1">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}
-    </div>
+          {step.detail && (step.status==="error" || step.detail!==run.steps[index-1]?.detail)?<p className="mt-1 leading-relaxed text-ink-4">{tr(step.detail)}</p>:null}
+        </li>)}</ol> : <div className="flex flex-wrap gap-1.5">{run.references.map(chip)}</div>}
+      </div>
+    </Sheet>:null}
     {error||run.error?<p role="alert" className="mx-3 mb-3 rounded bg-danger/5 p-2 text-[11px] leading-relaxed text-danger"><CircleAlert className="mr-1 inline size-3"/>{error||run.error}</p>:null}
     {run.errorCode?<details className="mx-3 mb-3 rounded-md border border-line p-2 text-[11px] text-ink-3">
       <summary className="cursor-pointer">{tr("调试详情 · {detail}",{detail:run.errorCode||(run.diagnostics?.length?tr("已自动修复的协议错误"):tr("旧任务未记录错误码"))})}</summary>
@@ -219,11 +264,9 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
       </details>)}
       <button type="button" className="mt-2 text-accent underline" onClick={async()=>{try{await copyText(JSON.stringify({runId:run.id,errorCode:run.errorCode,model:run.model,provider:run.provider,diagnostics:run.diagnostics},null,2));toast({title:tr("已复制调试信息"),tone:"success"});}catch{toast({title:tr("复制失败，请手动选中调试详情"),tone:"error"});}}}>{tr("复制调试信息")}</button>
     </details>:null}
-    {!running && summary.trim() && summary.trim()!==run.progress?.at(-1)?.text?<Markdown text={summary} className="break-words border-t border-line/60 px-4 py-3 text-[13px] leading-[1.9] text-ink-2"/>:null}
-    {!running?<div className="flex flex-wrap items-center gap-2 border-t border-line/70 bg-paper/35 px-4 py-3">
+    {settled && !discussion && pending.length?<div className="mt-2 flex flex-wrap items-center gap-2">
       {pending.length?<Button variant="primary" size="sm" className="min-h-9 flex-1 justify-center shadow-none" loading={busy} disabled={disabled||!selected.length||selected.some(c=>fields[c.id]?.length===0)} onClick={()=>void apply(selected)}>{tr("应用选中的 {count} 项",{count:selected.length})}{selected.some(c=>c.op==="delete")?tr("（含删除 {count}）",{count:selected.filter(c=>c.op==="delete").length}):""}</Button>:null}
-      {applied.length?<Button size="sm" variant="ghost" disabled={disabled||busy} icon={<RotateCcw className="size-3"/>} onClick={()=>void mutate(()=>commitAgent(run,{op:"undo"},bridge))}>{tr("撤回本轮")}</Button>:null}
-      {onContinue?<button type="button" className="text-[11px] text-ink-3 hover:text-accent" disabled={busy||disabled} onClick={()=>onContinue("请基于上轮候选继续修改：")}>{tr("继续修改")}</button>:null}
+      {onContinue && pending.length?<button type="button" className="text-[11px] text-ink-3 hover:text-accent" disabled={busy||disabled} onClick={()=>onContinue("请基于上轮候选继续修改：")}>{tr("继续修改")}</button>:null}
     </div>:null}
   </div>;
 }

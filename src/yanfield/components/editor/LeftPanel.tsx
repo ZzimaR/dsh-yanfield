@@ -59,7 +59,7 @@ export const LeftPanel = React.memo(function LeftPanel({
   ];
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-surface">
+    <div data-yf-reference-sidebar className="flex h-full min-h-0 w-full min-w-0 flex-col bg-surface">
       <div className="shrink-0 border-b border-line px-2 py-1.5">
         <div className="flex gap-1" role="tablist" aria-label={tr("左栏页签")}>
           {tabs.map((item) => {

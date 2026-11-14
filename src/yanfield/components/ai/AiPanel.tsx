@@ -309,14 +309,9 @@ export function AiPanel({
   const editAbortRef = React.useRef<AbortController | null>(null);
   const agentRunIdRef = React.useRef(0);
   const agentRunTabKeyRef = React.useRef<string | null>(null);
-  const requestContextRef = React.useRef({ novelId, chapterId });
   React.useEffect(
     () => {
-      const changed =
-        requestContextRef.current.novelId !== novelId ||
-        requestContextRef.current.chapterId !== chapterId;
-      requestContextRef.current = { novelId, chapterId };
-      if (changed) setPreparing(false);
+      setPreparing(false);
       return () => {
         agentRunIdRef.current += 1;
         codexAbortRef.current?.abort();
@@ -325,7 +320,7 @@ export function AiPanel({
         sendingRef.current = false;
       };
     },
-    [novelId, chapterId, chat.stop],
+    [novelId, chat.stop],
   );
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [contextOpen, setContextOpen] = React.useState(false);
@@ -405,7 +400,7 @@ export function AiPanel({
       return;
     }
     followLatest();
-  },[activeKey,chat.activeTab.messages.length,followLatest]);
+  },[activeKey,followLatest]);
   React.useEffect(()=>{
     if(chat.activeTab.messages.length===0){
       followingRef.current=true;setHasNewProgress(false);
@@ -468,10 +463,14 @@ export function AiPanel({
       selection: retryMessage
         ? savedRequest?.selection
         : contextConfig.includeSelection
-          ? (task?.selection || bridge?.getSelectionText().trim() || undefined)
+          ? (task ? task.selection : bridge?.getSelectionText().trim() || undefined)
           : undefined,
       snapshot: retryMessage ? savedRequest?.snapshot : undefined,
     };
+    const selection=requestContext.selection;
+    const range = !retryMessage && selection && selection === bridge?.getSelectionText().trim()
+      && bridge?.getChapterId?.() === requestContext.chapterId ? bridge.getSelectionRange?.() : undefined;
+    const selectionReference = range ? { ...range, chapterTitle: chapterTitle ?? "" } : undefined;
     // Persist unsaved writing before the agent reads the chapter; a failed save leaves the input intact.
     try { await bridge?.flush?.(); } catch {
       if (runId === agentRunIdRef.current) {
@@ -485,7 +484,6 @@ export function AiPanel({
     const history = historyMessages.filter(m=>m.status!=="streaming").slice(-10).map(m=>({role:m.role,content:m.content}));
     const previous = [...(retryMessage ? [retryMessage] : chat.activeTab.messages)].reverse().flatMap(m=>m.actions).find(a=>a.type==="agent-run");
     const previousRunId = previous && typeof previous.payload==="object" && previous.payload ? (previous.payload as {runId?:string}).runId : undefined;
-    const selection=requestContext.selection;
     const references=requestContext.mentions;
     const attached=referenceSnapshots[originalKey];
     const snapshot=requestContext.snapshot ?? (retryMessage ? undefined : task?.snapshot ?? (attached&&(!attached.id||references.some(m=>m.type===attached.kind&&m.id===attached.id))?attached:undefined));
@@ -493,7 +491,9 @@ export function AiPanel({
     const sessionId=await chat.prepareSession();
     if (runId !== agentRunIdRef.current) return;
     if(activeTabKeyRef.current!==originalKey){sendingRef.current=false;setPreparing(false);return;}
-    const assistantId=chat.beginExchange(text, retryMessage?.id);
+    const assistantId=chat.beginExchange(text, retryMessage?.id, selection ? {
+      id: String(runId), type: "selection-reference", label: "引用正文", payload: { text: selection, reference: selectionReference }, applied: false,
+    } : undefined);
     setPreparing(false);
     const controller=new AbortController();
     editAbortRef.current=controller;
@@ -502,14 +502,14 @@ export function AiPanel({
     let currentRun:AgentRun|undefined;
     let action:AiAction|undefined;
     try {
-      await streamAiAgent({novelId,chapterId:requestContext.chapterId,sessionId:sessionId||undefined,agentId:requestContext.agentId,message:text,snapshot,history,previousRunId,retryRunId:retryMessage ? previousRunId : undefined,selection,mentions:references,context:requestContext.context}, {
+      await streamAiAgent({novelId,chapterId:requestContext.chapterId,sessionId:sessionId||undefined,agentId:requestContext.agentId,message:text,snapshot,history,previousRunId,retryRunId:retryMessage ? previousRunId : undefined,selection,selectionReference,mentions:references,context:requestContext.context}, {
         signal:controller.signal,
         onEvent:event=>{
           if (runId !== agentRunIdRef.current) return;
           if(event.type==="meta") chat.patchExchange(assistantId,{provider:event.provider,model:event.model});
           if(event.type==="action") {
             const payload=isRecord(event.action.payload)?event.action.payload:{};
-            action={...event.action,payload:{...payload,requestContext}};
+            action={...event.action,payload:{...payload,requestContext:payload.requestContext??requestContext}};
             chat.patchExchange(assistantId,{actions:[action]});
           }
           if(event.type==="agent") {
@@ -543,7 +543,7 @@ export function AiPanel({
         await chat.endExchange({persist:!sessionId});
       }
     }
-  },[bridge,chat,novelId,chapterId,mentions,contextConfig,task,referenceSnapshots,setDraft,setMentions,tr]);
+  },[bridge,chat,novelId,chapterId,chapterTitle,mentions,contextConfig,task,referenceSnapshots,setDraft,setMentions,tr]);
   React.useEffect(()=>{
     const text=pendingAutoSendRef.current;
     if(!text||chat.streaming)return;

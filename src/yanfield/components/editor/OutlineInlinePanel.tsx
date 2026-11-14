@@ -252,21 +252,6 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
   const pendingActionRef = React.useRef<(() => void) | null>(null);
   const [discardOpen, setDiscardOpen] = React.useState(false);
   const activeRowRef = React.useRef<HTMLDivElement | null>(null);
-  /** 面板被左栏 hidden 保活隐藏时，portal 出去的浮窗也要一起藏起来 */
-  const rootRef = React.useRef<HTMLDivElement | null>(null);
-  const [visible, setVisible] = React.useState(true);
-
-  React.useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const node = rootRef.current;
-    if (!node) return;
-    const observer = new IntersectionObserver((entries) => {
-      const entry = entries[0];
-      if (entry) setVisible(entry.isIntersecting);
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
 
   const refreshAll = React.useCallback(() => {
     void outlineApi.refresh();
@@ -479,7 +464,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
   );
 
   return (
-    <div ref={rootRef} className="flex h-full min-h-0 w-full min-w-0 flex-col">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       {/* 1. 本章章纲摘要卡 */}
       <Card padded={false} className="mx-3 mt-3 shrink-0 px-3.5 py-3">
         <div className="flex items-center justify-between gap-2">
@@ -697,16 +682,14 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
 
       {/* 4. 编辑浮窗：一次只开一个，三选一复用现有编辑器 */}
       <FloatWindow
-        open={floatOpen && visible}
-        // 页签切走（visible=false）时保留挂载，草稿不丢；关闭编辑器（floatOpen=false）时卸载重置
-        keepMounted={floatOpen}
+        open={floatOpen}
         title={floatTitle}
         minimized={minimized}
         onMinimizedChange={setMinimized}
         onClose={closeEditor}
       >
         {editor === "novel" ? (
-          <div className="p-3">
+          <div className="px-5 py-4">
             <NovelOutlinePanel
               novelId={novelId}
               outline={outline ?? undefined}
@@ -720,7 +703,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
         ) : null}
 
         {editor === "volume" ? (
-          <div className="p-3">
+          <div className="px-5 py-4">
             <VolumePanel
               novelId={novelId}
               volumes={volumes}
@@ -738,21 +721,14 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
         ) : null}
 
         {editor === "blueprint" && editingChapter ? (
-          <div className="p-3">
+          <div className="px-5 py-4">
             <BlueprintEditor
               key={editingChapter.id}
               novelId={novelId}
               chapter={editingChapter}
               chapters={chapters}
               foreshadows={foreshadows}
-              onWrite={() => guardUnsaved(() => {
-                void onSelectChapter(editingChapter.id).then((selected) => {
-                  if (!selected) return;
-                  dirtyRef.current = false;
-                  setMinimized(false);
-                  setEditor(null);
-                });
-              })}
+              onWrite={() => { void onSelectChapter(editingChapter.id); }}
               onSaved={handleBlueprintSaved}
               onDirtyChange={handleDirtyChange}
             />

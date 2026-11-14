@@ -22,7 +22,7 @@ export function CardEditorDocument({children}:{children:React.ReactNode}) {
     <div role="tablist" aria-label={tr("资料编辑分类")} className="sticky top-0 z-10 flex gap-6 border-b border-line bg-surface px-7">
       {([["content","资料"],["links","关联与标签"],["settings","选项"]] as const).filter(([key])=>available.has(key)).map(([key,label])=><button type="button" key={key} role="tab" aria-selected={tab===key} onClick={()=>setTab(key)} className={cn("-mb-px border-b-2 py-3 text-[12px] transition-colors",tab===key?"border-accent font-medium text-ink":"border-transparent text-ink-3 hover:text-ink")}>{tr(label)}</button>)}
     </div>
-    <div role="tabpanel" className="px-7 pb-6 pt-1">{rest}</div>
+    <div role="tabpanel" className="@container px-7 pb-6 pt-1">{rest}</div>
   </div></TabContext.Provider>;
 }
 

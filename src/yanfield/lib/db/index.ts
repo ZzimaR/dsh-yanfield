@@ -391,6 +391,15 @@ const MIGRATIONS: ((db: DB) => void)[] = [
       db.exec("ALTER TABLE chapter_blueprints ADD COLUMN twist TEXT NOT NULL DEFAULT 'medium'");
     }
   },
+  // v6：写作台资料列表的顺序独立于卡片内容和父级。
+  (db) => {
+    db.exec(`CREATE TABLE IF NOT EXISTS codex_order (
+      novel_id TEXT NOT NULL REFERENCES novels(id) ON DELETE CASCADE,
+      group_key TEXT NOT NULL,
+      ids TEXT NOT NULL,
+      PRIMARY KEY (novel_id, group_key)
+    )`);
+  },
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

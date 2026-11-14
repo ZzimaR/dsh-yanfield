@@ -121,8 +121,8 @@ export function PanelCard({
   bodyClassName?: string;
 }) {
   return (
-    <Card padded={false} className={cn("flex min-w-0 flex-col overflow-visible", className)}>
-      <div className="flex items-start justify-between gap-2 border-b border-line px-4 py-3">
+    <Card padded={false} className={cn("yf-document-section flex min-w-0 flex-col overflow-visible", className)}>
+      <div className="yf-document-section-heading flex items-start justify-between gap-2 border-b border-line px-4 py-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-1.5 text-[14px] font-semibold text-ink">
             {icon ? <span className="text-ink-3">{icon}</span> : null}
@@ -230,10 +230,11 @@ export function AiTextField({
   className,
 }: AiTextFieldProps) {
   const tr = useT();
+  const fieldId = React.useId();
   return (
     <div className={cn("min-w-0", className)}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="text-[13px] font-medium text-ink-2">{typeof label === "string" ? tr(label) : label}</span>
+        <label htmlFor={fieldId} className="text-[13px] font-medium text-ink-2">{typeof label === "string" ? tr(label) : label}</label>
         {ai ? (
           <AiAssistButton
             feature={feature}
@@ -246,6 +247,7 @@ export function AiTextField({
         ) : null}
       </div>
       <Textarea
+        id={fieldId}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         rows={rows}
@@ -352,13 +354,14 @@ export function StringListEditor({ items, onChange, placeholder, addLabel, empty
       ) : (
         <div className="space-y-1.5">
           {items.map((item, index) => (
-            <div key={index} className="flex items-center gap-1">
-              <span className="w-4 shrink-0 text-center text-[11px] tabular-nums text-ink-3">{index + 1}</span>
-              <Input
+            <div key={index} className="flex items-start gap-1">
+              <span className="w-4 shrink-0 pt-2 text-center text-[11px] tabular-nums text-ink-3">{index + 1}</span>
+              <Textarea
                 value={item}
                 onChange={(event) => updateItem(index, event.target.value)}
                 placeholder={placeholder}
-                className="h-8 text-[13px]"
+                rows={1}
+                className="min-h-8 text-[13px]"
               />
               <IconButton label={tr("上移")} size="sm" disabled={index === 0} onClick={() => moveItem(index, -1)}>
                 <ArrowUp className="size-3.5" />

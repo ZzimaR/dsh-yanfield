@@ -77,7 +77,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
 
   const [theme, setTheme] = React.useState<EditorTheme>("light");
   const [selection, setSelection] = React.useState<SelectionInfo>(EMPTY_SELECTION);
-  const [editor, setEditor] = React.useState<Editor | null>(null);
+  const [mountedEditor, setMountedEditor] = React.useState<{ instance: Editor; chapterId: string } | null>(null);
 
   /* ---------------- 响应式断点 ----------------
    * ≥768：左栏内联（可拖宽/折叠）；<768：左栏改为 header 按钮唤起的抽屉
@@ -359,21 +359,22 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
 
   /* ---------------- EditorBridge：把编辑器能力注入整页 ---------------- */
 
-  const handleEditorReady = React.useCallback((instance: Editor | null) => {
-    setEditor(instance);
+  const handleEditorReady = React.useCallback((instance: Editor | null, id: string | null) => {
+    setMountedEditor(current => instance && id ? { instance, chapterId: id } : current?.chapterId === id ? null : current);
   }, []);
+  const editor = mountedEditor?.chapterId === chapterId ? mountedEditor?.instance ?? null : null;
   const rawBridge = useEditorBridgeValue(editor);
   const currentChapterRef = React.useRef(chapterId);
   currentChapterRef.current=chapterId;
   const bridge = React.useMemo(() => rawBridge ? {
-    ...rawBridge, getChapterId:()=>currentChapterRef.current, flush,
+    ...rawBridge, getChapterId:()=>chapterId, flush,
     setReadOnly:(locked:boolean)=>editor?.setEditable(!locked,false),
     syncSaved:(saved:Chapter)=>{
       if(currentChapterRef.current!==saved.id)return;
       adoptSaved(saved); actions.patchChapterLocal(saved.id,saved);
       editor?.commands.setContent(saved.content||"<p></p>",{emitUpdate:false});
     },
-  } : null,[rawBridge,flush,adoptSaved,actions,editor]);
+  } : null,[rawBridge,flush,adoptSaved,actions,editor,chapterId]);
   /* ---------------- 正文改动审阅：手动入口 + 自动打开 ---------------- */
 
   /** 已自动打开或已被作者关闭的审阅，key = `${run.id}:${change.id}`；关闭过的改动不会再弹。 */
@@ -882,7 +883,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
             role={!isWide&&drawerRightOpen?"dialog":undefined}
             aria-modal={!isWide&&drawerRightOpen?true:undefined}
           >
-            <EditorRightRail novelId={novelId} chapterId={chapter?.id??null} chapterTitle={title||null} onClose={()=>isWide?setRightOpen(false):setDrawerRightOpen(false)}/>
+            <EditorRightRail novelId={novelId} chapterId={chapterMeta?.id??null} chapterTitle={chapter ? title : chapterMeta?.title ?? null} onClose={()=>isWide?setRightOpen(false):setDrawerRightOpen(false)}/>
           </aside>
         </div>
 

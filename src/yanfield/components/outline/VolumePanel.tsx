@@ -205,7 +205,7 @@ export function VolumePanel({
         )
       ) : (
         <div className="space-y-4">
-          <div className="scroll-thin max-h-[236px] space-y-1 overflow-auto pr-1">
+          <div className="yf-volume-list scroll-thin max-h-[236px] space-y-1 overflow-auto pr-1">
             {volumes.map((volume, index) => {
               const active = volume.id === selectedVolumeId;
               return (

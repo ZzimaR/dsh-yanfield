@@ -355,6 +355,12 @@ html[data-prose-font="sans"] .prose-paper,
 .fade-in {
   animation: fade-in 0.2s ease-out both;
 }
+@media (prefers-reduced-motion: reduce) {
+  .ai-caret::after,
+  .fade-in {
+    animation: none;
+  }
+}
 @keyframes pulse-soft {
   0%, 100% { opacity: 0.55; }
   50% { opacity: 1; }
@@ -503,6 +509,53 @@ html[data-prose-font="sans"] .prose-paper,
 .card-document-title:focus { box-shadow: 0 1px 0 var(--accent); }
 .card-document-section label { font-size: 11px; color: var(--ink-3); font-weight: 400; }
 .card-document-section textarea::placeholder { color: var(--ink-4); font-size: 12px; }
+
+/* Long fields grow with the document. The floating window owns vertical scrolling. */
+.yf-reference-document textarea,
+.card-document textarea {
+  field-sizing: content;
+  min-height: 2lh;
+  max-height: none;
+  resize: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding-inline: 0;
+  font-family: var(--font-serif);
+  line-height: 1.85;
+}
+.yf-reference-document textarea:focus-visible,
+.card-document textarea:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+.yf-reference-document .yf-archive-ledger {
+  min-width: 0;
+  table-layout: fixed;
+  overflow-wrap: anywhere;
+}
+.yf-reference-document .yf-archive-ledger :is(th, td):last-child {
+  width: 45%;
+}
+.yf-reference-document .yf-document-section {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.yf-reference-document .yf-document-section + .yf-document-section {
+  border-top: 1px solid var(--line);
+}
+.yf-reference-document .yf-document-section-heading {
+  border: 0;
+  padding-block-end: 0;
+}
+.yf-reference-document .yf-volume-list {
+  max-height: none;
+  overflow: visible;
+}
 
 /* ---------------- 文本光标（I 形指针） ----------------
  * Windows 默认的 IBeam 是「白芯 + 一圈 1px 黑边」，落在米黄纸面上几乎看不见。

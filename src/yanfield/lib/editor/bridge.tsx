@@ -13,6 +13,7 @@ export interface EditorBridge {
   syncSaved?(chapter: import("@/lib/types").Chapter): void;
   setReadOnly?(locked: boolean): void;
   getSelectionText(): string;
+  getSelectionRange?(): Pick<import("./selection-reference").SelectionReference, "from" | "to" | "startLine" | "endLine"> | undefined;
   /** 在光标处插入（续写用） */
   insertText(text: string): void;
   replaceSelection(text: string): void;

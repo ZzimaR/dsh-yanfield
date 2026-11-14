@@ -84,8 +84,6 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
   const archivesApi = useApi<unknown>(`/api/archives${query}`);
 
   // 页签隐藏时也隐藏渲染在插件 portal 中的档案浮窗。
-  const rootRef = React.useRef<HTMLDivElement | null>(null);
-  const [visible, setVisible] = React.useState(true);
 
   const [selectedChapterId, setSelectedChapterId] = React.useState<string | null>(null);
   const [minimized, setMinimized] = React.useState(false);
@@ -199,18 +197,6 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
     return () => {
       aliveRef.current = false;
     };
-  }, []);
-
-  React.useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") return;
-    const node = rootRef.current;
-    if (!node) return;
-    const observer = new IntersectionObserver((entries) => {
-      const entry = entries[0];
-      if (entry) setVisible(entry.isIntersecting);
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
   }, []);
 
   React.useEffect(() => {
@@ -422,8 +408,9 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
 
   const detailBody = selectedChapter ? (
       selectedArchive ? (
-        <div className="p-3">
+        <div className="px-5 py-4">
           <ArchiveDetail
+            inFloat
             novelId={novelId}
             archive={selectedArchive}
             chapter={selectedChapter}
@@ -467,7 +454,7 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
   /* ---------- 渲染 ---------- */
 
   return (
-    <div ref={rootRef} className="flex h-full min-h-0 w-full min-w-0 flex-col">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       {/* 顶部状态 + 补齐 */}
       <div className="shrink-0 border-b border-line">
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-3 pb-1.5 pt-2">
@@ -657,9 +644,7 @@ export function ArchiveInlinePanel({ novelId }: ArchiveInlinePanelProps) {
       </div>
 
       <FloatWindow
-        open={selectedChapter !== null && visible}
-        // 页签切走（visible=false）时保留挂载，档案详情里未保存的输入不丢；关闭浮窗时卸载重置
-        keepMounted={selectedChapter !== null}
+        open={selectedChapter !== null}
         title={detailTitle}
         minimized={minimized}
         onMinimizedChange={setMinimized}

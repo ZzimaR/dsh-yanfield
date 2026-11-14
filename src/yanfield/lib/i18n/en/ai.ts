@@ -8,6 +8,13 @@ import type { TranslateValue } from "../core"
  * English UI text; `{one, other}` values are selected by `params.count`.
  */
 export const ai: Record<string, TranslateValue> = {
+  "执行记录": "Activity log",
+  "工具状态": "Tool status",
+  "已应用 {count} 项改动。": { one: "Applied {count} change.", other: "Applied {count} changes." },
+  "已准备 {count} 项候选，等待你确认。": { one: "I prepared {count} proposal for your review.", other: "I prepared {count} proposals for your review." },
+  "引用正文": "Quoted prose",
+  "第 {line} 行": "Line {line}",
+  "第 {from}–{to} 行": "Lines {from}–{to}",
   " · {calls} 次": { one: " · {calls} call", other: " · {calls} calls" },
   " · 上下文 {size}": " · Context {size}",
   " · 新建": " · New",
