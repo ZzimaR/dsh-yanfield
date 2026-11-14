@@ -33,7 +33,6 @@ import type {
   ChatSession,
   ContextConfig,
   DashboardStats,
-  PromptPreset,
   ProviderConfig,
 } from "@/lib/types";
 import { useMediaQuery } from "@/lib/ui/hooks";
@@ -50,7 +49,7 @@ import { ChatHistorySheet } from "./ChatHistorySheet";
 import { ChatMessageView } from "./ChatMessageView";
 import { ContextDrawer } from "./ContextDrawer";
 import { useContextPreview } from "./ContextMeter";
-import type { AgentRun } from "@/lib/ai/agent/types";
+import type { AgentRequest, AgentRun } from "@/lib/ai/agent/types";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
 import { ModelPicker } from "./ModelPicker";
 import { WelcomePanel } from "./WelcomePanel";
@@ -177,7 +176,6 @@ export function AiPanel({
   const statsApi = useApi<DashboardStats>("/api/stats");
   const wasStreaming = React.useRef(false);
   const { data: providers } = useApi<{ items: ProviderConfig[] }>("/api/providers");
-  const { data: presets } = useApi<{ items: PromptPreset[] }>(`/api/presets?novelId=${novelId}`);
   const agents = React.useMemo(() => listAgents(settings), [settings]);
   /** 只有一个智能体时隐藏选择器（内置已精简到 3 个，通常仍会显示） */
   const hasAgentChoice = agents.length > 1;
@@ -308,6 +306,7 @@ export function AiPanel({
   const codexAbortRef = React.useRef<AbortController | null>(null);
   const editAbortRef = React.useRef<AbortController | null>(null);
   const agentRunIdRef = React.useRef(0);
+  const continuation = React.useRef<{ tab: string; runId: string; prefix: string } | null>(null);
   const agentRunTabKeyRef = React.useRef<string | null>(null);
   React.useEffect(
     () => {
@@ -468,6 +467,7 @@ export function AiPanel({
       snapshot: retryMessage ? savedRequest?.snapshot : undefined,
     };
     const selection=requestContext.selection;
+    const writingPreset = retryMessage ? undefined : /^shortcut-(continue|expand|polish|deai)$/.exec(task?.id ?? "")?.[1] as AgentRequest["writingPreset"];
     const range = !retryMessage && selection && selection === bridge?.getSelectionText().trim()
       && bridge?.getChapterId?.() === requestContext.chapterId ? bridge.getSelectionRange?.() : undefined;
     const selectionReference = range ? { ...range, chapterTitle: chapterTitle ?? "" } : undefined;
@@ -483,7 +483,9 @@ export function AiPanel({
     const historyMessages = retryMessage ? chat.activeTab.messages.slice(0, Math.max(0, chat.activeTab.messages.findIndex(m=>m.id===retryMessage.id)-1)) : chat.activeTab.messages;
     const history = historyMessages.filter(m=>m.status!=="streaming").slice(-10).map(m=>({role:m.role,content:m.content}));
     const previous = [...(retryMessage ? [retryMessage] : chat.activeTab.messages)].reverse().flatMap(m=>m.actions).find(a=>a.type==="agent-run");
-    const previousRunId = previous && typeof previous.payload==="object" && previous.payload ? (previous.payload as {runId?:string}).runId : undefined;
+    const lastRunId = previous && typeof previous.payload==="object" && previous.payload ? (previous.payload as {runId?:string}).runId : undefined;
+    const chosen = continuation.current;
+    const previousRunId = !retryMessage && chosen?.tab === originalKey && text.startsWith(chosen.prefix) ? chosen.runId : lastRunId;
     const references=requestContext.mentions;
     const attached=referenceSnapshots[originalKey];
     const snapshot=requestContext.snapshot ?? (retryMessage ? undefined : task?.snapshot ?? (attached&&(!attached.id||references.some(m=>m.type===attached.kind&&m.id===attached.id))?attached:undefined));
@@ -498,11 +500,12 @@ export function AiPanel({
     const controller=new AbortController();
     editAbortRef.current=controller;
     agentRunTabKeyRef.current=originalKey;
+    if (continuation.current?.tab === originalKey && !retryMessage) continuation.current = null;
     setDraft("");setMentions([]);setTask(null);setReferenceSnapshots(prev=>({...prev,[originalKey]:undefined}));
     let currentRun:AgentRun|undefined;
     let action:AiAction|undefined;
     try {
-      await streamAiAgent({novelId,chapterId:requestContext.chapterId,sessionId:sessionId||undefined,agentId:requestContext.agentId,message:text,snapshot,history,previousRunId,retryRunId:retryMessage ? previousRunId : undefined,selection,selectionReference,mentions:references,context:requestContext.context}, {
+      await streamAiAgent({novelId,chapterId:requestContext.chapterId,sessionId:sessionId||undefined,agentId:requestContext.agentId,message:text,snapshot,history,previousRunId,retryRunId:retryMessage ? previousRunId : undefined,selection,selectionReference,mentions:references,context:requestContext.context,writingPreset}, {
         signal:controller.signal,
         onEvent:event=>{
           if (runId !== agentRunIdRef.current) return;
@@ -583,7 +586,8 @@ export function AiPanel({
     }
     chat.closeSession(sessionId);
   }, [chat.closeSession, chat.tabs]);
-  const handleContinue = React.useCallback((text: string) => {
+  const handleContinue = React.useCallback((text: string, runId: string) => {
+    continuation.current = { tab: activeTabKeyRef.current, runId, prefix: text };
     setDrafts((prev) => ({ ...prev, [activeTabKeyRef.current]: text }));
     setFocusSignal((value) => value + 1);
   }, []);
@@ -868,7 +872,6 @@ export function AiPanel({
           <WelcomePanel
             agent={activeAgent}
             model={target}
-            presets={presets?.items ?? null}
             onPickSkill={handlePickSkill}
             disabled={chat.streaming}
           />

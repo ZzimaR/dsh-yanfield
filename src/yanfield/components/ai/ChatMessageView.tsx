@@ -45,7 +45,7 @@ export interface ChatMessageViewProps {
   onApplyAction?: (action: AiAction) => void;
   pricing?: AiPricing;
   disableActions?:boolean;
-  onContinue?:(text:string)=>void;
+  onContinue?:(text:string, runId:string)=>void;
   className?: string;
 }
 

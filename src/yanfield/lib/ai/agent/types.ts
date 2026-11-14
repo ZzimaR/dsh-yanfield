@@ -18,7 +18,7 @@ export interface AgentChange {
   appliedId?: string;
   state: "pending" | "applied" | "rejected" | "reverted";
 }
-export interface AgentStep { id: string; label: string; detail: string; status: "running" | "complete" | "error"; tool?:string; targets?: (AgentReference & {changeId?:string})[] }
+export interface AgentStep { id: string; label: string; detail: string; detailValues?: Record<string, string | number>; status: "running" | "complete" | "error"; tool?:string; targets?: (AgentReference & {changeId?:string})[] }
 export interface AgentReference { kind: EntityKind; id: string; title: string }
 export interface AgentDiagnostic {
   code:"AGENT_JSON_INVALID"|"AGENT_SCHEMA_INVALID";
@@ -29,7 +29,7 @@ export interface AgentDiagnostic {
 export interface AgentRun {
   id: string; novelId: string; chapterId: string | null; request: string;
   sessionId?:string; messageId?:string;
-  requestContext?: Pick<AgentRequest, "chapterId" | "agentId" | "context" | "mentions" | "selection" | "selectionReference" | "snapshot">;
+  requestContext?: Pick<AgentRequest, "chapterId" | "agentId" | "context" | "mentions" | "selection" | "selectionReference" | "snapshot" | "previousRunId" | "writingPreset" | "locale">;
   status: "running" | "ready" | "complete" | "aborted" | "error";
   errorCode?:string; diagnostics?:AgentDiagnostic[];
   progress?: {id:string;text:string;stepIndex:number}[];
@@ -48,6 +48,8 @@ export interface AgentRequest {
   history?: { role: "user" | "assistant"; content: string }[];
   previousRunId?: string;
   retryRunId?: string;
+  writingPreset?: "continue" | "expand" | "polish" | "deai";
+  locale?: "zh" | "en";
   snapshot?:{kind:"world"|"character"|"location"|"foreshadow";id:string|null;fields:Fields};
   mentions?: { type: string; id: string; label: string }[];
   selection?: string;
