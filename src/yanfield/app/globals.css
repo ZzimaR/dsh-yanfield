@@ -483,7 +483,10 @@ html[data-prose-font="sans"] .prose-paper,
 .ai-surface input[type="checkbox"] { accent-color: var(--accent); }
 .ai-surface summary::marker { color: var(--ink-3); font-size: 9px; }
 
-/* Card dialogs read like editable documents, with form controls kept quiet. */
+.prose-paper .yf-inactive-selection {
+  background-color: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
 .prose-paper .yf-find-match {
   background-color: color-mix(in srgb, var(--gold) 27%, transparent);
   border-radius: 2px;
@@ -493,6 +496,7 @@ html[data-prose-font="sans"] .prose-paper,
   box-shadow: 0 0 0 1px var(--gold);
 }
 
+/* Card dialogs read like editable documents, with form controls kept quiet. */
 .card-editor-window, .card-editor-actions, .card-document { --accent: #315b80; --accent-hover: #254866; --accent-soft: #e5edf4; --accent-ink: #fffdf7; }
 [data-theme="dark"] :is(.card-editor-window, .card-editor-actions, .card-document) { --accent: #9dc4e7; --accent-hover: #bad8f0; --accent-soft: #23394c; --accent-ink: #102333; }
 .card-document { color: var(--ink); }

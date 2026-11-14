@@ -18,6 +18,7 @@ export const POST=handle(async request=>{
     history:z.array(z.object({role:z.enum(["user","assistant"]),content:z.string().max(100000)})).max(50).optional(),
     snapshot:z.object({kind:z.enum(["world","character","location","foreshadow"]),id:z.string().nullable(),fields:z.record(z.string(),z.unknown())}).optional(),
     retryRunId:z.string().optional(),previousRunId:z.string().optional(),mentions:z.array(z.object({type:z.string(),id:z.string(),label:z.string()})).max(30).optional(),
+    writingPreset:z.enum(["continue","expand","polish","deai"]).optional(),locale:z.enum(["zh","en"]).optional(),
     selection:z.string().max(30000).optional(),
     selectionReference:z.object({chapterTitle:z.string().max(1000),from:z.number().int().nonnegative(),to:z.number().int().positive(),startLine:z.number().int().positive(),endLine:z.number().int().positive()}).optional(),
     context:z.object({

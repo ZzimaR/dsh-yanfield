@@ -36,6 +36,7 @@ Writing features:
 - Typography: serif or sans, size, weight, line height, letter spacing, paragraph spacing, margins, max line width, with a live preview.
 - Find and replace in the chapter. Press `Ctrl / ⌘ + F` to open the panel in the lower-right corner of the editor while the formatting toolbar stays in place. Typing highlights matches in place. Use Previous or Next to jump. Press `Ctrl / ⌘ + Z` to undo a replacement and return to the edited passage.
 - The formatting toolbar stays at the top while you scroll the manuscript. `Alt + 1` toggles the outline and `Alt + J` focuses the AI composer.
+- In windowed mode on macOS, drag an empty area of the writing desk header to move the Harness window.
 - Returning to a chapter in the workbench restores its caret and scroll position. Switching chapters starts a fresh undo history.
 
 ## 4. Notes
@@ -63,7 +64,11 @@ Panel layout:
 - Progress messages stay visible while the answer appears below them. Proposals for review appear after the answer.
 - Applying a change in the manuscript review updates its status in chat. Open **Activity log** to see individual tool results and the materials read.
 - The active conversation stays open when switching chapters within a book. New messages use the current chapter as context, and tasks in progress keep the chapter specified when they were sent.
+- Each request is scoped before the assistant gets its editing tools. It can use prose to build cards while leaving the manuscript intact. Ask for multiple types of changes together when you need them. Use **Keep editing** on the proposal you want to revise.
+- The continuation, expansion, polishing, and AI-tone cleanup shortcuts in the manuscript toolbar use their corresponding enabled presets during prose generation. Presets guide the writing, and the current request determines what can change.
+- The assistant submits batches of note additions or edits together. Each item is validated independently. The activity log shows any failed items, and successful proposals stay available for review below the reply.
 - Retrying a task from conversation history uses its original chapter. Tasks created with this version also retain the selection, references, and context settings.
+- When you click the AI input, the quoted passage stays softly highlighted in the manuscript. Place the cursor back in the manuscript to clear the selection, or select a new passage to update the reference.
 - Messages sent with selected prose show the chapter and line range. Expand the reference to see the original text sent with the message. Line numbers follow paragraphs and manual line breaks.
 - Short writing requests can use the current context. For example, `这里顺一点` polishes the selected passage, `接着写` continues the current chapter, and `根据正文改章纲` reads the full chapter before proposing an updated blueprint.
 - Middle: message stream. Task steps keep their order and the current step updates in place; autoscroll pauses while you read back.
@@ -75,12 +80,12 @@ Capabilities:
 - Continue, expand, polish, remove AI flavour, diagnose a chapter, draft blueprints, create character / world cards, extract story archives.
 - Edit prose (paragraph-by-paragraph review), edit notes (field-level comparison), create notes, tidy blueprints, record foreshadowing.
 - `@` reference chapters, characters, places, settings, foreshadowing, archives; context budget (unlimited by default; 96k / 128k / 256k / 512k presets) with per-section preview.
-- Prompt presets: 20 built in; create, edit, disable, restore defaults.
+- Writing shortcuts and editor panels come with default prompts that you can customize in settings.
 - Persona: name, role, description, greeting, extra requirements, restorable.
 
 Review flow:
 
-1. The AI proposes changes; the task card always lists every candidate — prose changes with a word delta such as `319 → 338 words (+19)`, note changes with field-level before/after diffs. Only the execution log and reads are collapsed; debug details appear only on failure.
+1. Prose proposals show a word delta such as `319 → 338 words (+19)`. Note proposals start as clickable names. Open one to see field differences and source passages, or to apply or discard that item. Use the checkboxes next to the names to select notes to apply together. Open **Activity log** to see tools and materials read.
 2. The prose area also opens a review: original text (deletions in red, struck through) and the revised text (insertions in green) side by side.
 3. For each paragraph press **Keep** or **Revert**; **Revert all** / **Keep all** are also available.
 4. Press **Confirm review** — only kept paragraphs are written; undecided paragraphs keep the original text.
@@ -91,7 +96,7 @@ When prose is selected, a revision replaces only the selected text in the curren
 ## 7. Settings
 
 - **Model services**: add / edit / enable / delete services, switch model route (DSH account / official API key), query balance, default model, sync model list.
-- **Prompt presets**: built-in and custom presets.
+- **Prompt presets**: opens to custom presets. View or duplicate built-in templates and manage your own prompts for specific shortcuts and editor panels.
 - **Persona**: assistant identity and limits.
 - **AI & context**: context section toggles, context budget, max output, usage and cost (three unit prices, one-click official prices, daily and total stats), custom instructions.
 - **Editor**: font, size, line height, letter spacing, paragraph spacing, margins, max line width, live preview.

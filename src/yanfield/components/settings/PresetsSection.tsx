@@ -17,7 +17,7 @@ import { apiDelete, notifyDataChanged, useApi } from "@/lib/client/api";
 import { getYanfieldLocale, useT } from "@/lib/i18n";
 import { PRESET_EN } from "@/lib/ai/preset-en";
 import { AI_FEATURE_LABEL, type PromptPreset } from "@/lib/types";
-import { cn, formatRelativeTime } from "@/lib/ui/cn";
+import { cn } from "@/lib/ui/cn";
 import { PresetDialog } from "./PresetDialog";
 
 export interface PresetsSectionProps {
@@ -46,14 +46,13 @@ export function PresetsSection({ novelId }: PresetsSectionProps) {
   const url = novelId ? `/api/presets?novelId=${encodeURIComponent(novelId)}` : "/api/presets";
   const presetsApi = useApi<PresetListResponse>(url);
   const { toast } = useToast();
-  const [filter, setFilter] = React.useState<Filter>("all");
+  const [filter, setFilter] = React.useState<Filter>("custom");
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<PromptPreset | null>(null);
   const [removing, setRemoving] = React.useState<PromptPreset | null>(null);
   const [deleting, setDeleting] = React.useState(false);
 
   const items = presetsApi.data?.items ?? [];
-  const customCount = items.filter((preset) => !preset.isBuiltin).length;
   const visible = items.filter((preset) => {
     if (filter === "custom") return !preset.isBuiltin;
     if (filter === "builtin") return preset.isBuiltin;
@@ -100,7 +99,7 @@ export function PresetsSection({ novelId }: PresetsSectionProps) {
         <div>
           <h2 className="font-serif text-lg text-ink">{tr("提示词预设")}</h2>
           <p className="mt-1 text-[12px] leading-6 text-ink-3">
-            {tr("每个 AI 场景的 system / user 模板都在这里，可改、可停用、可恢复默认（内置预设只读）。")}
+            {tr("预设供对应的快捷任务和编辑面板使用。自由对话按你这次的要求执行。")}
           </p>
         </div>
         <Button variant="primary" size="sm" icon={<Plus className="size-3.5" />} onClick={openCreate}>
@@ -115,9 +114,6 @@ export function PresetsSection({ novelId }: PresetsSectionProps) {
           onChange={(value) => setFilter(value as Filter)}
           size="sm"
         />
-        <span className="text-[11px] text-ink-3">
-          {tr("共 {total} 个 · 自定义 {custom}", { total: items.length, custom: customCount, count: items.length })}
-        </span>
       </div>
 
       {presetsApi.loading && items.length === 0 ? (
@@ -166,9 +162,6 @@ export function PresetsSection({ novelId }: PresetsSectionProps) {
                   </div>
                   <p className="mt-1 line-clamp-2 text-[10.5px] leading-5 text-ink-3">
                     {onEn(preset)?.systemPrompt || preset.systemPrompt || preset.userTemplate}
-                  </p>
-                  <p className="mt-0.5 font-mono text-[9.5px] text-ink-3">
-                    {tr("温度 {temperature} · 更新于 {relative}", { temperature: preset.temperature.toFixed(2), relative: formatRelativeTime(preset.updatedAt) })}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-0.5">

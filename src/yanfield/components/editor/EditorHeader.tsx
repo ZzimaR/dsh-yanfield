@@ -97,7 +97,7 @@ export function EditorHeader({
   ];
 
   return (
-    <header className="@container/editor-header flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-surface/85 px-2 backdrop-blur">
+    <header className="@container/editor-header yf-editor-header flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-surface/85 px-2 backdrop-blur">
       <Tooltip label={backText}>
         <IconButton label={backText} onClick={onBack}>
           <ArrowLeft className="size-4" />
@@ -126,8 +126,8 @@ export function EditorHeader({
         </Link>
         {volumeTitle ? (
           <>
-            <ChevronRight className="hidden size-3 shrink-0 text-ink-4 @min-[640px]/editor-header:block" aria-hidden />
-            <span className="hidden max-w-[110px] truncate text-ink-3 @min-[640px]/editor-header:block" title={volumeTitle}>
+            <ChevronRight className="hidden size-3 shrink-0 text-ink-4 @min-[760px]/editor-header:block" aria-hidden />
+            <span className="hidden max-w-[110px] truncate text-ink-3 @min-[760px]/editor-header:block" title={volumeTitle}>
               {volumeTitle}
             </span>
           </>
@@ -140,7 +140,7 @@ export function EditorHeader({
 
       {/* 上下章导航：顺序未知（如新建/移出）时不展示 */}
       {chapterPosition != null && chapterTotal > 0 ? (
-        <div className="hidden shrink-0 items-center gap-0.5 @min-[640px]/editor-header:flex">
+        <div className="hidden shrink-0 items-center gap-0.5 @min-[760px]/editor-header:flex">
           <Tooltip label={prevChapterTitle ? tr("上一章：{title}", { title: prevChapterTitle }) : tr("上一章")}>
             <IconButton
               label={tr("上一章")}

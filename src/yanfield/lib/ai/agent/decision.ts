@@ -1,3 +1,6 @@
+import { z } from "zod"
+import { patchSchemas } from "./schema";
+import { CARD_KINDS, OUTLINE_KINDS } from "./task-scope";
 import { extractJson } from "@/lib/ai/prompts";
 import { terminalReply } from "./reply";
 
@@ -44,10 +47,34 @@ export const DECISION_TOOLS=[
   tool("write_chapter","准备正文候选。局部修改用 patch 和逐字引用的原句；整章起草或明确重写才用 rewrite",{id:str,title:str,volumeId:{type:["string","null"]},instruction:str,words:{type:"integer"},mode:{type:"string",enum:["rewrite","append","selection","patch"]},edits:{type:"array",items:{type:"object",properties:{original:str,replacement:str},required:["original","replacement"],additionalProperties:false}}},["instruction"]),
   tool("reject_change","丢弃本轮候选",{changeId:str},["changeId"]),
   tool("read_archive","读取章节档案",{chapterId:str},["chapterId"]),
-  tool("respond","用自然语言回答作者。讨论时直接给结论和理由，提交候选时说明具体改了什么、为什么这样改，以及确实需要作者判断的地方。依据工具回执区分待审阅和已保存，不输出内部 ID。",{message:{...str,minLength:1}},["message"])
 ];
+
+type ProposalKind = typeof CARD_KINDS[number] | typeof OUTLINE_KINDS[number];
+
+function proposalItem(kind: ProposalKind) {
+  const { $schema, ...fields } = z.toJSONSchema(patchSchemas[kind], { target: "draft-7", io: "input" });
+  return {
+    type: "object",
+    properties: { kind: { type: "string", enum: [kind] }, id: str, fields, reason: str },
+    required: ["kind", "fields"],
+    additionalProperties: false,
+  };
+}
+
+export function decisionToolsFor(kinds: ProposalKind[], allows: (name: string) => boolean) {
+  const tools = DECISION_TOOLS.filter(tool => allows(tool.name)).map(tool => tool.name === "propose"
+    ? { ...tool, parameters: { type: "object", properties: { kind: { type: "string", enum: kinds }, id: str, reason: str, fields: { anyOf: kinds.map(kind => proposalItem(kind).properties.fields) } }, required: ["kind", "fields"], additionalProperties: false } }
+    : tool);
+  const cards = kinds.filter(kind => (CARD_KINDS as readonly string[]).includes(kind));
+  if (cards.length && allows("propose_cards")) {
+    tools.push(tool("propose_cards", "分批准备资料卡。每项独立校验；新建省略 id，修改用已读取的卡片 ID。人物身份写在 identity，role 只写其叙事角色。只重试回执中的失败项。", {
+      items: { type: "array", minItems: 1, maxItems: 20, items: { anyOf: cards.map(proposalItem) } },
+    }, ["items"]));
+  }
+  return tools;
+}
 export function nativeDecisionSystem(system:string):string {
-  return system.replace(/^每轮最多12个工具调用[^\n]+/m,"通过声明的原生函数推进任务，不在回复里书写JSON或DSML/XML工具标签。每轮最多12个调用。完成、普通讨论或需要作者确认时调用respond；其他工具结果返回后继续执行。");
+  return system.replace(/^每轮最多12个工具调用[^\n]+/m,"通过声明的原生函数推进任务，不在回复里书写JSON或DSML/XML工具标签。每轮最多12个调用。工具返回后继续执行；所有步骤完成后用自然语言回复作者。纯讨论或澄清直接用自然语言回复。");
 }
 /**
  * DeepSeek 原生工具（function calling）在思考模式下同样可用；离线演示走文本回退。

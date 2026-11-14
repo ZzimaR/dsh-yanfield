@@ -19,7 +19,7 @@ function stepKey(step: AgentStep): string {
 export function AgentProgress({run,compact=false,renderTargets}:{run:AgentRun;compact?:boolean;renderTargets:(step:AgentStep)=>React.ReactNode}) {
   const tr=useT();
   const progress=run.progress??[];
-  const important=(step:AgentStep)=>step.status!=="complete" || ["write_chapter","propose","organize_materials"].includes(step.tool??"");
+  const important=(step:AgentStep)=>step.status!=="complete" || ["write_chapter","propose","propose_cards","delete","organize_materials"].includes(step.tool??"");
   const visibleSteps: {step: AgentStep; index: number; repeated: boolean}[] = [];
   let previousKey = "";
   run.steps.forEach((step, index) => {
@@ -34,7 +34,7 @@ export function AgentProgress({run,compact=false,renderTargets}:{run:AgentRun;co
       {!compact && !repeated && important(step) ? <div className="border-l-2 border-accent/20 pl-3 text-[11px] text-ink-3">
         <div className="flex items-center gap-1.5">
           {step.status==="running"?<Loader2 className="size-3 shrink-0 animate-spin text-accent"/>:step.status==="error"?<CircleAlert className="size-3 shrink-0 text-danger"/>:<Check className="size-3 shrink-0 text-jade"/>}
-          <span>{step.label}</span>
+          <span>{tr(step.label)}</span>
           {step.status==="running"&&step.tool==="write_chapter"&&run.preview?<span className="ml-auto tabular-nums">{tr("已生成 {count} 字",{count:countWords(run.preview)})}</span>:null}
         </div>
         {renderTargets(step)}

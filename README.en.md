@@ -102,8 +102,8 @@ Both real routes can be switched in Settings; an unavailable route explains why 
 - `@` to reference chapters, characters, settings, foreshadowing and archives; context budget and per-section preview
 - Progress steps keep their order, the current step updates in place, and autoscroll pauses while you read back
 - Prose changes are reviewed inline (green insertions, red deletions); note changes are compared field by field
-- After writing, the assistant proposes note candidates backed by the text — it only fills blanks, never overwrites your facts
-- Save frequently used instructions as prompt presets; the toolbar AI menu collects quick tasks
+- The current request determines which changes the assistant can propose. Card creation produces card proposals only. Request both prose and note updates to extract evidence-backed notes from the new draft
+- Save frequently used instructions as prompt presets. The toolbar's continuation, expansion, polishing, and AI-tone cleanup shortcuts use the corresponding presets
 
 
 ## AI and cost
@@ -112,7 +112,7 @@ Both real routes can be switched in Settings; an unavailable route explains why 
 - **Catalog** — `deepseek-flash` (DeepSeek-V4.1-Flash, text and images) and `deepseek-v4-pro` (DeepSeek-V4-Pro, text only), roughly 1M tokens of context each; new models registered in Harness are synced automatically.
 - **Balance** — the **Balance** button under the composer queries the signed-in DSH account, no key needed.
 - **Cost** — the footer shows *today's* cumulative estimate, not a single task. Unit prices come from a built-in DeepSeek price table and switch between peak and off-peak by Beijing time (peak: weekdays 09:00–12:00 and 14:00–18:00; everything else, including weekends and public holidays, is off-peak at half price). **Estimates only — the DeepSeek bill is authoritative.**
-- **Built-in thrift** — decision rounds skip deep thinking, short polishes drop a tier, small edits skip the note-organizing pass, and oversized tool results are truncated with paging hints. A single-paragraph polish usually costs well under a cent; a blueprint task costs a few cents.
+- **Usage controls** — a short model call determines the scope of each request. Routine decisions skip deep thinking, short polishes use a lower thinking level, and long tool results are paginated.
 
 ## Screenshots
 

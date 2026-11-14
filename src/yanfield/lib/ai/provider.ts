@@ -24,7 +24,10 @@ export function redactProviderEndpoint(endpoint: string): string {
 }
 
 export interface AiMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
+  toolCalls?: { id: string; name: string; args: Record<string, unknown> }[];
+  toolCallId?: string;
+  toolError?: boolean;
   content: string;
   reasoning_content?: string;
 }
@@ -77,6 +80,10 @@ const OUTPUT_LIMIT_MESSAGE="模型输出因长度限制被截断，内容尚未�
 
 export function isOutputLimitError(error: unknown): boolean {
   return error instanceof ProviderError && error.message === OUTPUT_LIMIT_MESSAGE;
+}
+
+export function isInvalidToolInputError(error: unknown): boolean {
+  return error instanceof ProviderError && /tool input is invalid JSON/i.test(error.message);
 }
 
 const DEFAULT_BASE: Record<ProviderConfig["kind"], string> = {
@@ -248,7 +255,12 @@ async function* streamOpenAiCompatible(request: CompletionRequest): AsyncGenerat
     headers: { "Content-Type": "application/json", ...authHeaders(provider) },
     body: JSON.stringify({
       model,
-      messages,
+      messages: messages.map(({ role, content, reasoning_content, toolCalls, toolCallId }) => ({
+        role, content, reasoning_content, tool_call_id: toolCallId,
+        tool_calls: toolCalls?.map(call => ({
+          id: call.id, type: "function", function: { name: call.name, arguments: JSON.stringify(call.args) },
+        })),
+      })),
       stream: true,
       stream_options: { include_usage: true },
       ...(request.disableThinking&&!reasoning&&profile.adapter==="deepseek"&&!request.thinkingLevel?{thinking:{type:"disabled"}}:{}),
@@ -270,7 +282,7 @@ async function* streamOpenAiCompatible(request: CompletionRequest): AsyncGenerat
   if (!response.ok) throw await httpError(response, provider);
 
   let outputLimited = false;
-  const functionCalls=new Map<number,{name:string;arguments:string}>();
+  const functionCalls=new Map<number,{id:string;name:string;arguments:string}>();
   let fallbackText="";
   for await (const payload of readSse(response)) {
     if (payload === "[DONE]") break;
@@ -291,8 +303,8 @@ async function* streamOpenAiCompatible(request: CompletionRequest): AsyncGenerat
           const entry=asRecord(item),fn=asRecord(entry?.function);
           if(!entry||!fn)continue;
           const index=typeof entry.index==="number"?entry.index:0;
-          const call=functionCalls.get(index)||{name:"",arguments:""};
-          call.name+=pickString(fn.name);call.arguments+=pickString(fn.arguments);functionCalls.set(index,call);
+          const call=functionCalls.get(index)||{id:"",name:"",arguments:""};
+          call.id ||= pickString(entry.id);call.name+=pickString(fn.name);call.arguments+=pickString(fn.arguments);functionCalls.set(index,call);
         }
       }else if (text) yield { type: "delta", text };
     }
@@ -315,7 +327,7 @@ async function* streamOpenAiCompatible(request: CompletionRequest): AsyncGenerat
       const parse=(value:string):unknown=>{try{return JSON.parse(value);}catch{return value;}};
       const reply=calls.find(call=>call.name==="respond");
       const response=reply?parse(reply.arguments):null;
-      const planned=calls.filter(call=>call.name!=="respond").map(call=>({name:call.name,args:parse(call.arguments)}));
+      const planned=calls.filter(call=>call.name!=="respond").map(call=>({id:call.id||undefined,name:call.name,args:parse(call.arguments)}));
       yield {type:"delta",text:JSON.stringify({message:reply?(response&&typeof response==="object"&&"message" in response?response.message:null):fallbackText,calls:planned,done:!!reply&&!planned.length})};
     }else if(fallbackText)yield {type:"delta",text:thinking?JSON.stringify({message:fallbackText,calls:[],done:true}):fallbackText};
   }
@@ -486,15 +498,18 @@ function harnessRoute(provider: ProviderConfig): string {
 }
 
 function harnessMessages(messages: AiMessage[]): unknown[] {
-  return messages.map((message) => ({
+  return messages.map(message => ({
     id: randomId(),
     role: message.role,
-    content: [{ type: "text", text: message.content }],
-    source: message.role === "system"
-      ? { kind: "system-prompt" }
-      : message.role === "assistant"
-        ? { kind: "model" }
-        : { kind: "user" },
+    content: [
+      ...(message.content ? [{ type: "text", text: message.content }] : []),
+      ...(message.toolCalls ?? []).map(call => ({
+        type: "tool-call", id: call.id, name: call.name, arguments: JSON.stringify(call.args),
+      })),
+    ],
+    source: message.role === "tool" ? { kind: "tool", callId: message.toolCallId }
+      : { kind: message.role === "system" ? "system-prompt" : message.role === "assistant" ? "model" : "user" },
+    ...(message.role === "tool" ? { toolCallId: message.toolCallId, isError: message.toolError } : {}),
   }));
 }
 
@@ -534,7 +549,7 @@ async function* streamHarness(request: CompletionRequest): AsyncGenerator<Provid
     signal: request.signal,
   };
   let outputLimited = false;
-  const functionCalls = new Map<number, { name: string; arguments: string }>();
+  const functionCalls = new Map<number, { id: string; name: string; arguments: string }>();
   let fallbackText = "";
   try {
     for await (const raw of bridge.stream(input)) {
@@ -547,7 +562,8 @@ async function* streamHarness(request: CompletionRequest): AsyncGenerator<Provid
         yield { type: "reasoning", text: chunk.text };
       } else if (chunk.type === "tool-call-delta") {
         const index = typeof chunk.index === "number" ? chunk.index : 0;
-        const call = functionCalls.get(index) || { name: "", arguments: "" };
+        const call = functionCalls.get(index) || { id: "", name: "", arguments: "" };
+        if (typeof chunk.id === "string") call.id ||= chunk.id;
         if (typeof chunk.name === "string") call.name += chunk.name;
         if (typeof chunk.argumentsDelta === "string") call.arguments += chunk.argumentsDelta;
         functionCalls.set(index, call);
@@ -594,7 +610,7 @@ async function* streamHarness(request: CompletionRequest): AsyncGenerator<Provid
       };
       const reply = calls.find((call) => call.name === "respond");
       const response = reply ? parse(reply.arguments) : null;
-      const planned = calls.filter((call) => call.name !== "respond").map((call) => ({ name: call.name, args: parse(call.arguments) }));
+      const planned = calls.filter((call) => call.name !== "respond").map((call) => ({ id:call.id||undefined, name: call.name, args: parse(call.arguments) }));
       const message = reply && response && typeof response === "object" && "message" in response
         ? (response as { message?: unknown }).message
         : fallbackText;

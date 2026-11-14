@@ -37,7 +37,7 @@ export function AgentPicker({ value, onChange, agents, disabled = false, classNa
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={tr("选择智能体，当前：{name}", { name: current.name })}
+        aria-label={tr("选择智能体，当前：{name}", { name: localizedAgentName(current) })}
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
         className="flex w-full items-center gap-2 rounded-md border border-line bg-surface px-2 py-1.5 text-left transition-colors duration-150 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-60"
