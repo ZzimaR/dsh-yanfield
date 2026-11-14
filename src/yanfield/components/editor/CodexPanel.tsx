@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { ChevronRight, Folder, FolderOpen, MapPin, MapPinned, Package, Plus, ScrollText, Search, User } from "lucide-react";
-import { Button, Dropdown, EmptyState, Input, Skeleton } from "@/components/ui/kit";
-import { useApi, useDataChanged } from "@/lib/client/api";
+import { ChevronRight, Folder, FolderOpen, GripVertical, MapPin, MapPinned, Package, Plus, ScrollText, Search, User } from "lucide-react";
+import { Button, Dropdown, EmptyState, Input, Skeleton, useToast } from "@/components/ui/kit";
+import { apiPost, useApi, useDataChanged } from "@/lib/client/api";
+import { orderCodexEntries, type CodexGroup, type CodexOrder } from "@/lib/editor/codex-order";
 import { toItems } from "@/lib/editor/normalize";
 import {
   type Chapter,
@@ -98,6 +99,22 @@ function entryMatches(entry: CodexEntry, keyword: string): boolean {
  */
 export function CodexPanel({ novelId }: CodexPanelProps) {
   const tr = useT();
+  const { toast } = useToast();
+  const orderApi = useApi<CodexOrder>(`/api/codex-order?novelId=${encodeURIComponent(novelId)}`);
+  const drag = React.useRef<{ group: CodexGroup; id: string; parent: string | null } | null>(null);
+  const savingOrder = React.useRef(false);
+  const [drop, setDrop] = React.useState<{ id: string; after: boolean } | null>(null);
+  const moveEntry = async (group: CodexGroup, id: string, anchor: string, after: boolean) => {
+    if (savingOrder.current || id === anchor) return;
+    savingOrder.current = true;
+    try {
+      orderApi.setData(await apiPost<CodexOrder>("/api/codex-order", { novelId, group, id, anchor, after }));
+    } catch (error) {
+      toast({ title: tr("资料排序未保存"), description: error instanceof Error ? error.message : undefined, tone: "error" });
+    } finally {
+      savingOrder.current = false;
+    }
+  };
   const charactersApi = useApi<unknown>(`/api/characters?novelId=${encodeURIComponent(novelId)}`);
   const locationsApi = useApi<unknown>(`/api/locations?novelId=${encodeURIComponent(novelId)}`);
   const worldApi = useApi<unknown>(`/api/world?novelId=${encodeURIComponent(novelId)}`);
@@ -169,7 +186,7 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
   const matched = (showsGroup("characters") ? filtered.characters.length : 0) + (showsGroup("locations") ? filtered.locations.length : 0) + (showsGroup("world") ? filtered.world.length : 0) + (showsGroup("items") ? filtered.items.length : 0) + (showsGroup("foreshadows") ? filtered.foreshadows.length : 0);
   const loreTotal = locations.length + world.length;
 
-  const groups: { key: string; title: string; icon: React.ReactNode; entries: CodexEntry[]; total: number }[] = [
+  const groups: { key: CodexGroup; title: string; icon: React.ReactNode; entries: CodexEntry[]; total: number }[] = [
     { key: "characters", title: tr("角色"), icon: <User className="size-3.5" />, entries: filtered.characters, total: characters.length },
     { key: "locations", title: tr("地点"), icon: <MapPinned className="size-3.5" />, entries: filtered.locations, total: locations.length },
     { key: "world", title: tr("世界观"), icon: <MapPin className="size-3.5" />, entries: filtered.world, total: world.length - itemTotal },
@@ -324,7 +341,7 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
             ]}
           />
         </div>
-        <div className="flex gap-1 rounded-md bg-surface-2 p-1" role="group" aria-label={tr("资料分类")}>
+        <div className="flex flex-wrap gap-1 rounded-md bg-surface-2 p-1" role="group" aria-label={tr("资料分类")}>
           {([
             { key: "all", title: tr("全部"), total },
             { key: "characters", title: tr("角色"), total: characters.length },
@@ -333,7 +350,7 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
           ]).map((filter) => (
             <button key={filter.key} type="button" aria-pressed={activeGroup===filter.key}
               onClick={()=>setActiveGroup(filter.key)}
-              className={cn("flex min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded px-1 py-1.5 text-[11px] transition-colors",activeGroup===filter.key?"bg-surface text-ink shadow-sm":"text-ink-3 hover:text-ink")}>
+              className={cn("flex flex-[1_0_auto] items-center justify-center gap-1 whitespace-nowrap rounded px-1 py-1.5 text-[11px] transition-colors",activeGroup===filter.key?"bg-surface text-ink shadow-sm":"text-ink-3 hover:text-ink")}>
               {filter.title}<span className="text-[10px] tabular-nums text-ink-4">{filter.total}</span>
             </button>
           ))}
@@ -363,20 +380,31 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
         ) : (
           <div className="space-y-3">
             {groups.filter((group) => showsGroup(group.key)).map((group) => {
+              const entries = orderCodexEntries(group.entries, orderApi.data?.[group.key] ?? [], entry => entry.data.id);
+              const entryById = new Map(entries.map((entry) => [entry.data.id, entry]));
+              const parentOf = (entry: CodexEntry) => {
+                const parent = "parentId" in entry.data ? entry.data.parentId : null;
+                return parent && entryById.has(parent) ? parent : null;
+              };
+              const siblingsByParent = new Map<string | null, CodexEntry[]>();
+              for (const entry of entries) {
+                const parent = parentOf(entry);
+                const siblings = siblingsByParent.get(parent) ?? [];
+                siblings.push(entry);
+                siblingsByParent.set(parent, siblings);
+              }
               const tree = (group.key === "world" || group.key === "items" || group.key === "locations") && !keyword;
               const groupSettings = tree
-                ? group.entries.flatMap((entry) => entry.kind === "world" || entry.kind === "location" ? [entry.data] : [])
+                ? entries.flatMap((entry) => entry.kind === "world" || entry.kind === "location" ? [entry.data] : [])
                 : [];
               const parentIds = parentIdsOf(groupSettings);
-              const entryById = new Map(group.entries.map((entry) => [entry.data.id, entry]));
-              const groupCanFold = loreKeys.has(group.key);
-              const groupClosed = groupCanFold && closedGroups.has(group.key);
+              const groupClosed = !keyword && closedGroups.has(group.key);
               return group.entries.length === 0 ? null : (
                 <section key={group.key} aria-label={group.title}>
                   <div className="mb-1.5 flex items-center gap-1.5 px-2 text-[11px] font-semibold tracking-wide text-ink-3">
-                    {groupCanFold ? (
                       <button
                         type="button"
+                        disabled={Boolean(keyword)}
                         aria-expanded={!groupClosed}
                         aria-label={groupClosed ? tr("展开{title}", { title: group.title }) : tr("收起{title}", { title: group.title })}
                         onClick={() => setClosedGroups((prev) => {
@@ -392,56 +420,94 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
                         <span>{group.title}</span>
                         <span className="tabular-nums">{group.entries.length}</span>
                       </button>
-                    ) : (
-                      <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                        {group.icon}
-                        <span>{group.title}</span>
-                        <span className="tabular-nums">{group.entries.length}</span>
-                      </span>
-                    )}
                     {tree && !groupClosed && parentIds.size>0 ? <span className="ml-auto flex gap-2 font-normal tracking-normal">
                       <button type="button" onClick={()=>setCollapsed(prev=>{const next=new Set(prev);parentIds.forEach(id=>next.delete(id));return next;})} className="hover:text-accent">{tr("全部展开")}</button>
                       <button type="button" onClick={()=>setCollapsed(prev=>new Set([...prev,...parentIds]))} className="hover:text-accent">{tr("全部收起")}</button>
                     </span> : null}
                   </div>
-                  {groupClosed ? null : <div className="space-y-1">
+                  {groupClosed ? null : <div>
                     {(tree
                       ? worldRows(groupSettings, collapsed).map(({ setting, depth }) => ({
                           entry: entryById.get(setting.id)!,
                           depth,
                         }))
-                      : group.entries.map((entry) => ({ entry, depth: 0 }))
+                      : entries.map((entry) => ({ entry, depth: 0 }))
                     ).map(({ entry, depth }) => {
                       const branch = (entry.kind === "world" || entry.kind === "location") && parentIds.has(entry.data.id);
                       const folded=collapsed.has(entry.data.id);
                       const title = entryTitle(entry);
+                      const id = entry.data.id;
+                      const parent = parentOf(entry);
+                      const siblings = siblingsByParent.get(parent) ?? [];
+                      const sortable = !keyword && siblings.length > 1;
+                      const acceptsDrop = () => sortable && drag.current?.group === group.key && drag.current.parent === parent && drag.current.id !== id;
                       const importance = entry.kind === "world"
                         ? (entry.data.category === "item" || entry.data.importance !== "medium" ? entry.data.importance : null)
                         : entry.kind === "location" && entry.data.importance !== "medium"
                           ? entry.data.importance
                           : null;
                       return (
-                        <div key={`${entry.kind}:${entry.data.id}`} className="flex min-w-0 items-start"
+                        <div key={`${entry.kind}:${entry.data.id}`} className={cn("group/card relative flex min-w-0 items-start",
+                          drop?.id === id && (drop.after ? "after:absolute after:inset-x-0 after:bottom-0 after:border-b-2 after:border-accent" : "before:absolute before:inset-x-0 before:top-0 before:border-t-2 before:border-accent"))}
+                          onDragOver={event => {
+                            if (!acceptsDrop()) return;
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                            const bounds = event.currentTarget.getBoundingClientRect();
+                            const after = event.clientY > bounds.top + bounds.height / 2;
+                            setDrop(current => current?.id === id && current.after === after ? current : { id, after });
+                          }}
+                          onDrop={event => {
+                            if (!acceptsDrop() || !drag.current) return;
+                            event.preventDefault();
+                            const bounds = event.currentTarget.getBoundingClientRect();
+                            void moveEntry(group.key, drag.current.id, id, event.clientY > bounds.top + bounds.height / 2);
+                            drag.current = null;
+                            setDrop(null);
+                          }}
+                          onDragLeave={event => {
+                            if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
+                              setDrop(current => current?.id === id ? null : current);
+                            }
+                          }}
                           style={{ marginLeft: Math.min(depth, 6) * 10, width: `calc(100% - ${Math.min(depth, 6) * 10}px)` }}>
                           {branch?<button type="button" aria-label={folded ? tr("展开{title}", { title }) : tr("收起{title}", { title })} aria-expanded={!folded}
-                            className="mt-2 flex size-5 shrink-0 items-center justify-center rounded text-ink-3 hover:bg-surface-2 hover:text-ink focus-visible:outline-accent"
+                            className="mt-1 flex size-5 shrink-0 items-center justify-center rounded text-ink-3 hover:bg-surface-2 hover:text-ink focus-visible:outline-accent"
                             onClick={()=>setCollapsed(prev=>{const next=new Set(prev);if(next.has(entry.data.id))next.delete(entry.data.id);else next.add(entry.data.id);return next;})}>
                             <ChevronRight className={cn("size-3.5 transition-transform",!folded&&"rotate-90")}/>
                           </button>:<span className="w-5 shrink-0"/>}
                         <button
                           type="button"
                           onClick={() => setEditing(entry)}
-                          className="group block w-full min-w-0 rounded-md border border-transparent bg-surface/40 px-2.5 py-2 text-left transition-colors duration-150 hover:border-jade/30 hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 motion-reduce:transition-none"
+                          className="block w-full min-w-0 rounded px-2 py-1.5 text-left hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                         >
                           <span className="flex min-w-0 items-center gap-2">
                             <span className="shrink-0 text-ink-3">{branch?(folded?<Folder className="size-3.5"/>:<FolderOpen className="size-3.5"/>):group.icon}</span>
                             <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{title}</span>
                             {importance?<span title={tr("重要程度：{level}", { level: tr(WORLD_IMPORTANCE_LABEL[importance]) })} className={cn("shrink-0 rounded px-1 text-[10px] leading-4",importance==="high"?"bg-accent/10 text-accent":importance==="low"?"bg-surface-2 text-ink-4":"bg-jade/10 text-jade")}>{tr("重要 · {level}", { level: tr(WORLD_IMPORTANCE_LABEL[importance]) })}</span>:null}
                           </span>
-                          <span className="mt-0.5 block truncate pl-[22px] text-[11px] leading-5 text-ink-3">
+                          {entryBlurb(entry) ? <span className="mt-0.5 block truncate pl-[22px] text-[11px] leading-5 text-ink-3">
                             {entryBlurb(entry)}
-                          </span>
+                          </span> : null}
                         </button>
+                        {sortable ? <button type="button" draggable
+                          aria-label={tr("调整“{title}”的顺序", { title })}
+                          title={tr("拖动排序，也可按上或下方向键")}
+                          className="mt-1 flex size-5 shrink-0 cursor-grab items-center justify-center rounded text-ink-3 opacity-50 hover:bg-surface-2 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-accent active:cursor-grabbing"
+                          onDragStart={event => {
+                            drag.current = { group: group.key, id, parent };
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData("text/plain", title);
+                          }}
+                          onDragEnd={() => { drag.current = null; setDrop(null); }}
+                          onKeyDown={event => {
+                            if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+                            event.preventDefault();
+                            const after = event.key === "ArrowDown";
+                            const anchor = siblings[siblings.findIndex(item => item.data.id === id) + (after ? 1 : -1)];
+                            if (anchor) void moveEntry(group.key, id, anchor.data.id, after);
+                          }}
+                        ><GripVertical className="size-3.5" aria-hidden /></button> : null}
                         </div>
                       );
                     })}

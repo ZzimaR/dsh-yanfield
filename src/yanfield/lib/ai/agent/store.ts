@@ -15,6 +15,26 @@ export function getRun(id: string): AgentRun {
   if (!row) throw new ApiError("任务不存在",404);
   return JSON.parse(row.data) as AgentRun;
 }
+
+/** Publish a replacement and retire its old candidates in the same transaction. */
+export function supersedeRun(run: AgentRun, previous: AgentRun, retiredIds: string[]): void {
+  tx(() => {
+    const current = getRun(previous.id);
+    for (const id of retiredIds) {
+      const candidate = current.changes.find(change => change.id === id);
+      const expected = previous.changes.find(change => change.id === id);
+      if (candidate?.state !== "pending" || !sameFields(candidate, expected)) {
+        throw new ApiError("原候选已有更新，请重新打开后再继续修改",409);
+      }
+      candidate.state = "rejected";
+    }
+    saveRun(current);
+    saveRun(run);
+  });
+  for (const candidate of previous.changes) {
+    if (retiredIds.includes(candidate.id)) candidate.state = "rejected";
+  }
+}
 export function listRuns(novelId: string): AgentRun[] {
   return all<{data:string}>("SELECT data FROM agent_runs WHERE novel_id=? ORDER BY created_at DESC LIMIT 30",[novelId]).map(r=>JSON.parse(r.data));
 }
@@ -71,6 +91,7 @@ export function propose(
   reason: string,
   title?: string,
   visibility?: { chapterIndex: number | null; explicitlyReferenced: boolean },
+  persist = true,
 ): AgentChange {
   const after = validatePatch(kind,patch);
   if (targetId && run.changes.some(c=>c.op==="delete" && c.kind===kind && c.targetId===targetId && c.state==="pending")) throw new ApiError("这张资料已有待确认的删除；如需改为修改，请先丢弃删除候选",409);
@@ -91,7 +112,7 @@ export function propose(
   const change: AgentChange = existing ?? {id:uid("change"),kind,targetId,title:title || String(after.title||after.name||before?.title||before?.name||""),reason,before,after:{},state:"pending"};
   change.after=merged; change.reason=reason;
   if (!existing) run.changes.push(change);
-  saveRun(run);
+  if (persist) saveRun(run);
   return change;
 }
 
@@ -244,7 +265,7 @@ export function applyChanges(id: string, selections: {id:string; fields?:string[
       for (const evidence of change.evidence ?? []) {
         if (evidence.field && !Object.hasOwn(patch,evidence.field)) continue;
         const source = evidence.candidate ? value.changes.find(c=>c.id===evidence.sourceId && c.kind==="chapter") : undefined;
-        const chapterId = evidence.candidate ? (source?.state==="applied" ? source.appliedId : undefined) : evidence.sourceId;
+        const chapterId = evidence.candidate ? source?.appliedId ?? source?.targetId : evidence.sourceId;
         const chapter = chapterId ? repo.getChapter(chapterId) : undefined;
         if (!chapter || chapter.novelId!==value.novelId || !stripHtml(chapter.content).includes(evidence.quote)) {
           throw new ApiError("资料引用的段落尚未保存或已改变，请先保留相关正文，或取消勾选这项资料改动",409);

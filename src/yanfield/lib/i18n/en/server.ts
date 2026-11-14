@@ -10,6 +10,28 @@ import type { TranslateValue } from "../core"
  * the variables at the call site.
  */
 export const server: Record<string, TranslateValue> = {
+  "正在保存本轮改动": "Saving this task’s changes.",
+  "本轮未生成可审阅的改动。可在执行记录里查看原因。": "No changes were prepared for review. See the activity log for details.",
+  "资料排序参数无效": "Invalid material order.",
+  "只能在同一组同一层级内调整顺序": "You can reorder cards within the same group and parent.",
+  "本轮只讨论作品，请直接回答作者的问题": "This is a discussion. Answer the author’s question directly.",
+  "原候选已有更新，请重新打开后再继续修改": "The original proposal has changed. Reopen it before continuing.",
+  "请先确认要改的是哪一稿，再局部修改": "Confirm which draft you want to edit before making a local revision.",
+  "修订未能保留原来的段落结构，请重试或缩小选区": "The revision could not preserve the paragraph structure. Try again or select a shorter passage.",
+  "本轮只修改当前章节的章纲": "This task is limited to the current chapter’s blueprint.",
+  "本轮只修改指定的正文范围": "This task is limited to the specified passage.",
+  "请按 nextOffset 读完当前章正文，再生成章纲": "Read the rest of the current chapter before generating its blueprint.",
+  "当前章节还没有可用于整理章纲的正文": "The current chapter has no prose to use for its blueprint.",
+  "请先打开要续写的章节": "Open the chapter you want to continue.",
+  "选区已变化或无法定位，请重新选择正文": "The selection has changed or could not be located. Select the passage again.",
+  "任务不属于该会话": "This task belongs to a different conversation.",
+  "请提供要修改的原句": "Provide the original text to edit.",
+  "原句无法唯一定位，请引用同一格式内更明确的原文": "Quote a unique passage that uses the same formatting throughout.",
+  "局部修改范围重叠，请合并后重试": "The edits overlap. Combine them and try again.",
+  "局部修改需要指定已读取的章节或正文候选": "Read the target chapter or draft before making a local edit.",
+  "这项请求只涉及局部修改，请用 patch 引用原句并提供替换文字": "For this local edit, quote the original text and provide the replacement.",
+  "本轮已达到处理步数上限。请审阅已生成的候选，也可以点「继续修改」。": "This run reached its step limit. Review the proposed changes or select Continue editing.",
+  "本轮已达到处理步数上限，尚未生成待审阅的候选。": "This run reached its step limit before preparing a change for review.",
   "数据库由更新版本的砚田创建，请升级砚田后再打开": "This database was created by a newer version of Yanfield. Update Yanfield before opening it.",
   "无法创建升级前的数据库备份，升级已停止。请检查磁盘空间和数据库目录的写入权限后重试": "The upgrade stopped because Yanfield could not back up the database. Check disk space and write permissions for the database folder, then try again.",
   // 客户端兜底

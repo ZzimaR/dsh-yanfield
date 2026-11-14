@@ -1,6 +1,6 @@
 {
   "name": "dsh-yanfield",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A long-form fiction writing desk for DeepSeek Harness: manuscript, outline, story notes, and reviewable AI revisions. 在 DeepSeek Harness 里写长篇小说。",
   "type": "module",
   "main": "./dist/host.js",

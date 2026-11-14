@@ -298,6 +298,8 @@ export const editor: Record<string, TranslateValue> = {
   "返回概览": "Back to overview",
   "返回正文编辑": "Back to editing",
   "还原": "Revert",
+  "放大窗口": "Enlarge window",
+  "还原窗口大小": "Restore window size",
   "还没有分卷；可以在“分卷”里新建卷，把章节归到卷下。": "No volumes yet — create one under “Volumes” and put chapters inside it.",
   "还没有总纲，先定下这本书的一句话故事。": "No book outline yet. Start with the one-sentence premise.",
   "还没有章纲": "No outline yet",

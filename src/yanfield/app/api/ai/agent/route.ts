@@ -19,6 +19,7 @@ export const POST=handle(async request=>{
     snapshot:z.object({kind:z.enum(["world","character","location","foreshadow"]),id:z.string().nullable(),fields:z.record(z.string(),z.unknown())}).optional(),
     retryRunId:z.string().optional(),previousRunId:z.string().optional(),mentions:z.array(z.object({type:z.string(),id:z.string(),label:z.string()})).max(30).optional(),
     selection:z.string().max(30000).optional(),
+    selectionReference:z.object({chapterTitle:z.string().max(1000),from:z.number().int().nonnegative(),to:z.number().int().positive(),startLine:z.number().int().positive(),endLine:z.number().int().positive()}).optional(),
     context:z.object({
       contextBudget:z.number().int().min(0).max(MAX_CONTEXT_BUDGET),maxTokens:z.number().int().min(0).max(MAX_OUTPUT_TOKENS),
       includeNovelOutline:z.boolean(),includeVolumeOutline:z.boolean(),includeChapterBlueprint:z.boolean(),

@@ -7,7 +7,7 @@ import { splitBlocks } from "@/lib/diff/blocks";
 import { reviewUnits } from "@/lib/editor/agent-review";
 import { useEditorBridge } from "@/lib/editor/bridge";
 import { apiGet, apiPatch, notifyDataChanged } from "@/lib/client/api";
-import { broadcastRun, commitAgent } from "@/lib/ai/agent/client";
+import { AGENT_UPDATED, broadcastRun, commitAgent } from "@/lib/ai/agent/client";
 import type { AgentRun } from "@/lib/ai/agent/types";
 import { useT } from "@/lib/i18n";
 
@@ -20,11 +20,14 @@ export function AgentReview({initial,changeId,onClose}:{initial:AgentRun;changeI
   const bridge=useEditorBridge(),root=React.useRef<HTMLDivElement>(null);
   React.useEffect(()=>{
     let live=true;
-    void apiGet<AgentRun>(`/api/ai/agent/${initial.id}?novelId=${encodeURIComponent(initial.novelId)}`).then(value=>{if(live)setRun(current=>value.updatedAt>=current.updatedAt?value:current);}).catch(e=>{if(live)setError(e.message);});
-    return()=>{live=false;};
-  },[initial.id]);
+    const receive=(value:AgentRun)=>{if(live && value.id===initial.id)setRun(current=>value.updatedAt>=current.updatedAt?value:current);};
+    const onUpdate=(event:Event)=>receive((event as CustomEvent<AgentRun>).detail);
+    window.addEventListener(AGENT_UPDATED,onUpdate);
+    void apiGet<AgentRun>(`/api/ai/agent/${initial.id}?novelId=${encodeURIComponent(initial.novelId)}`).then(receive).catch(e=>{if(live)setError(e.message);});
+    return()=>{live=false;window.removeEventListener(AGENT_UPDATED,onUpdate);};
+  },[initial.id,initial.novelId]);
   const change=run.changes.find(c=>c.id===changeId);
-  const before=String(change?.before?.content||""),after=String(change?.after.content||"");
+  const before=String(change?.before?.content||""),after=String((change?.state==="applied"?change.saved?.content:undefined)??change?.after.content??"");
   const units=React.useMemo(()=>reviewUnits(before,after),[before,after]);
   const pending=change?.state==="pending";
   const jump=(index:number)=>{

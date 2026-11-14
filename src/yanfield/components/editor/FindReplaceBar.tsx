@@ -68,7 +68,7 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
     const frame = window.requestAnimationFrame(() => {
       const input = findInputRef.current;
       if (!input) return;
-      input.focus();
+      input.focus({ preventScroll: true });
       input.select();
     });
     return () => window.cancelAnimationFrame(frame);
@@ -211,7 +211,7 @@ export function FindReplaceBar({ editor, open, focusRequest = 0, onClose, classN
       role="dialog"
       aria-label={tr("查找与替换")}
       className={cn(
-        "ml-auto mr-3 mt-2 flex w-[360px] max-w-[calc(100%_-_1.5rem)] shrink-0 flex-col gap-1.5 rounded-lg border border-line bg-surface p-2",
+        "absolute right-3 z-30 flex w-[360px] max-w-[calc(100%_-_1.5rem)] flex-col gap-1.5 rounded-lg border border-line bg-surface p-2 shadow-float",
         className,
       )}
     >

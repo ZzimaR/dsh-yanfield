@@ -2,6 +2,9 @@ import type { TranslateValue } from "../core"
 
 /** Card editors: character / world / foreshadow sheets, relations and the shared preview. */
 export const cards: Record<string, TranslateValue> = {
+  "资料排序未保存": "Card order could not be saved",
+  "调整“{title}”的顺序": "Reorder {title}",
+  "拖动排序，也可按上或下方向键": "Drag to reorder, or press Up or Down",
   // 资料档案外壳
   "资料编辑分类": "Research editor sections",
   "关联与标签": "Links & tags",

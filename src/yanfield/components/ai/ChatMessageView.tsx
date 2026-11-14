@@ -11,6 +11,7 @@ import { localizedAgentName } from "@/lib/ai/agent-display";
 import Link from "next/link";
 import {
   Brain,
+  FileText,
   ChevronDown,
   CircleAlert,
   Copy,
@@ -19,6 +20,7 @@ import {
   Trash,
 } from "lucide-react";
 import type { AgentDef, AiAction, AiPricing } from "@/lib/types";
+import type { SelectionReference } from "@/lib/editor/selection-reference";
 import { Badge, Button, IconButton, Markdown } from "@/components/ui/kit";
 import { openSettingsDialog } from "@/components/settings/open";
 import { cn, formatRelativeTime } from "@/lib/ui/cn";
@@ -68,10 +70,28 @@ export const ChatMessageView = React.memo(function ChatMessageView({
 
   /* ---------------- 用户消息 ---------------- */
   if (message.role === "user") {
+    const quote = message.actions.find(action => action.type === "selection-reference")?.payload as
+      { text?: string; reference?: SelectionReference } | undefined;
+    const range = quote?.reference;
     return (
       <div className={cn("group/msg flex justify-end", className)}>
         <div className="flex max-w-[92%] flex-col items-end gap-1.5">
-          <div className="whitespace-pre-wrap break-words rounded-2xl rounded-br-md border border-line/70 bg-surface-2/60 px-4 py-2.5 text-[13px] leading-[1.85] text-ink-2">
+          <div className="min-w-0 max-w-full whitespace-pre-wrap break-words rounded-2xl rounded-br-md border border-line/70 bg-surface-2/60 px-4 py-2.5 text-[13px] leading-[1.85] text-ink-2">
+            {typeof quote?.text === "string" ? (
+              <details className="mb-2 text-xs">
+                <summary className="w-fit max-w-full cursor-pointer list-none rounded-md border border-accent/20 bg-accent/5 px-2 py-1 text-accent">
+                  <span className="flex items-center gap-1.5">
+                    <FileText className="size-3 shrink-0" aria-hidden />
+                    <span className="truncate" title={range?.chapterTitle}>{range?.chapterTitle || tr("引用正文")}</span>
+                    {range ? <span className="shrink-0 tabular-nums">{range.startLine === range.endLine
+                      ? tr("第 {line} 行", { line: range.startLine })
+                      : tr("第 {from}–{to} 行", { from: range.startLine, to: range.endLine })}</span> : null}
+                    <ChevronDown className="size-3 shrink-0" aria-hidden />
+                  </span>
+                </summary>
+                <blockquote className="mt-2 max-h-40 overflow-auto border-l-2 border-accent/25 pl-2 text-ink-3">{quote.text}</blockquote>
+              </details>
+            ) : null}
             {message.content}
           </div>
           <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/msg:opacity-100">

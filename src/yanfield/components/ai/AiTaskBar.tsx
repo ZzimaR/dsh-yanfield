@@ -91,7 +91,7 @@ export function AiTaskBar({chapterId,selection,className}:AiTaskBarProps) {
     const selected=(selection??bridge?.getSelectionText()??"").trim();
     if(task.needsSelection&&!selected){toast({title:tr("先在正文中选中要处理的段落"),tone:"error"});return;}
     const instruction=task.feature==="continue"?"承接当前章末尾续写约600字，追加到本章，不新建下一章。":task.needsSelection?`${task.label}当前选中的段落，保持其余正文和人物事实不变。`:task.instruction||task.hint;
-    handToAssistant({reference:chapterId?{type:"chapter",id:chapterId,label:"当前章节"}:null,taskId:`shortcut-${task.key}`,taskLabel:task.label,prompt:instruction,selection:selected||undefined,autoSend:true});
+    handToAssistant({reference:chapterId?{type:"chapter",id:chapterId,label:"当前章节"}:null,taskId:`shortcut-${task.key}`,taskLabel:task.label,prompt:instruction,selection:task.needsSelection?selected:undefined,autoSend:true});
   };
   return <Dropdown align="start" width={236} trigger={<Button className={cn("h-7 gap-1 px-1.5 text-accent",className)} size="sm" variant="ghost" aria-label={tr("AI 快捷任务")} title={tr("AI 快捷任务")} aria-haspopup="menu" disabled={!chapterId} icon={<Sparkles className="size-3.5"/>}><ChevronDown className="size-3" aria-hidden /></Button>} items={TASKS.map(task=>({label:tr(task.label),icon:task.icon,disabled:!chapterId,onSelect:()=>run(task)}))}/>;
 }

@@ -439,6 +439,7 @@ export type AiStreamEvent =
 
 export type AiActionType =
   | "agent-run"
+  | "selection-reference"
   | "insert"
   | "append"
   | "replace-selection"

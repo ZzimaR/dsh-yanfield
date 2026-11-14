@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { Minus, X } from "lucide-react";
+import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 import { IconButton, useOverlayEscape } from "@/components/ui/kit";
 import { cn } from "@/lib/ui/cn";
 import { yanfieldPanelBounds, yanfieldPortal } from "@/lib/ui/portal";
@@ -101,7 +101,6 @@ export function FloatWindow({
   children,
   footer,
   className,
-  keepMounted = false,
 }: {
   open: boolean;
   title: string;
@@ -112,19 +111,14 @@ export function FloatWindow({
   footer?: React.ReactNode;
   /** 追加样式（字符串末尾合并，可覆盖默认层级等工具类） */
   className?: string;
-  /**
-   * 首次打开之后，open=false 时是否保持挂载（只 hidden 隐藏）。
-   * 用于「页签切走但编辑会话仍在」的场景；显式关闭传 false，好让子编辑器卸载重置。
-   */
-  keepMounted?: boolean;
 }) {
   const bounds = useYanfieldPanelBounds(open);
   const tr = useT();
   const [pos, setPos] = React.useState({ x: 292, y: 76 });
-  /** null = 默认 560 宽 + 高度随内容；非 null = 用户调整过尺寸（高度固定，内容区滚动） */
+  const placed = React.useRef(false);
+  /** null = 默认宽度随面板调整，高度随内容；非 null = 使用指定尺寸 */
   const [size, setSize] = React.useState<FloatWindowSize | null>(null);
-  /** 首次打开后记录，供 keepMounted 判断；最小化时 open 仍为 true，不依赖它 */
-  const [hasOpened, setHasOpened] = React.useState(open);
+  const [restore, setRestore] = React.useState<{ pos: typeof pos; size: FloatWindowSize | null } | null>(null);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   useOverlayEscape(rootRef, open, onClose);
   const dragRef = React.useRef<{ pointerX: number; pointerY: number; originX: number; originY: number } | null>(null);
@@ -137,8 +131,6 @@ export function FloatWindow({
   } | null>(null);
   /** 缩放过程中的最新尺寸，pointerup 时写回记忆 */
   const resizedSizeRef = React.useRef<FloatWindowSize | null>(null);
-
-  const mounted = open || (keepMounted && hasOpened);
 
   // 首次挂载时沿用上次的尺寸（本会话共享 / localStorage），避免每个浮窗各弹各的
   useIsomorphicLayoutEffect(() => {
@@ -154,7 +146,6 @@ export function FloatWindow({
 
   React.useEffect(() => {
     if (!open) return;
-    setHasOpened(true);
     // 打开时套用“最后一次调整过的尺寸”，让后开的浮窗与已有浮窗保持一致
     const shared = readStoredFloatSize();
     if (!shared) return;
@@ -174,15 +165,29 @@ export function FloatWindow({
     });
   }, []);
 
-  // 挂载 / 展开 / 最小化变化后夹回视口（layout 阶段执行，不会闪到屏幕外）
-  useIsomorphicLayoutEffect(() => {
-    if (open) clampNow();
-  }, [open, minimized, clampNow]);
+  const bringToFront = React.useCallback(() => {
+    const active = yanfieldPortal().querySelector("[data-yf-front-float]");
+    if (!rootRef.current || active === rootRef.current) return;
+    active?.removeAttribute("data-yf-front-float");
+    rootRef.current.setAttribute("data-yf-front-float", "");
+  }, []);
 
   useIsomorphicLayoutEffect(() => {
+    if (open) bringToFront();
+  }, [open, bringToFront]);
+
+  // 挂载 / 展开 / 最小化变化后夹回视口（layout 阶段执行，不会闪到屏幕外）
+  useIsomorphicLayoutEffect(() => {
     if (!open || !bounds) return;
-    clampNow();
-  }, [bounds, open, clampNow]);
+    if (!placed.current && rootRef.current) {
+      placed.current = true;
+      const scope = rootRef.current.getRootNode() as ShadowRoot | Document;
+      const sidebar = Array.from(scope.querySelectorAll("[data-yf-reference-sidebar]"))
+        .find((node) => node.getClientRects().length > 0);
+      const x = (sidebar?.getBoundingClientRect().right ?? bounds.left) + VIEWPORT_MARGIN;
+      setPos(clampToViewport({ x, y: bounds.top + 64 }, rootRef.current));
+    } else clampNow();
+  }, [bounds, open, minimized, clampNow]);
 
   // 内容异步加载导致尺寸变化时同步夹取
   React.useEffect(() => {
@@ -193,7 +198,22 @@ export function FloatWindow({
     return () => observer.disconnect();
   }, [open, clampNow]);
 
-  if (!mounted || typeof document === "undefined") return null;
+  if (!open || typeof document === "undefined") return null;
+
+  const toggleSize = () => {
+    if (restore) {
+      const previousSize = restore.size && clampSize(restore.size);
+      setSize(previousSize);
+      setPos(restore.pos);
+      setRestore(null);
+      return;
+    }
+    const panel = yanfieldPanelBounds() ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+    const next = clampSize({ width: Math.min(MAX_WIDTH, Math.max(rootRef.current?.offsetWidth ?? DEFAULT_WIDTH, panel.width * 0.72)), height: panel.height - VIEWPORT_SIZE_GUTTER });
+    setRestore({ pos, size });
+    setSize(next);
+    setPos(clampToViewport({ x: panel.left + panel.width - next.width - VIEWPORT_MARGIN, y: panel.top + VIEWPORT_MARGIN }, rootRef.current, next));
+  };
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -238,6 +258,7 @@ export function FloatWindow({
   const onResizePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
     const resize = resizeRef.current;
     if (!resize) return;
+    setRestore(null);
     resize.moved = true;
     const next = clampSize({
       width: resize.originWidth + (event.clientX - resize.pointerX),
@@ -272,16 +293,16 @@ export function FloatWindow({
       role="dialog"
       data-yf-overlay
       aria-label={title}
-      aria-hidden={open ? undefined : true}
+      onPointerDownCapture={bringToFront}
+      onFocusCapture={bringToFront}
       className={cn(
-        "fixed z-50 flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-float fade-in",
-        !open && "hidden",
+        "fixed z-50 flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-float fade-in data-yf-front-float:z-[51]",
         className,
       )}
       style={{
         left: pos.x,
         top: pos.y,
-        width: size?.width ?? DEFAULT_WIDTH,
+        width: size?.width ?? (bounds ? Math.max(MIN_WIDTH, Math.min(DEFAULT_WIDTH, bounds.width / 2)) : DEFAULT_WIDTH),
         height: minimized ? undefined : size?.height,
         maxWidth: bounds ? bounds.width - VIEWPORT_SIZE_GUTTER : "calc(100vw - 24px)",
         maxHeight: bounds ? Math.min(size ? bounds.height : 760, bounds.height - VIEWPORT_SIZE_GUTTER) : "calc(100vh - 24px)",
@@ -297,6 +318,9 @@ export function FloatWindow({
       >
         <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{title}</p>
         <span className="shrink-0 text-[11px] text-ink-4">{minimized ? tr("已最小化") : tr("拖动")}</span>
+        {!minimized ? <IconButton label={restore ? tr("还原窗口大小") : tr("放大窗口")} size="sm" onClick={toggleSize}>
+          {restore ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+        </IconButton> : null}
         <IconButton label={minimized ? tr("展开") : tr("最小化")} size="sm" onClick={() => onMinimizedChange(!minimized)}>
           <Minus className="size-3.5" />
         </IconButton>
@@ -306,7 +330,7 @@ export function FloatWindow({
       </div>
       {/* 最小化时只隐藏内容，保持子组件挂载，展开后未保存的草稿仍在 */}
       <div className={cn("flex min-h-0 flex-1 flex-col", minimized && "hidden")}>
-        <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">{children}</div>
+        <div className="yf-reference-document scroll-thin min-h-0 flex-1 overflow-y-auto">{children}</div>
         {footer ? <div className="border-t border-line py-3 pl-5 pr-7">{footer}</div> : null}
       </div>
       {/* 右下角缩放把手：同时调整宽高；最小化时隐藏（内容已收起，无高度可调） */}

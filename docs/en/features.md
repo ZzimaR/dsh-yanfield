@@ -23,7 +23,8 @@ Everything the Yanfield plugin can do, by area. The interface follows the Harnes
 
 Three columns:
 
-- **Left rail**: outline (volume / chapter tree), chapter blueprints, notes (characters / places / world / foreshadowing), archives. On narrow panels, the left rail opens as a drawer. Archive details open above it in a floating window you can move, resize, or minimize.
+- **Left rail**: outline (volume / chapter tree), chapter blueprints, notes (characters / places / world / foreshadowing), archives. On narrow panels, the left rail opens as a drawer. Floating blueprint, note, and archive windows stay available when switching left-rail tabs, so you can reference them as you write. Drag the title bar to move the window or its lower-right corner to resize it. You can also enlarge, restore, or minimize it. Long text expands in place for reading and editing.
+- **Card order**: drag the handle on the right, or focus the handle and press Up or Down. Each book saves the order of cards with the same group and parent. Children move with their parent. Clear the search to reorder cards.
 - **Middle**: prose editor (Tiptap). Toolbar has undo/redo, heading levels, bold / italic / underline / strike, quote, lists, divider, a formatting toolbar and an AI menu.
 - **Right**: AI assistant panel (section 6).
 
@@ -33,7 +34,7 @@ Writing features:
 - Word / paragraph / reading-time stats; chapter status (draft, final, …).
 - Focus mode (hide side rails), typewriter mode (caret stays vertically centered).
 - Typography: serif or sans, size, weight, line height, letter spacing, paragraph spacing, margins, max line width, with a live preview.
-- Find and replace in the chapter. Typing highlights matches in place. Use Previous or Next to jump. Press `Ctrl / ⌘ + Z` to undo a replacement and return to the edited passage.
+- Find and replace in the chapter. Press `Ctrl / ⌘ + F` to open the panel in the lower-right corner of the editor while the formatting toolbar stays in place. Typing highlights matches in place. Use Previous or Next to jump. Press `Ctrl / ⌘ + Z` to undo a replacement and return to the edited passage.
 - The formatting toolbar stays at the top while you scroll the manuscript. `Alt + 1` toggles the outline and `Alt + J` focuses the AI composer.
 - Returning to a chapter in the workbench restores its caret and scroll position. Switching chapters starts a fresh undo history.
 
@@ -58,6 +59,13 @@ Writing features:
 Panel layout:
 
 - Top: conversation title (auto-named from the first prompt), history, new conversation.
+- When you ask for an opinion about the book, the assistant can read relevant material and give a direct answer. Expand the activity or references to see what it read.
+- Progress messages stay visible while the answer appears below them. Proposals for review appear after the answer.
+- Applying a change in the manuscript review updates its status in chat. Open **Activity log** to see individual tool results and the materials read.
+- The active conversation stays open when switching chapters within a book. New messages use the current chapter as context, and tasks in progress keep the chapter specified when they were sent.
+- Retrying a task from conversation history uses its original chapter. Tasks created with this version also retain the selection, references, and context settings.
+- Messages sent with selected prose show the chapter and line range. Expand the reference to see the original text sent with the message. Line numbers follow paragraphs and manual line breaks.
+- Short writing requests can use the current context. For example, `这里顺一点` polishes the selected passage, `接着写` continues the current chapter, and `根据正文改章纲` reads the full chapter before proposing an updated blueprint.
 - Middle: message stream. Task steps keep their order and the current step updates in place; autoscroll pauses while you read back.
 - Bottom: skills (quick prompts), persona / style / archive pickers, input box, model and reasoning level, `@` references, send.
 - Status line: today's usage, estimated cost, balance.
@@ -78,7 +86,7 @@ Review flow:
 4. Press **Confirm review** — only kept paragraphs are written; undecided paragraphs keep the original text.
 5. After applying you can **Undo this round** or open the **change history**.
 
-When prose is selected, a revision replaces only the selected text in the current chapter. Automatically suggested note changes start unchecked, with a quotation for each suggested field. If a quotation comes from a draft, save the cited passage first or apply the prose and note together. You can request separate edits to personality, speech style, and long-term goals.
+When prose is selected, a revision replaces only the selected text in the current chapter. You can also quote a unique passage to request a local edit and keep the surrounding text and formatting. Automatically suggested note changes start unchecked, with a quotation for each suggested field. If the quotation is already in the saved chapter, you can apply the note on its own. If the quotation appears only in the draft, keep the cited passage first or apply the prose and note together. You can request separate edits to personality, speech style, and long-term goals.
 
 ## 7. Settings
 

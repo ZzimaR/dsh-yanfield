@@ -62,7 +62,7 @@ interface EditorCanvasProps {
   onTitleChange: (title: string) => void;
   onContentChange: (html: string, wordCount: number) => void;
   onStatusChange: (status: ChapterStatus) => void;
-  onEditorReady: (editor: Editor | null) => void;
+  onEditorReady: (editor: Editor | null, chapterId: string | null) => void;
   onSelectionChange: (selection: SelectionInfo) => void;
   onAskAi: () => void;
   onExitImmersive: () => void;
@@ -238,11 +238,11 @@ export function EditorCanvas(props: EditorCanvasProps) {
 
   // 把编辑器实例交给上层（用于构造 EditorBridge）
   React.useEffect(() => {
-    handlersRef.current.onEditorReady(editor ?? null);
+    handlersRef.current.onEditorReady(editor ?? null, chapterId);
     return () => {
-      handlersRef.current.onEditorReady(null);
+      handlersRef.current.onEditorReady(null, chapterId);
     };
-  }, [editor]);
+  }, [editor, chapterId]);
 
   // EditorWorkbench mounts a fresh editor per chapter so history cannot cross chapters.
   React.useLayoutEffect(() => {
@@ -385,7 +385,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
           open
           focusRequest={findRequest}
           onClose={() => setFindOpen(false)}
-          className={immersive ? "mt-14" : undefined}
+          className={immersive ? "bottom-14" : showStatusBar ? "bottom-12" : "bottom-3"}
         />
       ) : null}
       {immersive ? (

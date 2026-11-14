@@ -315,7 +315,7 @@ export function BlueprintEditor({
             ) : (
               <div className="space-y-2">
                 {draft.scenes.map((scene, index) => (
-                  <div key={scene.id} className="rounded-md border border-line bg-surface-2 p-2.5">
+                  <div key={scene.id} className="yf-document-section rounded-md border border-line bg-surface-2 py-3">
                     <div className="flex items-center gap-1">
                       <span className="shrink-0 text-[11px] tabular-nums text-ink-3">{tr("场景 {index}", { index: index + 1 })}</span>
                       <Input
@@ -366,10 +366,11 @@ export function BlueprintEditor({
                         onChange={(event) => updateScene(draft, update, scene.id, { emotion: event.target.value })}
                       />
                     </div>
-                    <Input
+                    <Textarea
                       value={scene.purpose}
                       placeholder={tr("场景目的：为什么保留这一场")}
-                      className="mt-1.5 h-8 text-[13px]"
+                      rows={1}
+                      className="mt-1.5 min-h-0 text-[13px]"
                       onChange={(event) => updateScene(draft, update, scene.id, { purpose: event.target.value })}
                     />
                     <Textarea
@@ -425,7 +426,7 @@ export function BlueprintEditor({
             placeholder={tr("给写作时的自己留提示（可不填）")}
           />
 
-          <div className="rounded-md border border-line bg-surface-2 px-3 py-2.5">
+          <div className="yf-document-section rounded-md border border-line bg-surface-2 px-3 py-2.5">
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <span className="text-[12px] font-medium text-ink-2">{tr("本章伏笔")}</span>
               <Link
