@@ -4,6 +4,7 @@ import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { Readable } from "node:stream"
 import assert from "node:assert/strict"
+import { DatabaseSync } from "node:sqlite"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const dir = await mkdtemp(path.join(tmpdir(), "yanfield-dsh-"))
@@ -167,6 +168,38 @@ try {
     return events.findLast((event) => event.type === "agent").run
   }
   const apply = (run, changes) => api("POST", `/ai/agent/${run.id}/apply`, { novelId, selections: changes.map(({ id }) => ({ id })) })
+  const createPlace = async (name, parentId) =>
+    (await api("POST", "/locations", { novelId, name, kind: "town", parentId })).data
+  const oldParent = await createPlace("旧港")
+  const newParent = await createPlace("新港")
+  const linkedPlace = await createPlace("渡口", oldParent.id)
+  const linkedRun = await agentRun("Move the ferry stop to the new harbor", [
+    tool("read", { kind: "location", id: linkedPlace.id }),
+    tool("write", { items: [{ kind: "location", id: linkedPlace.id, fields: { parentId: newParent.id } }] }),
+    reply,
+  ])
+  const expectedLinks = { [`location:${oldParent.id}`]: "旧港", [`location:${newParent.id}`]: "新港" }
+  assert.deepEqual(linkedRun.linkTitles, expectedLinks)
+  assert.equal(linkedRun.changes[0].after.parentId, newParent.id)
+  const runRoute = `/ai/agent/${linkedRun.id}?novelId=${novelId}`
+  const clearLinkSnapshot = () => {
+    const db = new DatabaseSync(dbPath)
+    try {
+      db.prepare("UPDATE agent_runs SET data = json_remove(data, '$.linkTitles') WHERE id = ?").run(linkedRun.id)
+    } finally {
+      db.close()
+    }
+  }
+  clearLinkSnapshot()
+  assert.deepEqual((await api("GET", runRoute)).data.linkTitles, expectedLinks)
+  const appliedLink = await apply(linkedRun, linkedRun.changes)
+  assert.equal(appliedLink.status, 200)
+  assert.deepEqual(appliedLink.data.linkTitles, expectedLinks)
+  assert.equal((await api("GET", `/locations/${linkedPlace.id}`)).data.parentId, newParent.id)
+  assert.equal((await api("DELETE", `/locations/${oldParent.id}`)).status, 200)
+  assert.deepEqual((await api("GET", runRoute)).data.linkTitles, expectedLinks)
+  clearLinkSnapshot()
+  assert.deepEqual((await api("GET", runRoute)).data.linkTitles, { [`location:${newParent.id}`]: "新港" })
   const withoutThoughts = await agentRun("Reply without reasoning", [{ deltas: ["First chunk.", "\n\nSecond chunk."] }], {}, events => {
     assert.deepEqual(events.filter(event => event.type === "agent-thinking").map(event => event.phase), ["start", "end"])
     const first = events.findIndex(event => event.type === "delta")

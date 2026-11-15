@@ -87,7 +87,7 @@ Capabilities:
 
 Review flow:
 
-1. Prose proposals show a word delta such as `319 → 338 words (+19)`. Note proposals start as clickable names. Open one to see field differences and source passages, or to apply or discard that item. Use the checkboxes next to the names to select notes to apply together. Open **Activity log** to see tools and materials read.
+1. Prose proposals show a word delta such as `319 → 338 words (+19)`. Note proposals start as clickable names. Open one to see field differences and source passages, or to apply or discard that item. Linked fields such as **Parent place** show the linked item's name. Use the checkboxes next to the names to select notes to apply together. Open **Activity log** to see tools and materials read.
 2. The prose area opens the review at the first change. Deletions appear crossed out in red, and insertions are highlighted in green. Use **Go to change** for a single change, or **Previous change** and **Next change** to move between changes.
 3. For each paragraph press **Keep** or **Revert**; **Revert all** / **Keep all** are also available.
 4. Press **Confirm review** — only kept paragraphs are written; undecided paragraphs keep the original text.

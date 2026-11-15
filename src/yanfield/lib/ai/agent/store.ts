@@ -5,8 +5,40 @@ import { countWords, stripHtml, uid } from "@/lib/ui/cn";
 import { sameFields, validatePatch } from "./schema";
 import { applyBlockDiff, diffBlocks } from "@/lib/diff/blocks";
 import type { AgentChange, AgentRun, EntityKind, Fields } from "./types";
+import { agentLinkField, agentLinkKey, type AgentLinkKind } from "./links";
+
+const linkReaders = {
+  chapter: repo.getChapter,
+  volume: repo.getVolume,
+  world: repo.getWorld,
+  location: repo.getLocation,
+} satisfies Record<AgentLinkKind, (id: string) => { novelId: string } | undefined>;
+
+/** Preserve names alongside finished proposals. Resolve missing names when reading older runs. */
+export function withAgentLinkTitles(value: AgentRun): AgentRun {
+  const titles = { ...value.linkTitles };
+  const seen = new Set<string>();
+  for (const change of value.changes) {
+    for (const field of Object.keys(change.after)) {
+      const relation = agentLinkField(change.kind, field);
+      if (!relation) continue;
+      for (const id of [change.before?.[field], change.after[field]]) {
+        if (typeof id !== "string" || !id) continue;
+        const key = agentLinkKey(relation.kind, id);
+        if (titles[key] || seen.has(key)) continue;
+        seen.add(key);
+        const row = linkReaders[relation.kind](id);
+        const reference = value.references.find(item => item.kind === relation.kind && item.id === id);
+        const title = row?.novelId === value.novelId ? ("name" in row ? row.name : row.title) : reference?.title;
+        if (title) titles[key] = title;
+      }
+    }
+  }
+  return Object.keys(titles).length ? { ...value, linkTitles: titles } : value;
+}
 
 export function saveRun(value: AgentRun): void {
+  if (value.status !== "running") value.linkTitles = withAgentLinkTitles(value).linkTitles;
   value.updatedAt = new Date().toISOString();
   sql("INSERT INTO agent_runs (id,novel_id,data,created_at) VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data", [value.id,value.novelId,JSON.stringify(value),value.createdAt]);
 }

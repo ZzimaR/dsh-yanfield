@@ -14,6 +14,7 @@ import { countWords, stripHtml } from "@/lib/ui/cn";
 import { diffInline } from "@/lib/diff/blocks";
 import { AGENT_COMMIT_CHANGED, AGENT_UPDATED,broadcastRun,commitAgent,isAgentCommitting,openAgentReview } from "@/lib/ai/agent/client";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
+import { agentLinkField, agentLinkKey } from "@/lib/ai/agent/links";
 import { ENTITY_LABEL, FIELD_LABEL, type AgentChange, type AgentRun, type AgentReference, type AgentThought } from "@/lib/ai/agent/types";
 import { t, useT } from "@/lib/i18n";
 import { BLUEPRINT_TENSION_LABEL } from "@/lib/types";
@@ -51,9 +52,13 @@ function evidenceLabel(run:AgentRun,e:NonNullable<AgentChange["evidence"]>[numbe
   if(source?.state==="rejected")return t("已丢弃正文");
   return t("待确认正文");
 }
-export function FieldChange({before,after,format=display}:{before:unknown;after:unknown;format?:(value:unknown)=>string}) {
+export function FieldChange({before,after,format=display,wholeValue=false}:{before:unknown;after:unknown;format?:(value:unknown)=>string;wholeValue?:boolean}) {
   const tr=useT();
-  const segments=diffInline(format(before),format(after));
+  const original = format(before);
+  const updated = format(after);
+  const segments = wholeValue
+    ? [{ type: "del", text: original }, { type: "add", text: updated }]
+    : diffInline(original, updated);
   return <div className="space-y-1.5 text-[12px] leading-[1.85]">
     <div className="whitespace-pre-wrap break-words rounded-md border-l-2 border-danger/25 bg-danger/[0.035] px-2.5 py-2 text-ink-3"><span className="mr-2 text-[10px] text-danger">{tr("原")}</span>{segments.filter(x=>x.type!=="add").map((s,i)=><span key={i} className={s.type==="del"?"bg-danger/10 text-danger line-through":""}>{s.text}</span>)}</div>
     <div className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/35 bg-jade/[0.035] px-2.5 py-2 text-ink-2"><span className="mr-2 text-[10px] text-jade">{tr("改")}</span>{segments.filter(x=>x.type!=="del").map((s,i)=><span key={i} className={s.type==="add"?"bg-jade/15 text-jade":""}>{s.text}</span>)}</div>
@@ -201,11 +206,17 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
         ? <div className="mt-2 rounded-lg border border-danger/20 bg-danger/[0.03] p-2.5 opacity-80"><MaterialPreview kind={c.kind as "character"|"world"|"location"|"foreshadow"} fields={c.before??{}} showTitle={false}/></div>
         : <div className="scroll-thin mt-2.5 max-h-80 space-y-2.5 overflow-y-auto pr-1">
             {keys.map(key=>{
-              const format = key === "scenes" ? displayScenes
+              const relation = agentLinkField(c.kind, key);
+              const label = relation?.label ?? FIELD_LABEL[key];
+              const format = relation ? (value: unknown) => {
+                if (typeof value !== "string" || !value) return tr("未填写");
+                return run.linkTitles?.[agentLinkKey(relation.kind, value)] ?? tr("未找到此资料");
+              }
+                : key === "scenes" ? displayScenes
                 : key === "suspense" || key === "twist" ? displayTension : display;
               return <div key={key}>
-              <label className="mb-1 flex items-center gap-1.5 text-[10.5px] text-ink-3">{isPending?<input type="checkbox" checked={chosen.includes(key)} disabled={busy||running||disabled} onChange={e=>setFields(p=>({...p,[c.id]:e.target.checked?[...chosen,key]:chosen.filter(k=>k!==key)}))}/>:null}{FIELD_LABEL[key]?tr(FIELD_LABEL[key]):key}</label>
-              {c.before?<FieldChange before={c.before[key]} after={c.after[key]} format={format}/>:<p className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/25 bg-jade/[0.035] px-2.5 py-2 text-[12px] leading-[1.85] text-ink-2">{format(c.after[key])}</p>}
+              <label className="mb-1 flex items-center gap-1.5 text-[10.5px] text-ink-3">{isPending?<input type="checkbox" checked={chosen.includes(key)} disabled={busy||running||disabled} onChange={e=>setFields(p=>({...p,[c.id]:e.target.checked?[...chosen,key]:chosen.filter(k=>k!==key)}))}/>:null}{label?tr(label):key}</label>
+              {c.before?<FieldChange before={c.before[key]} after={c.after[key]} format={format} wholeValue={Boolean(relation)}/>:<p className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/25 bg-jade/[0.035] px-2.5 py-2 text-[12px] leading-[1.85] text-ink-2">{format(c.after[key])}</p>}
             </div>;
             })}
           </div>}
@@ -241,7 +252,7 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
       <p>{tr("已准备 {count} 项候选，等待你确认。", { count: pending.length })}</p>
       <ul className="list-disc space-y-1 pl-4">
         {pending.slice(0, 4).map(change => {
-          const fields = Object.keys(change.after).map(key => FIELD_LABEL[key]).filter(Boolean).map(key => tr(key));
+          const fields = Object.keys(change.after).map(key => agentLinkField(change.kind, key)?.label ?? FIELD_LABEL[key]).filter(Boolean).map(key => tr(key));
           return <li key={change.id}>
             {tr(change.op === "delete" ? "删除" : change.before ? "修改" : "新建")} · {tr(ENTITY_LABEL[change.kind])}
             {change.title ? ` · ${change.title}` : ""}
