@@ -9,8 +9,7 @@
  * 只收「真的写过内容」的章纲：仓库层会给每章兜底一行空章纲，不能算作已填写。
  */
 import * as React from "react";
-import { apiGet } from "@/lib/client/api";
-import { toItems } from "@/lib/editor/normalize";
+import { useApi, useDataChanged } from "@/lib/client/api";
 import type { Chapter, ChapterBlueprint, ID } from "@/lib/types";
 
 export interface BlueprintIndex {
@@ -18,6 +17,7 @@ export interface BlueprintIndex {
   filled: Set<ID>;
   /** chapterId → 章纲，用于列表里显示一句话摘要与节奏标记 */
   byChapter: Map<ID, ChapterBlueprint>;
+  pending: Set<ID>;
   /** 参与统计的章节数 */
   total: number;
   loading: boolean;
@@ -39,38 +39,22 @@ export function hasBlueprintContent(blueprint: ChapterBlueprint): boolean {
   );
 }
 
-export function useBlueprintIndex(novelId: string, chapters: Chapter[], version = 0): BlueprintIndex {
-  const [byChapter, setByChapter] = React.useState<Map<ID, ChapterBlueprint>>(() => new Map());
-  const [loading, setLoading] = React.useState(false);
-  const chapterKey = chapters.map((chapter) => chapter.id).join("|");
+const refreshTopics = ["agent", "blueprint", "blueprint-review"]
 
-  React.useEffect(() => {
-    if (!novelId) return;
-    let cancelled = false;
-    setLoading(true);
-    apiGet<unknown>(`/api/blueprints?novelId=${encodeURIComponent(novelId)}`)
-      .then((data) => {
-        if (cancelled) return;
-        const next = new Map<ID, ChapterBlueprint>();
-        for (const item of toItems<ChapterBlueprint>(data)) {
-          if (item.chapterId && hasBlueprintContent(item)) next.set(item.chapterId, item);
-        }
-        setByChapter(next);
-      })
-      .catch(() => {
-        // 读取失败只影响覆盖率与摘要显示，不打断写作台
-        if (!cancelled) setByChapter(new Map());
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // chapterKey 代表章节集合；version 用于保存章纲后强制刷新
-  }, [novelId, chapterKey, version]);
+export function useBlueprintIndex(novelId: string, chapters: Chapter[]): BlueprintIndex {
+  const chapterKey = chapters.map((chapter) => chapter.id).join("|");
+  const { data, loading, refresh } = useApi<{ items: ChapterBlueprint[]; pendingChapterIds?: ID[] }>(
+    novelId ? `/api/blueprints?novelId=${encodeURIComponent(novelId)}` : null,
+    [chapterKey],
+  );
+  useDataChanged(refresh, refreshTopics);
+  const byChapter = React.useMemo(() => new Map(
+    (data?.items ?? []).filter(item => item.novelId === novelId && hasBlueprintContent(item))
+      .map(item => [item.chapterId, item]),
+  ), [data, novelId]);
+  const pending = React.useMemo(() => new Set(data?.pendingChapterIds), [data]);
 
   const filled = React.useMemo(() => new Set(byChapter.keys()), [byChapter]);
 
-  return { filled, byChapter, total: chapters.length, loading };
+  return { filled, byChapter, pending, total: chapters.length, loading: loading && !data };
 }

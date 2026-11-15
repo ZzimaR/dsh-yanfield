@@ -264,6 +264,7 @@ export const ai: Record<string, TranslateValue> = {
   "思考·{level}": "Thinking · {level}",
   "思考程度": "Thinking effort",
   "思考过程 · {count} 字": "Reasoning · {count} chars",
+  "思考过程": "Reasoning",
   "思考能力未知；可在模型设置中重新拉取。未确认能力时使用服务商默认。": "Thinking capability unknown; re-fetch it in model settings. The provider default is used until confirmed.",
   "思考中…": "Thinking…",
   "添加 / 启用 DeepSeek 服务，配置默认模型": "Add or enable a DeepSeek provider and set a default model",

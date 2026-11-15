@@ -11,6 +11,7 @@ import { protocolDiagnostic } from "./diagnostics";
 import { displayAgentReply } from "./reply";
 import * as repo from "@/lib/repo";
 import { resolveTarget, mergeContextConfig } from "@/lib/ai/engine";
+import { streamThoughts } from "./thoughts";
 import { isInvalidToolInputError, isOutputLimitError, streamCompletion, type AiMessage, type ProviderChunk } from "@/lib/ai/provider";
 import { historyLimitsFor, trimChatHistory } from "@/lib/ai/history";
 import { agentPreamble, extractJson, renderTemplate, resolvePreset, withLanguageDirective } from "@/lib/ai/prompts";
@@ -135,7 +136,7 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
     shortWrite?: boolean
     structured?: boolean
     temperature?: number
-  }): AsyncGenerator<string> {
+  }): AsyncGenerator<string | Extract<AiStreamEvent, { type: "agent-thinking" }>> {
     const { stage, shortWrite, structured, temperature = 0.4 } = options
     const decisionOutput = stage === "decide"
     const planning = stage === "plan"
@@ -165,10 +166,11 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
       const maxTokens = planning ? Math.min(baseMaxTokens ?? 900, 900) : capped ? 1400 : baseMaxTokens;
       let limited = false;
       try {
-        for await (const chunk of streamCompletion({
+        for await (const chunk of streamThoughts(run, streamCompletion({
           provider: target.provider, model: target.model, messages: input, maxTokens,
           temperature, signal, disableThinking: true, thinkingLevel, decisionTools: tools, outputFormat,
-        })) {
+        }), stage === "write" || stage === "materials")) {
+          if (chunk.type === "agent-thinking") yield chunk;
           if (chunk.type === "usage") usage = chunk;
           if (signal?.aborted) throw new DOMException("已停止", "AbortError");
           if (chunk.type === "reasoning") reasoning += chunk.text;
@@ -245,7 +247,10 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
     for (let attempt = 0; attempt < 2 && !plan; attempt++) {
       let raw = ""
       try {
-        for await (const delta of complete(planningMessages, { stage: "plan", temperature: 0 })) raw += delta
+        for await (const delta of complete(planningMessages, { stage: "plan", temperature: 0 })) {
+          if (typeof delta === "string") raw += delta;
+          else yield delta;
+        }
       } catch (error) {
         if (!isOutputLimitError(error) || signal?.aborted) throw error
       }
@@ -384,7 +389,10 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
       for(let attempt=0;attempt<2;attempt++) {
         raw="";
         try {
-          for await(const delta of complete(messages, { stage: "decide" })) raw+=delta;
+          for await (const delta of complete(messages, { stage: "decide" })) {
+            if (typeof delta === "string") raw += delta;
+            else yield delta;
+          }
         } catch (error) {
           if (attempt || signal?.aborted || !isInvalidToolInputError(error)) throw error;
           messages.push({ role: "user", content: "上一次的工具参数没有形成有效 JSON，未执行。请重新调用。若正在整理一批资料，每次提交至多 5 项，先完成一组并读取回执，再接着提交余下的条目。" });
@@ -619,7 +627,10 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
                 let revision: { patches: ReturnType<typeof selectedEdit.patches>; words: number } | undefined;
                 for(let attempt=0;attempt<2;attempt++) {
                   output="";
-                  for await(const delta of complete(writer, { stage: "write", shortWrite, structured: true, temperature })) output+=delta;
+                  for await (const delta of complete(writer, { stage: "write", shortWrite, structured: true, temperature })) {
+                    if (typeof delta === "string") output += delta;
+                    else yield delta;
+                  }
                   if(signal?.aborted) throw new DOMException("已停止","AbortError");
                   const result=schema.safeParse(extractJson(output));
                   if(result.success) {
@@ -640,6 +651,10 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
                 generated=revision.words;
               } else {
                 for await(const delta of complete(writer, { stage: "write", shortWrite, temperature })) {
+                  if (typeof delta !== "string") {
+                    yield delta;
+                    continue;
+                  }
                   output+=delta;
                   run.preview+=delta;yield {type:"agent-preview",runId:run.id,text:delta};
                 }
@@ -791,7 +806,11 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
         if(budget>0&&input.reduce((n,m)=>n+estimateTokens(m.content+(m.reasoning_content||"")),0)>budget)throw new Error("资料整理材料超过预算，本轮正文已保留，可引用单章继续整理");
         let parsed:z.infer<typeof materialResultSchema>|undefined;
         for(let attempt=0;attempt<2;attempt++) {
-          let raw="";for await(const delta of complete(input, { stage: "materials" }))raw+=delta;
+          let raw="";
+          for await (const delta of complete(input, { stage: "materials" })) {
+            if (typeof delta === "string") raw += delta;
+            else yield delta;
+          }
           const result=materialResultSchema.safeParse(extractJson(raw));if(result.success){parsed=result.data;break;}
           input.push({role:"user",content:"请按cards、kind、fields、evidence约定返回有效JSON，每条evidence含field、sourceId、quote。"});
         }
@@ -826,9 +845,10 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
     if(proposalsNeedRecap(run.changes, finalReply)) run.recap=true;
     run.status=run.changes.some(c=>c.state==="pending")?"ready":"complete";
   } catch(error) {
-    run.status=signal?.aborted?"aborted":"error";
-    run.errorCode??=signal?.aborted?"AGENT_ABORTED":"AGENT_EXECUTION_FAILED";
-    run.error=signal?.aborted?"已停止，完成的候选已保留":error instanceof Error?error.message:"任务失败";
+    const aborted = signal?.aborted || (error instanceof Error && error.name === "AbortError");
+    run.status=aborted?"aborted":"error";
+    run.errorCode??=aborted?"AGENT_ABORTED":"AGENT_EXECUTION_FAILED";
+    run.error=aborted?"已停止，完成的候选已保留":error instanceof Error?error.message:"任务失败";
     run.steps.filter(s=>s.status==="running").forEach(s=>{s.status="error";s.detail=run.error;});
   } finally {
     delete run.answering;

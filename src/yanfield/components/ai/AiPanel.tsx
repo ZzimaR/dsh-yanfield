@@ -503,6 +503,7 @@ export function AiPanel({
     if (continuation.current?.tab === originalKey && !retryMessage) continuation.current = null;
     setDraft("");setMentions([]);setTask(null);setReferenceSnapshots(prev=>({...prev,[originalKey]:undefined}));
     let currentRun:AgentRun|undefined;
+    let agentThought: UIMessage["agentThought"];
     let action:AiAction|undefined;
     try {
       await streamAiAgent({novelId,chapterId:requestContext.chapterId,sessionId:sessionId||undefined,agentId:requestContext.agentId,message:text,snapshot,history,previousRunId,retryRunId:retryMessage ? previousRunId : undefined,selection,selectionReference,mentions:references,context:requestContext.context,writingPreset}, {
@@ -517,28 +518,45 @@ export function AiPanel({
           }
           if(event.type==="agent") {
             currentRun=event.run;
-            chat.patchExchange(assistantId,{agentRun:event.run,content:event.run.summary||tr("正在处理任务"),status:event.run.status==="running"?"streaming":event.run.status==="error"?"error":event.run.status==="aborted"?"aborted":"complete",error:event.run.error,usage:event.run.usage});
+            agentThought=undefined;
+            chat.patchExchange(assistantId,{agentRun:event.run,agentThought,content:event.run.summary||tr("正在处理任务"),status:event.run.status==="running"?"streaming":event.run.status==="error"?"error":event.run.status==="aborted"?"aborted":"complete",error:event.run.error,usage:event.run.usage});
+          }
+          if (event.type === "agent-thinking" && currentRun) {
+            const { phase, thought } = event;
+            if (phase === "end") {
+              agentThought = undefined;
+              if (thought.text.trim()) currentRun = { ...currentRun, thoughts: [...(currentRun.thoughts ?? []), thought] };
+              chat.patchExchange(assistantId, { agentRun: currentRun, agentThought });
+            } else {
+              const text = agentThought?.id === thought.id ? agentThought.text + thought.text : thought.text;
+              agentThought = { ...thought, text };
+              chat.patchExchange(assistantId, { agentThought });
+            }
           }
           if(event.type==="agent-preview" && currentRun) {
             currentRun={...currentRun,preview:currentRun.preview+event.text};
             chat.patchExchange(assistantId,{agentRun:currentRun});
           }
-          if(event.type==="error") chat.patchExchange(assistantId,{status:"error",error:event.message,content:currentRun?.summary||tr("任务未完成")});
+          if(event.type==="error") chat.patchExchange(assistantId,{agentThought:undefined,status:"error",error:event.message,content:currentRun?.summary||tr("任务未完成")});
           if(event.type==="done") chat.patchExchange(assistantId,{usage:event.usage});
         },
       });
     } catch(e) {
       if (runId === agentRunIdRef.current) {
-        chat.patchExchange(assistantId,{status:controller.signal.aborted?"aborted":"error",content:currentRun?.summary||tr("任务未完成"),error:controller.signal.aborted?tr("已停止，完成的候选已保留"):e instanceof Error?e.message:tr("任务失败")});
+        chat.patchExchange(assistantId,{agentThought:undefined,status:controller.signal.aborted?"aborted":"error",content:currentRun?.summary||tr("任务未完成"),error:controller.signal.aborted?tr("已停止，完成的候选已保留"):e instanceof Error?e.message:tr("任务失败")});
       }
       if(action && runId === agentRunIdRef.current) {
         const savedRunId=(action.payload as {runId:string}).runId;
         try {
           const saved=await apiGet<AgentRun>(`/api/ai/agent/${savedRunId}?novelId=${encodeURIComponent(novelId)}`);
-          if (runId === agentRunIdRef.current) chat.patchExchange(assistantId,{agentRun:saved});
+          if (runId === agentRunIdRef.current) {
+            currentRun = saved;
+            chat.patchExchange(assistantId,{agentRun:saved});
+          }
         } catch {}
       }
     } finally {
+      if (currentRun?.changes.some(change => change.kind === "blueprint")) notifyDataChanged("blueprint-review");
       if (runId === agentRunIdRef.current) {
         sendingRef.current=false;
         editAbortRef.current=null;

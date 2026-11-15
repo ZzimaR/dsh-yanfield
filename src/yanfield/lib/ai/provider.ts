@@ -584,13 +584,13 @@ async function* streamHarness(request: CompletionRequest): AsyncGenerator<Provid
         if (reason?.kind === "error" || reason?.kind === "aborted") {
           const failure = reason.failure && typeof reason.failure === "object" ? reason.failure as Record<string, unknown> : null;
           const message = typeof failure?.message === "string" ? failure.message : "模型调用失败";
-          if (reason.kind === "aborted") return;
+          if (reason.kind === "aborted") throw new DOMException("已停止", "AbortError");
           throw new ProviderError(message);
         }
       }
     }
   } catch (error) {
-    if (error instanceof ProviderError) throw error;
+    if (error instanceof ProviderError || (error instanceof Error && error.name === "AbortError")) throw error;
     const message = error instanceof Error ? error.message : "模型调用失败";
     if (input.reasoningEffort && /UNSUPPORTED_REASONING_EFFORT/i.test(message)) {
       yield* streamHarness({ ...request, thinkingLevel: "default" });

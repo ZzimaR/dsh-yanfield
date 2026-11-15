@@ -42,6 +42,7 @@ Writing features:
 ## 4. Notes
 
 - **Outline**: book outline, volume outlines, chapter blueprints (goal, conflict, emotional arc, scene beats, plot points, hooks, target words, suspense level, and twist level).
+- The blueprint list shows the saved suspense level, twist level, and summary. AI proposals are marked **Pending review**. Applying or undoing a proposal updates the list and the count of filled blueprints.
 - **Characters**: name, aliases, role, age, personality, goals, relationships, appearance, secrets, appearance chapter, AI visibility.
 - **Place cards**: name, aliases, type, parent place, sensory details, and layout. Browse by hierarchy and set AI visibility and reveal chapters.
 - **World settings**: name, category, importance, description, related characters, reveal chapter, AI visibility.
@@ -62,6 +63,7 @@ Panel layout:
 - Top: conversation title (auto-named from the first prompt), history, new conversation.
 - When you ask for an opinion about the book, the assistant can read relevant material and give a direct answer. Expand the activity or references to see what it read.
 - Progress messages stay visible while the answer appears below them. Proposals for review appear after the answer.
+- When the model streams reasoning, the assistant shows the latest three lines. Once the model starts replying or moves on to a tool, expand **Reasoning** to read the full text for that round.
 - Applying a change in the manuscript review updates its status in chat. Open **Activity log** to see individual tool results and the materials read.
 - The active conversation stays open when switching chapters within a book. New messages use the current chapter as context, and tasks in progress keep the chapter specified when they were sent.
 - Each request is scoped before the assistant gets its editing tools. It can use prose to build cards while leaving the manuscript intact. Ask for multiple types of changes together when you need them. Use **Keep editing** on the proposal you want to revise.

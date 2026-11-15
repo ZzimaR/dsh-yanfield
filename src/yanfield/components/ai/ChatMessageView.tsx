@@ -10,7 +10,6 @@ import * as React from "react";
 import { localizedAgentName } from "@/lib/ai/agent-display";
 import Link from "next/link";
 import {
-  Brain,
   FileText,
   ChevronDown,
   CircleAlert,
@@ -26,8 +25,9 @@ import { openSettingsDialog } from "@/components/settings/open";
 import { cn, formatRelativeTime } from "@/lib/ui/cn";
 import { useT } from "@/lib/i18n";
 import type { UIMessage } from "./types";
-import { ACTION_LABEL, AGENT_TINT_CLASS, agentInitial, formatTokens, isBodyAction } from "./utils";
+import { ACTION_LABEL, AGENT_TINT_CLASS, agentInitial, isBodyAction } from "./utils";
 import { AgentRunCard } from "./AgentRunCard";
+import { ThinkingPreview } from "./ThinkingPreview";
 import { UsageIndicator } from "./UsageIndicator";
 
 export interface ChatMessageViewProps {
@@ -64,7 +64,6 @@ export const ChatMessageView = React.memo(function ChatMessageView({
   onContinue,
   className,
 }: ChatMessageViewProps) {
-  const [showReasoning, setShowReasoning] = React.useState(false);
   const tr = useT();
   const tint = AGENT_TINT_CLASS[agent.tint] ?? AGENT_TINT_CLASS.accent;
 
@@ -109,7 +108,7 @@ export const ChatMessageView = React.memo(function ChatMessageView({
 
   /* ---------------- 助手消息 ---------------- */
   const isStreaming = streaming;
-  const reasoningLength = (message.reasoning ?? "").trim().length;
+  const hasAgentRun = message.actions.some((action) => action.type === "agent-run");
 
   return (
     <div className={cn("group/msg w-full min-w-0", className)}>
@@ -120,32 +119,10 @@ export const ChatMessageView = React.memo(function ChatMessageView({
           {message.model?<span className="ml-auto max-w-[58%] truncate text-[10px] text-ink-3" title={message.provider?`${message.provider} / ${message.model}`:message.model}>{message.model}</span>:null}
         </div>
 
-        {reasoningLength > 0 ? (
-          <div className="mt-1.5">
-            <button
-              type="button"
-              onClick={() => setShowReasoning((prev) => !prev)}
-              aria-expanded={showReasoning}
-              className="inline-flex items-center gap-1 rounded-sm text-[11px] text-ink-3 transition-colors duration-150 hover:text-ink-2 dark:text-ink-2 dark:hover:text-ink"
-            >
-              <Brain className="size-3" />
-              {isStreaming ? tr("思考中…") : tr("思考过程 · {count} 字", { count: formatTokens(reasoningLength) })}
-              <ChevronDown
-                className={cn("size-3 transition-transform duration-150", showReasoning && "rotate-180")}
-              />
-            </button>
-            {showReasoning ? (
-              <div className="scroll-thin mt-1 max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-line bg-surface-2 px-2.5 py-2 text-[12px] leading-relaxed text-ink-3 dark:text-ink-2">
-                {message.reasoning}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        {!hasAgentRun && <ThinkingPreview text={message.reasoning ?? ""} active={isStreaming && !message.content} />}
 
-        {message.content && !message.actions.some(a=>a.type==="agent-run") ? (
+        {message.content && !hasAgentRun ? (
           <Markdown text={message.content} className={cn("mt-1 text-[13px] leading-[1.9]", isStreaming && "ai-caret")} />
-        ) : isStreaming && !message.actions.some(a=>a.type==="agent-run") ? (
-          <div className="ai-caret mt-1 h-5" aria-label={tr("正在生成")} />
         ) : null}
 
         {!message.content && !isStreaming && message.status === "aborted" ? (
@@ -192,7 +169,7 @@ export const ChatMessageView = React.memo(function ChatMessageView({
 
         {message.actions.filter(a=>a.type==="agent-run").map(action=>{
           const runId=(action.payload as {runId?:string})?.runId;
-          return runId?<AgentRunCard key={runId} runId={runId} novelId={novelId} initial={message.agentRun} disabled={disableActions} onContinue={onContinue}/>:null;
+          return runId?<AgentRunCard key={runId} runId={runId} novelId={novelId} initial={message.agentRun} thought={message.agentThought} disabled={disableActions} onContinue={onContinue}/>:null;
         })}
         {message.actions.some(a=>a.type!=="agent-run") ? (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">

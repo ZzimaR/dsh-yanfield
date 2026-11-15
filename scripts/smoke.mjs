@@ -34,9 +34,14 @@ const ctx = {
     async *stream({ maxTokens, messages, tools }) {
       const scripted = scriptedReplies.shift()
       if (scripted !== undefined) {
-        yield { type: "text-delta", text: typeof scripted === "function" ? await scripted(messages, tools) : scripted }
+        const value = typeof scripted === "function" ? await scripted(messages, tools) : scripted
+        if (typeof value === "string") yield { type: "text-delta", text: value }
+        else {
+          for (const text of value.thoughts ?? []) yield { type: "reasoning-delta", text }
+          if (value.reply) yield { type: "text-delta", text: value.reply }
+        }
         if (maxTokens === 900) yield { type: "usage", usage: { inputTokens: 400, outputTokens: 50 } }
-        yield { type: "finish", reason: { kind: "stop" } }
+        yield { type: "finish", reason: { kind: value?.finish ?? "stop" } }
         return
       }
       outputLimits.push(maxTokens)
@@ -161,6 +166,27 @@ try {
     return events.findLast((event) => event.type === "agent").run
   }
   const apply = (run, changes) => api("POST", `/ai/agent/${run.id}/apply`, { novelId, selections: changes.map(({ id }) => ({ id })) })
+  const withoutThoughts = await agentRun("Reply without reasoning", [reply], {}, events => {
+    assert.deepEqual(events.filter(event => event.type === "agent-thinking").map(event => event.phase), ["start", "end", "start", "end"])
+  })
+  assert.equal(withoutThoughts.status, "complete")
+  assert.equal(withoutThoughts.thoughts, undefined)
+  const interruptedThought = await agentRun("Stop in the middle of reasoning", [
+    { thoughts: ["Partial thought"], finish: "aborted" },
+  ], {}, events => {
+    assert.deepEqual(events.filter(event => event.type === "agent-thinking").map(event => event.phase), ["start", "end", "start", "delta"])
+  })
+  assert.equal(interruptedThought.status, "aborted")
+  assert.deepEqual(interruptedThought.thoughts.map(thought => thought.text), ["Partial thought"])
+  assert.deepEqual(interruptedThought.changes, [])
+
+  const retriedThought = await agentRun("Retry after a truncated model response", [
+    { thoughts: ["First attempt"], finish: "max-tokens" },
+    { thoughts: ["Second attempt"], reply },
+  ])
+  assert.equal(retriedThought.status, "complete")
+  assert.deepEqual(retriedThought.thoughts.map(thought => thought.text), ["First attempt", "Second attempt"])
+  assert.equal(retriedThought.summary, "Done")
   const batch = await agentRun("Create a character and a location card.", [
     decision("propose_cards", { items: [
       { kind: "character", fields: { name: "Batch character", role: "ferrymaster" } },
@@ -449,12 +475,12 @@ try {
   }
   let firstPage
   const blueprintRun = await agentRun("根据正文改章纲", [
-    readChapter(0),
+    { thoughts: ["Read the ", "manuscript."], reply: JSON.stringify({ ...JSON.parse(readChapter(0)), message: "I will check the manuscript." }) },
     (messages) => {
       firstPage = chapterReceipt(messages)
       assert(firstPage.nextOffset > 0)
       assert.equal(firstPage.contentTotal, manuscript.length)
-      return decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "Premature" } })
+      return { thoughts: ["Check the remaining pages."], reply: decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "Premature" } }) }
     },
     (messages) => {
       assert.match(messages.at(-1).content[0].text, /读完当前章正文/)
@@ -465,31 +491,61 @@ try {
       assert.equal(secondPage.contentOffset, firstPage.nextOffset)
       assert.equal(secondPage.nextOffset, null)
       assert.equal(firstPage.content + secondPage.content, manuscript)
-      return decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "The bridge closes." } })
+      return decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "The bridge closes.", suspense: "high", twist: "low" } })
     },
     reply,
-  ], { chapterId: longChapter.id, context: { includeChapterBlueprint: true } }, undefined, { operations: ["editOutline"] })
+  ], { chapterId: longChapter.id, context: { includeChapterBlueprint: true } }, events => {
+    const thoughts = events.filter(event => event.type === "agent-thinking")
+    assert.deepEqual(thoughts.slice(2, 9).map(event => [event.phase, event.thought.stepIndex, event.thought.text]), [
+      ["start", 0, ""], ["delta", 0, "Read the "], ["delta", 0, "manuscript."], ["end", 0, "Read the manuscript."],
+      ["start", 1, ""], ["delta", 1, "Check the remaining pages."], ["end", 1, "Check the remaining pages."],
+    ])
+  }, { operations: ["editOutline"] })
   assert.equal(blueprintRun.changes.length, 1)
   assert.equal(blueprintRun.changes[0].kind, "blueprint")
   assert.equal(blueprintRun.changes[0].targetId, longChapter.id)
-  assert.deepEqual(blueprintRun.changes[0].after, { goal: "The bridge closes." })
+  assert.deepEqual(blueprintRun.changes[0].after, { goal: "The bridge closes.", suspense: "high", twist: "low" })
+  assert.equal(blueprintRun.progress[0].text, "I will check the manuscript.")
+  assert.deepEqual((await api("GET", `/ai/agent/${blueprintRun.id}?novelId=${novelId}`)).data.thoughts.map(thought => thought.text), [
+    "Read the manuscript.", "Check the remaining pages.",
+  ])
+  const chapterBlueprints = async () => (await api("GET", `/blueprints?novelId=${novelId}`)).data
+  assert((await chapterBlueprints()).pendingChapterIds.includes(longChapter.id))
   assert.equal((await apply(blueprintRun, blueprintRun.changes)).status, 200)
+  const savedBlueprints = await chapterBlueprints()
+  assert(!savedBlueprints.pendingChapterIds.includes(longChapter.id))
+  const savedBlueprint = savedBlueprints.items.find(item => item.chapterId === longChapter.id)
+  assert.deepEqual([savedBlueprint.suspense, savedBlueprint.twist], ["high", "low"])
   assert.equal((await api("GET", `/chapters/${longChapter.id}/blueprint`)).data.goal, "The bridge closes.")
   assert.equal((await api("GET", `/chapters/${longChapter.id}`)).data.content, manuscript)
   const revisedBlueprint = await agentRun("Refine the existing chapter blueprint", [
     readChapter(0),
-    decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "Leave before the bridge closes." } }),
+    decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "Leave before the bridge closes.", suspense: "low", twist: "high" } }),
     reply,
   ], { chapterId: longChapter.id, context: { includeChapterBlueprint: true } }, undefined, { operations: ["editOutline"] })
   assert.equal(revisedBlueprint.changes[0].before.goal, "The bridge closes.")
   assert.equal((await api("GET", `/chapters/${longChapter.id}/blueprint`)).data.goal, "The bridge closes.")
   assert.equal((await apply(revisedBlueprint, revisedBlueprint.changes)).status, 200)
   assert.equal((await api("GET", `/chapters/${longChapter.id}/blueprint`)).data.goal, "Leave before the bridge closes.")
+  assert.equal((await api("POST", `/ai/agent/${revisedBlueprint.id}/apply`, { novelId, op: "undo" })).status, 200)
+  const restoredBlueprint = (await chapterBlueprints()).items.find(item => item.chapterId === longChapter.id)
+  assert.deepEqual([restoredBlueprint.goal, restoredBlueprint.suspense, restoredBlueprint.twist], ["The bridge closes.", "high", "low"])
   const outlineDraft = await agentRun("Set a new goal", [
     decision("read", { kind: "blueprint", id: longChapter.id }),
     decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "Wait by the bridge." } }),
     reply,
   ], { chapterId: longChapter.id }, undefined, { operations: ["editOutline"] })
+  assert((await chapterBlueprints()).pendingChapterIds.includes(longChapter.id))
+  const alternateOutline = await agentRun("Propose a higher twist level", [
+    decision("read", { kind: "blueprint", id: longChapter.id }),
+    decision("propose", { kind: "blueprint", id: longChapter.id, fields: { twist: "high" } }),
+    reply,
+  ], { chapterId: longChapter.id }, undefined, { operations: ["editOutline"] })
+  assert.equal((await chapterBlueprints()).pendingChapterIds.filter(id => id === longChapter.id).length, 1)
+  assert.equal((await api("PATCH", `/ai/agent/${alternateOutline.id}`, {
+    novelId, op: "reject", changeId: alternateOutline.changes[0].id,
+  })).status, 200)
+  assert((await chapterBlueprints()).pendingChapterIds.includes(longChapter.id))
   const invalidFollowUp = await agentRun("Revise the candidate", [
     decision("propose", { kind: "blueprint", id: outlineDraft.changes[0].id, fields: { unknownField: "invalid" } }),
     reply,
@@ -508,6 +564,8 @@ try {
   assert.deepEqual(retiredWhileGenerating.changes, [])
   assert.match(retiredWhileGenerating.steps[0].detail, /原候选已有更新/)
   assert.equal((await api("GET", `/ai/agent/${outlineDraft.id}?novelId=${novelId}`)).data.changes[0].state, "rejected")
+  assert(!(await chapterBlueprints()).pendingChapterIds.includes(longChapter.id))
+  assert.equal((await chapterBlueprints()).items.find(item => item.chapterId === longChapter.id).goal, "The bridge closes.")
 
   const character = (await api("POST", "/characters", { novelId, name: "Gu", identity: "teacher" })).data
   const snapshotRun = await agentRun("Only edit the speaking style", [

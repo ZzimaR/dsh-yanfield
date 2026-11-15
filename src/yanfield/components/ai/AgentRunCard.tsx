@@ -7,14 +7,15 @@ import { AgentProgress } from "./AgentProgress";
 import { AgentReply, useAgentReplyReveal } from "./AgentReply";
 import { MaterialPreview } from "@/components/cards/MaterialPreview";
 import { Button, ConfirmDialog, Markdown, Sheet, useToast } from "@/components/ui/kit";
-import { apiGet, apiPatch, useDataChanged } from "@/lib/client/api";
+import { apiGet, apiPatch, notifyDataChanged, useDataChanged } from "@/lib/client/api";
 import { useEditorBridge } from "@/lib/editor/bridge";
 import { countWords, stripHtml } from "@/lib/ui/cn";
 import { diffInline } from "@/lib/diff/blocks";
 import { AGENT_COMMIT_CHANGED, AGENT_UPDATED,broadcastRun,commitAgent,isAgentCommitting,openAgentReview } from "@/lib/ai/agent/client";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
-import { ENTITY_LABEL, FIELD_LABEL, type AgentChange, type AgentRun, type AgentReference } from "@/lib/ai/agent/types";
+import { ENTITY_LABEL, FIELD_LABEL, type AgentChange, type AgentRun, type AgentReference, type AgentThought } from "@/lib/ai/agent/types";
 import { t, useT } from "@/lib/i18n";
+import { BLUEPRINT_TENSION_LABEL } from "@/lib/types";
 
 const entityIcons = { character: User, location: MapPinned, world: MapPin, foreshadow: Bookmark };
 
@@ -22,6 +23,9 @@ function display(value:unknown):string {
   if(value===null||value===undefined||value==="") return t("未填写");
   if(Array.isArray(value)) return value.map(v=>typeof v==="string"?v:JSON.stringify(v)).join("\n");
   return typeof value==="object"?JSON.stringify(value,null,2):String(value);
+}
+function displayTension(value: unknown): string {
+  return value === "low" || value === "medium" || value === "high" ? t(BLUEPRINT_TENSION_LABEL[value]) : display(value);
 }
 function displayScenes(value:unknown):string {
   if(!Array.isArray(value)||!value.length)return t("未填写");
@@ -54,7 +58,7 @@ export function FieldChange({before,after,format=display}:{before:unknown;after:
     <div className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/35 bg-jade/[0.035] px-2.5 py-2 text-ink-2"><span className="mr-2 text-[10px] text-jade">{tr("改")}</span>{segments.filter(x=>x.type!=="del").map((s,i)=><span key={i} className={s.type==="add"?"bg-jade/15 text-jade":""}>{s.text}</span>)}</div>
   </div>;
 }
-export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{runId:string;novelId:string;initial?:AgentRun;disabled?:boolean;onContinue?:(text:string, runId:string)=>void}) {
+export function AgentRunCard({runId,novelId,initial,thought,disabled=false,onContinue}:{runId:string;novelId:string;initial?:AgentRun;thought?:AgentThought;disabled?:boolean;onContinue?:(text:string, runId:string)=>void}) {
   const [run,setRun]=React.useState<AgentRun|undefined>(initial);
   const [error,setError]=React.useState("");
   const [expanded,setExpanded]=React.useState<string|null>(null);
@@ -212,10 +216,14 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
       {deleting
         ? <div className="mt-2 rounded-lg border border-danger/20 bg-danger/[0.03] p-2.5 opacity-80"><MaterialPreview kind={c.kind as "character"|"world"|"location"|"foreshadow"} fields={c.before??{}} showTitle={false}/></div>
         : <div className="scroll-thin mt-2.5 max-h-80 space-y-2.5 overflow-y-auto pr-1">
-            {keys.map(key=><div key={key}>
+            {keys.map(key=>{
+              const format = key === "scenes" ? displayScenes
+                : key === "suspense" || key === "twist" ? displayTension : display;
+              return <div key={key}>
               <label className="mb-1 flex items-center gap-1.5 text-[10.5px] text-ink-3">{isPending?<input type="checkbox" checked={chosen.includes(key)} disabled={busy||running||disabled} onChange={e=>setFields(p=>({...p,[c.id]:e.target.checked?[...chosen,key]:chosen.filter(k=>k!==key)}))}/>:null}{FIELD_LABEL[key]?tr(FIELD_LABEL[key]):key}</label>
-              {c.before?<FieldChange before={c.before[key]} after={c.after[key]} format={key==="scenes"?displayScenes:display}/>:<p className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/25 bg-jade/[0.035] px-2.5 py-2 text-[12px] leading-[1.85] text-ink-2">{(key==="scenes"?displayScenes:display)(c.after[key])}</p>}
-            </div>)}
+              {c.before?<FieldChange before={c.before[key]} after={c.after[key]} format={format}/>:<p className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/25 bg-jade/[0.035] px-2.5 py-2 text-[12px] leading-[1.85] text-ink-2">{format(c.after[key])}</p>}
+            </div>;
+            })}
           </div>}
       {c.evidence?.length?<details className="mt-2 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("原文依据 · {count}",{count:c.evidence.length})}</summary><div className="mt-2 space-y-2">{c.evidence.map((e,i)=><blockquote key={i} className="border-l-2 border-jade/25 pl-2.5 leading-relaxed"><span className="mb-1 block text-[10px] text-jade">{e.field&&FIELD_LABEL[e.field]?`${tr(FIELD_LABEL[e.field])} · `:""}{e.title}{` · ${evidenceLabel(run,e)}`}</span>{e.quote}</blockquote>)}</div></details>:null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -233,7 +241,7 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
   </button>;
   };
   return <div className="min-w-0" data-testid="agent-run-card">
-    <AgentProgress run={run} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
+    <AgentProgress run={run} thought={running ? thought : undefined} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
     {(running || revealing) && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}
     {showReply?<AgentReply text={summary} length={replyLength}/>:null}
     {settled && validationStopped?<p className="px-1 py-1 text-[13px] leading-relaxed text-ink-2" role="status">{
@@ -318,7 +326,12 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
         if(confirmation.op==="delete")void apply(confirmation.changes);
         else {
           setExpandedMaterial(null);
-          void mutate(()=>apiPatch<AgentRun>(`/api/ai/agent/${run.id}`,{op:"reject",changeId:confirmation.changes[0].id,novelId:run.novelId}));
+          const change = confirmation.changes[0];
+          void mutate(async () => {
+            const result = await apiPatch<AgentRun>(`/api/ai/agent/${run.id}`, { op: "reject", changeId: change.id, novelId: run.novelId });
+            if (change.kind === "blueprint") notifyDataChanged("blueprint-review");
+            return result;
+          });
         }
       }}/>:null}
   </div>;

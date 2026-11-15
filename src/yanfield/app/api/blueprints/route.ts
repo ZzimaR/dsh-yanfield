@@ -1,5 +1,6 @@
 import { handle, ok } from "@/lib/api-utils";
 import * as repo from "@/lib/repo";
+import { pendingBlueprintChapterIds } from "@/lib/ai/agent/store";
 import { requireQueryParam } from "@/app/api/_lib/http";
 
 export const runtime = "nodejs";
@@ -14,5 +15,5 @@ export const GET = handle(async (request) => {
   const novelId = requireQueryParam(request, "novelId", "novelId");
   // 列表端点对父资源缺失保持宽松：删掉的作品返回空列表而不是 404
   if (!repo.getNovel(novelId)) return ok({ items: [] });
-  return ok({ items: repo.listBlueprints(novelId) });
+  return ok({ items: repo.listBlueprints(novelId), pendingChapterIds: pendingBlueprintChapterIds(novelId) });
 });

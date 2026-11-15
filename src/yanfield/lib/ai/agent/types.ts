@@ -20,6 +20,12 @@ export interface AgentChange {
 }
 export interface AgentStep { id: string; label: string; detail: string; detailValues?: Record<string, string | number>; status: "running" | "complete" | "error"; tool?:string; targets?: (AgentReference & {changeId?:string})[] }
 export interface AgentReference { kind: EntityKind; id: string; title: string }
+export interface AgentThought {
+  id: string
+  stepIndex: number
+  withinStep?: boolean
+  text: string
+}
 export interface AgentDiagnostic {
   code:"AGENT_JSON_INVALID"|"AGENT_SCHEMA_INVALID";
   stage:"decision";round:number;attempt:number;responseChars:number;
@@ -33,6 +39,7 @@ export interface AgentRun {
   status: "running" | "ready" | "complete" | "aborted" | "error";
   errorCode?:string; diagnostics?:AgentDiagnostic[];
   progress?: {id:string;text:string;stepIndex:number}[];
+  thoughts?: AgentThought[];
   materialPolicy?: "auto" | "skip";
   summary: string; error: string; steps: AgentStep[]; changes: AgentChange[];
   recap?: boolean;
@@ -65,6 +72,7 @@ export const FIELD_LABEL: Record<string, string> = {
   category: "分类", importance: "重要程度", parentId: "所属设定", description: "描述", notes: "备注", status: "状态",
   kind: "地点类型", sensory: "感官", layout: "空间", occupants: "常驻", rules: "此地规矩", storyRole: "叙事作用",
   goal: "章节目标", pov: "视角", conflict: "核心冲突", emotionalArc: "情绪曲线", scenes: "分场",
+  suspense: "悬念强度", twist: "转折强度",
   plotPoints: "情节节点", hooks: "钩子", targetWords: "目标字数", premise: "一句话故事", theme: "主题",
   tone: "基调", mainPlot: "主线", subplots: "支线", characterArcs: "人物弧光", worldRules: "世界规则",
   ending: "结局", arcGoal: "卷目标", keyEvents: "关键事件", foreshadowPlan: "伏笔计划", volumeId: "所属卷", orderIndex: "排序",

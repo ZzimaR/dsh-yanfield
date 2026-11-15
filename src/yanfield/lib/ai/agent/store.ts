@@ -39,6 +39,18 @@ export function listRuns(novelId: string): AgentRun[] {
   return all<{data:string}>("SELECT data FROM agent_runs WHERE novel_id=? ORDER BY created_at DESC LIMIT 30",[novelId]).map(r=>JSON.parse(r.data));
 }
 
+export function pendingBlueprintChapterIds(novelId: string): string[] {
+  return all<{ chapterId: string }>(`
+    SELECT DISTINCT json_extract(change.value, '$.targetId') AS chapterId
+    FROM agent_runs, json_each(agent_runs.data, '$.changes') AS change
+    WHERE agent_runs.novel_id = ?
+      AND json_extract(agent_runs.data, '$.status') <> 'running'
+      AND json_extract(change.value, '$.kind') = 'blueprint'
+      AND json_extract(change.value, '$.state') = 'pending'
+      AND json_type(change.value, '$.targetId') = 'text'
+  `, [novelId]).map(row => row.chapterId)
+}
+
 /** Outline getters in repo create empty rows. Probe first so agent reads are truly read-only. */
 export function readEntity(kind: EntityKind, id: string, novelId: string): Fields | null {
   let result: unknown;
