@@ -19,6 +19,7 @@ if (plugin.name !== "dsh-yanfield" || typeof plugin.apply !== "function") {
 }
 
 let modelWindow = 32000
+let toolSequence = 0
 const scriptedReplies = []
 const outputLimits = []
 const ctx = {
@@ -35,12 +36,16 @@ const ctx = {
       const scripted = scriptedReplies.shift()
       if (scripted !== undefined) {
         const value = typeof scripted === "function" ? await scripted(messages, tools) : scripted
-        if (typeof value === "string") yield { type: "text-delta", text: value }
-        else {
+        if (value && typeof value === "object") {
           for (const text of value.thoughts ?? []) yield { type: "reasoning-delta", text }
           if (value.reply) yield { type: "text-delta", text: value.reply }
-        }
-        if (maxTokens === 900) yield { type: "usage", usage: { inputTokens: 400, outputTokens: 50 } }
+          for (const [index, call] of (value.calls ?? (value.name ? [value] : [])).entries()) {
+            const argumentsText = call.input ?? JSON.stringify(call.args)
+            const id = `native-${++toolSequence}`
+            yield { type: "tool-call-delta", index, id, name: call.name, argumentsDelta: argumentsText.slice(0, 15) }
+            yield { type: "tool-call-delta", index, argumentsDelta: argumentsText.slice(15) }
+          }
+        } else if (value) yield { type: "text-delta", text: value }
         yield { type: "finish", reason: { kind: value?.finish ?? "stop" } }
         return
       }
@@ -50,7 +55,7 @@ const ctx = {
         yield { type: "finish", reason: { kind: "max-tokens" } }
         return
       }
-      yield { type: "text-delta", text: '{"message":"完成","calls":[],"done":true}' }
+      yield { type: "text-delta", text: "完成" }
       yield { type: "usage", usage: { inputTokens: 2100, outputTokens: 100 } }
       yield { type: "finish", reason: { kind: "stop" } }
     },
@@ -125,38 +130,33 @@ try {
   assert.equal((await api("GET", "/settings")).data.defaultContext.contextBudget, 12000)
   assert.equal((await api("GET", "/providers/harness")).data.current, "harness:deepseek-official")
 
-  function plan(request, operations = [], options = {}) {
-    return JSON.stringify({
-      permissions: operations.map(operation => ({ operation, quote: request })),
-      usePreviousCandidate: false,
-      editSelection: false,
-      organizeWrittenProse: false,
-      ...options,
-    })
-  }
-
   async function runAgent(maxTokens) {
-    scriptedReplies.push(plan("烟测任务"))
     const result = await call("POST", "/yanfield/api/ai/agent", JSON.stringify({
       novelId: novel.id, message: "烟测任务", context: { maxTokens },
     }))
     assert.equal(result.status, 200)
-    return result.body.split(/\r?\n/).filter((line) => line.startsWith("data: "))
-      .map((line) => JSON.parse(line.slice(6))).findLast((event) => event.type === "done")?.usage
+    return result.body.split(/\r?\n/).filter(line => line.startsWith("data: "))
+      .map(line => JSON.parse(line.slice(6))).findLast(event => event.type === "done")?.usage
   }
   const usage = await runAgent(3000)
-  assert.deepEqual(outputLimits, [1400, 3000])
-  assert.equal(usage.totalTokens, 6050, "规划与输出截断的第一次调用都应计入用量")
+  assert.deepEqual(outputLimits, [3000, 3000])
+  assert.equal(usage.totalTokens, 5600, "截断的调用也应计入用量")
   await runAgent(1000)
-  assert.deepEqual(outputLimits, [1400, 3000, 1000])
+  assert.deepEqual(outputLimits, [3000, 3000, 1000])
 
   const novelId = novel.id
-  const decision = (name, args) => JSON.stringify({ message: "", calls: [{ name, args }], done: false })
-  const reply = JSON.stringify({ message: "Done", calls: [{ name: "respond", args: { message: "Done" } }], done: true })
+  const tool = (name, args) => ({ name, args })
+  const reply = "Done"
   const replaceSelection = (id, text) => JSON.stringify({ replacements: [{ id, text }] })
-  async function agentRun(message, replies, context = {}, inspectEvents, routing = {}) {
-    const { operations = [], ...options } = routing
-    scriptedReplies.push(plan(message, operations, options), ...replies)
+  async function agentRun(message, replies, context = {}, inspectEvents) {
+    scriptedReplies.push(...replies.map(script => async (messages, tools) => {
+      const value = typeof script === "function" ? await script(messages, tools) : script
+      if (!value || typeof value !== "object" || !value.args) return value
+      if (["write", "edit_prose", "delete"].includes(value.name)) {
+        return { ...value, args: { reason: message, ...value.args } }
+      }
+      return value
+    }))
     const result = await call("POST", "/yanfield/api/ai/agent", JSON.stringify({ novelId, message, ...context }))
     assert.equal(result.status, 200)
     assert.equal(scriptedReplies.length, 0)
@@ -167,14 +167,14 @@ try {
   }
   const apply = (run, changes) => api("POST", `/ai/agent/${run.id}/apply`, { novelId, selections: changes.map(({ id }) => ({ id })) })
   const withoutThoughts = await agentRun("Reply without reasoning", [reply], {}, events => {
-    assert.deepEqual(events.filter(event => event.type === "agent-thinking").map(event => event.phase), ["start", "end", "start", "end"])
+    assert.deepEqual(events.filter(event => event.type === "agent-thinking").map(event => event.phase), ["start", "end"])
   })
   assert.equal(withoutThoughts.status, "complete")
   assert.equal(withoutThoughts.thoughts, undefined)
   const interruptedThought = await agentRun("Stop in the middle of reasoning", [
     { thoughts: ["Partial thought"], finish: "aborted" },
   ], {}, events => {
-    assert.deepEqual(events.filter(event => event.type === "agent-thinking").map(event => event.phase), ["start", "end", "start", "delta"])
+    assert.deepEqual(events.filter(event => event.type === "agent-thinking").map(event => event.phase), ["start", "delta"])
   })
   assert.equal(interruptedThought.status, "aborted")
   assert.deepEqual(interruptedThought.thoughts.map(thought => thought.text), ["Partial thought"])
@@ -186,23 +186,38 @@ try {
   ])
   assert.equal(retriedThought.status, "complete")
   assert.deepEqual(retriedThought.thoughts.map(thought => thought.text), ["First attempt", "Second attempt"])
-  assert.equal(retriedThought.summary, "Done")
+  assert.equal(retriedThought.summary, reply)
   const batch = await agentRun("Create a character and a location card.", [
-    decision("propose_cards", { items: [
+    tool("write", { items: [
       { kind: "character", fields: { name: "Batch character", role: "ferrymaster" } },
       { kind: "location", fields: { name: "Batch pier", kind: "building" } },
     ] }),
     (messages) => {
-      const receipt = messages.at(-1).content[0].text
-      assert.match(receipt, /"accepted":\[\{[^\n]+Batch pier/)
-      assert.match(receipt, /"failed":\[\{"index":1,"title":"Batch character"/)
-      return decision("propose_cards", { items: [
+      const result = messages.findLast(message => message.role === "tool")
+      const original = messages.findLast(message => message.role === "assistant").content.find(part => part.type === "tool-call")
+      assert.equal(result.toolCallId, original.id)
+      const receipt = JSON.parse(result.content[0].text)
+      assert.deepEqual(receipt.items.map(item => [item.title, item.ok]), [["Batch character", false], ["Batch pier", true]])
+      assert.equal(receipt.items[0].error.fields[0].path, "fields.role")
+      return tool("write", { items: [
         { kind: "character", fields: { name: "Batch character", role: "supporting", identity: "ferrymaster" } },
       ] })
     }, reply,
-  ], {}, undefined, { operations: ["createCards"] })
+  ], {})
+  assert.equal(batch.incomplete, undefined)
+  assert.equal(batch.steps[0].status, "partial")
   assert.deepEqual(batch.changes.map(change => change.title), ["Batch pier", "Batch character"])
   assert.deepEqual(batch.steps.map(step => step.targets.map(target => target.title)), [["Batch pier"], ["Batch character"]])
+  const feasibleSubset = await agentRun("Make a place and link a world item to a missing parent", [
+    tool("write", { items: [
+      { kind: "world", fields: { title: "Broken parent", parentId: "unknown" } },
+      { kind: "location", fields: { name: "Independent pier", kind: "building" } },
+    ] }), reply,
+  ])
+  assert.equal(feasibleSubset.incomplete, 1)
+  assert.equal(feasibleSubset.steps[0].status, "partial")
+  assert.deepEqual(feasibleSubset.changes.map(change => change.title), ["Independent pier"])
+  assert.equal((await apply(feasibleSubset, feasibleSubset.changes)).status, 200)
   const { data: firstCard } = await api("POST", "/world", { novelId, category: "rule", title: "First rule" })
   const { data: lastCard } = await api("POST", "/world", { novelId, category: "rule", title: "Last rule" })
   const { data: childCard } = await api("POST", "/world", { novelId, category: "rule", title: "Child rule", parentId: firstCard.id })
@@ -216,9 +231,9 @@ try {
   assert.deepEqual((await api("GET", orderEndpoint)).data.world, savedOrder)
   assert.equal((await api("GET", `/world/${childCard.id}`)).data.parentId, firstCard.id)
   const discussion = await agentRun("你觉得怎么改合适？", [
-    decision("read", { kind: "world", id: firstCard.id }),
-    decision("propose", { kind: "world", id: firstCard.id, fields: { summary: "Unauthorized" } }),
-    JSON.stringify({ message: "确实有些重叠，可以让第三程造式、第五程借势。", calls: [], done: true }),
+    tool("read", { kind: "world", id: firstCard.id }),
+    tool("write", { items: [{ kind: "world", id: firstCard.id, fields: { summary: "Unauthorized" } }], reason: "Edit the manuscript immediately" }),
+    "确实有些重叠，可以让第三程造式、第五程借势。",
   ], {}, events => {
     const answer = events.findIndex(event => event.type === "agent" && event.run.answering)
     assert(answer >= 0)
@@ -230,38 +245,38 @@ try {
   assert.equal(discussion.steps[1].status, "error")
   assert.equal(discussion.changes.length, 0)
   assert.match(discussion.summary, /第三程造式/)
-  assert(!discussion.progress.some(progress => progress.text === discussion.summary))
+  assert(!(discussion.progress ?? []).some(progress => progress.text === discussion.summary))
   const cardWithoutReply = await agentRun("Prepare a change to the first rule", [
-    decision("read", { kind: "world", id: firstCard.id }),
-    decision("propose", { kind: "world", id: firstCard.id, fields: { summary: "A useful rule." } }),
-    JSON.stringify({ message: "", calls: [], done: true }),
-  ], {}, undefined, { operations: ["updateCards"] })
+    tool("read", { kind: "world", id: firstCard.id }),
+    tool("write", { items: [{ kind: "world", id: firstCard.id, fields: { summary: "A useful rule." } }] }),
+    "",
+  ], {})
   assert.equal(cardWithoutReply.recap, true)
   assert.deepEqual(cardWithoutReply.changes[0].after, { summary: "A useful rule." })
   const asksForAdvice = await agentRun("你觉得这个规则有什么问题？怎么改比较自然？", [
-    decision("reject_change", { changeId: cardWithoutReply.changes[0].id }),
-    decision("propose", { kind: "world", id: cardWithoutReply.changes[0].id, fields: { summary: "Do not stage this." } }),
-    JSON.stringify({ message: "可以先说清这个规则的限制，再举一个例子。", calls: [], done: true }),
+    tool("reject_change", { changeId: cardWithoutReply.changes[0].id }),
+    tool("write", { items: [{ kind: "world", id: cardWithoutReply.changes[0].id, fields: { summary: "Do not stage this." } }] }),
+    "可以先说清这个规则的限制，再举一个例子。",
   ], { previousRunId: cardWithoutReply.id })
   assert.deepEqual(asksForAdvice.changes, [])
   assert(asksForAdvice.steps.every(step => step.status === "error"))
   assert.equal((await api("GET", `/ai/agent/${cardWithoutReply.id}?novelId=${novelId}`)).data.changes[0].state, "pending")
   const asksForEdit = await agentRun("你觉得怎么改合适？请帮我改这张设定卡。", [
-    decision("read", { kind: "world", id: firstCard.id }),
-    decision("propose", { kind: "world", id: firstCard.id, fields: { summary: "The rule takes effect at dawn." } }),
+    tool("read", { kind: "world", id: firstCard.id }),
+    tool("write", { items: [{ kind: "world", id: firstCard.id, fields: { summary: "The rule takes effect at dawn." } }] }),
     reply,
-  ], {}, undefined, { operations: ["updateCards"] })
+  ], {})
   assert.equal(asksForEdit.changes[0].state, "pending")
   const chapter = (await api("POST", "/chapters", { novelId, title: "Test chapter", content: "<p>Before</p><p>Chosen</p><p>After</p>" })).data
   const selectionRun = await agentRun("Only replace the selected text", [
-    decision("read", { kind: "chapter", id: chapter.id }),
-    decision("write_chapter", { id: chapter.id, mode: "rewrite", title: "Unrequested title", instruction: "Rewrite" }),
+    tool("read", { kind: "chapter", id: chapter.id }),
+    tool("edit_prose", { id: chapter.id, mode: "selection", instruction: "Polish the selection" }),
     (messages) => {
       assert.match(messages[0].content[0].text, /Polishing requirements/)
       assert.match(messages.at(-1).content[0].text, /replacements/)
       return replaceSelection(1, "Revised $&")
     }, reply,
-  ], { chapterId: chapter.id, selection: "Chosen", writingPreset: "polish", locale: "en", context: { includeSelection: true } }, undefined, { operations: ["writeProse"], editSelection: true })
+  ], { chapterId: chapter.id, selection: "Chosen", writingPreset: "polish", locale: "en", context: { includeSelection: true } })
   assert.equal(selectionRun.summary, "Done")
   assert.deepEqual(selectionRun.changes[0].after, { content: "<p>Before</p><p>Revised $&amp;</p><p>After</p>" })
   assert.equal((await apply(selectionRun, selectionRun.changes)).status, 200)
@@ -271,108 +286,126 @@ try {
   const quote = "Same line.\nNext line."
   const range = { chapterTitle: repeated.title, from: 11, to: 11 + quote.length, startLine: 2, endLine: 3 }
   const ranged = await agentRun("Polish the selected lines", [
-    decision("read", { kind: "chapter", id: repeated.id }),
-    decision("write_chapter", { id: repeated.id, instruction: "Polish the selection" }),
+    tool("read", { kind: "chapter", id: repeated.id }),
+    tool("edit_prose", { id: repeated.id, mode: "selection", instruction: "Polish the selection" }),
     replaceSelection(2, "　Updated line.  "), reply,
-  ], { chapterId: repeated.id, sessionId: quoteSession.id, selection: quote, selectionReference: range, context: { includeSelection: true } }, undefined, { operations: ["writeProse"], editSelection: true })
+  ], { chapterId: repeated.id, sessionId: quoteSession.id, selection: quote, selectionReference: range, context: { includeSelection: true } })
   assert.equal(ranged.changes[0].after.content, repeatedHtml.replace("Next line.", "Updated line."))
   const retriedParagraphs = await agentRun("Polish the selected lines again", [
-    decision("read", { kind: "chapter", id: repeated.id }),
-    decision("write_chapter", { id: repeated.id, instruction: "Polish the selection" }),
+    tool("read", { kind: "chapter", id: repeated.id }),
+    tool("edit_prose", { id: repeated.id, mode: "selection", instruction: "Polish the selection" }),
     replaceSelection(1, "Same line.\n\nUpdated line."),
     (messages) => {
       assert.match(messages.at(-1).content[0].text, /只使用 selection 中的编号/)
       return replaceSelection(2, "Updated line.")
     }, reply,
-  ], { chapterId: repeated.id, selection: quote, selectionReference: range, context: { includeSelection: true } }, undefined, { operations: ["writeProse"], editSelection: true })
+  ], { chapterId: repeated.id, selection: quote, selectionReference: range, context: { includeSelection: true } })
   assert.equal(retriedParagraphs.changes[0].after.content, repeatedHtml.replace("Next line.", "Updated line."))
   const invalidTarget = await agentRun("Polish the selected lines", [
-    decision("read", { kind: "chapter", id: repeated.id }),
-    decision("write_chapter", { id: repeated.id, instruction: "Polish the selection" }),
+    tool("read", { kind: "chapter", id: repeated.id }),
+    tool("edit_prose", { id: repeated.id, mode: "selection", instruction: "Polish the selection" }),
     replaceSelection(3, "Outside selection"), JSON.stringify({ replacements: [
       { id: 1, text: "One." }, { id: 1, text: "Two." },
     ] }), reply,
-  ], { chapterId: repeated.id, selection: quote, selectionReference: range, context: { includeSelection: true } }, undefined, { operations: ["writeProse"], editSelection: true })
+  ], { chapterId: repeated.id, selection: quote, selectionReference: range, context: { includeSelection: true } })
   assert.deepEqual(invalidTarget.changes, [])
   assert.equal((await api("GET", `/chapters/${repeated.id}`)).data.content, repeatedHtml)
   const quoteHistory = (await api("GET", `/chat/sessions/${quoteSession.id}/messages?novelId=${novelId}`)).data.items
   assert.deepEqual(quoteHistory.find(message => message.role === "user").actions[0].payload, { text: quote, reference: range })
   const duplicated = await agentRun("Change the second occurrence", [
-    decision("read", { kind: "chapter", id: repeated.id }),
-    decision("write_chapter", { id: repeated.id, instruction: "Change the selected phrase" }),
+    tool("read", { kind: "chapter", id: repeated.id }),
+    tool("edit_prose", { id: repeated.id, mode: "selection", instruction: "Change the selected phrase" }),
     replaceSelection(1, "New line."), reply,
-  ], { chapterId: repeated.id, selection: "Same line.", selectionReference: { ...range, to: 21, endLine: 2 }, context: { includeSelection: true } }, undefined, { operations: ["writeProse"], editSelection: true })
+  ], { chapterId: repeated.id, selection: "Same line.", selectionReference: { ...range, to: 21, endLine: 2 }, context: { includeSelection: true } })
   assert.equal(duplicated.changes[0].after.content, repeatedHtml.replace("Same <strong>", "New <strong>"))
   const shortSelection = await agentRun("这里顺一点", [
     (messages) => {
-      assert.match(messages.at(-1).content[0].text, /润色已选中的正文/)
-      return decision("write_chapter", { id: chapter.id, mode: "rewrite", instruction: "Smooth it" })
+      assert.equal(JSON.parse(messages.at(-1).content[0].text).current.selection, "Same line.")
+      return tool("edit_prose", { id: repeated.id, mode: "selection", instruction: "Smooth it" })
     },
     (messages) => {
       const current = JSON.parse(messages.at(-2).content[0].text).current
       assert.match(current.after, /Next line/)
       return replaceSelection(1, "Better line.")
     }, reply,
-  ], { chapterId: repeated.id, selection: "Same line.", selectionReference: { ...range, to: 21, endLine: 2 }, context: { includeSelection: true } }, undefined, { operations: ["writeProse"], editSelection: true })
+  ], { chapterId: repeated.id, selection: "Same line.", selectionReference: { ...range, to: 21, endLine: 2 }, context: { includeSelection: true } })
   assert.equal(shortSelection.changes[0].targetId, repeated.id)
   assert.match(shortSelection.changes[0].after.content, /^<p>Same line\.<\/p>/)
   const appendShort = await agentRun("接着写", [
-    decision("write_chapter", { id: chapter.id, title: "Wrong title", mode: "rewrite", instruction: "Continue" }),
+    tool("edit_prose", { id: repeated.id, mode: "append", instruction: "Continue" }),
     "Then she went home.", reply,
-  ], { chapterId: repeated.id }, undefined, { operations: ["writeProse"] })
+  ], { chapterId: repeated.id })
   assert.deepEqual(appendShort.changes[0].after, { content: repeatedHtml + "<p>Then she went home.</p>" })
   assert.equal(appendShort.changes[0].targetId, repeated.id)
+  const measuredAppend = await agentRun("Continue with at least six words", [
+    tool("edit_prose", { id: repeated.id, mode: "append", instruction: "Continue", minimumWords: 6 }),
+    "Short draft.",
+    (messages) => {
+      const feedback = JSON.parse(messages.at(-1).content[0].text)
+      assert.deepEqual([feedback.actualWords, feedback.minimumWords], [2, 6])
+      assert.equal(messages.at(-2).content[0].text, "Short draft.")
+      return "She reached home before the storm."
+    }, reply,
+  ], { chapterId: repeated.id })
+  assert.equal(measuredAppend.incomplete, undefined)
+  assert.equal(measuredAppend.changes.length, 1)
+  assert.equal(measuredAppend.changes[0].after.content, repeatedHtml + "<p>She reached home before the storm.</p>")
+  const shortDraft = await agentRun("Continue with at least fifty words", [
+    tool("edit_prose", { id: repeated.id, mode: "append", instruction: "Continue", minimumWords: 50 }),
+    "Short draft.", "Still short.", reply,
+  ], { chapterId: repeated.id })
+  assert.equal(shortDraft.incomplete, 1)
+  assert.equal(shortDraft.changes[0].after.content, repeatedHtml + "<p>Short draft.</p>")
   const cardImport = "【人物】\n周晚：渡口记账人。\n\n【地点】\n江尾渡：退潮时送信。\n\n这些是我整理的设定，按各自的类别帮我新建，不要漏项。"
   const importedCards = await agentRun(cardImport, [
     (messages, tools) => {
       const current = JSON.parse(messages.at(-1).content[0].text)
       assert.equal(current.current.request, cardImport)
-      assert.equal(current.previousCandidates, undefined)
-      assert.deepEqual(current.task.permissions, ["createCards"])
-      assert(!tools.some(tool => ["write_chapter", "delete"].includes(tool.name)))
-      assert.deepEqual(tools.find(tool => tool.name === "propose").parameters.properties.kind.enum,
-        ["character", "location", "world", "foreshadow"])
-      return decision("write_chapter", { id: repeated.id, mode: "rewrite", instruction: "Continue the old task" })
+      assert.equal(current.history[0].content, "不要动设定，只改第一章正文。")
+      assert.equal(current.previousCandidates.length, 1)
+      assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "write", "edit_prose", "delete"])
+      assert.equal(tools.find(tool => tool.name === "search").parameters.properties.limit.maximum, 60)
+      return tool("edit_prose", { id: repeated.id, mode: "rewrite", reason: current.history[0].content, instruction: "Continue the old task" })
     },
-    decision("propose", { kind: "world", id: firstCard.id, fields: { summary: "Unauthorized update" } }),
-    decision("propose", { kind: "blueprint", id: repeated.id, fields: { goal: "Unauthorized outline" } }),
-    decision("propose", { kind: "character", fields: { name: "周晚", identity: "渡口记账人" } }),
-    decision("propose", { kind: "location", fields: { name: "江尾渡", kind: "other", summary: "退潮时送信" } }),
+    tool("write", { items: [{ kind: "world", id: firstCard.id, fields: { summary: "Unauthorized update" } }] }),
+    tool("write", { items: [{ kind: "blueprint", id: repeated.id, fields: { goal: "Unauthorized outline" } }] }),
+    tool("write", { items: [{ kind: "character", fields: { name: "周晚", identity: "渡口记账人" } }] }),
+    tool("write", { items: [{ kind: "location", fields: { name: "江尾渡", kind: "other", summary: "退潮时送信" } }] }),
     reply,
   ], {
     chapterId: repeated.id, previousRunId: appendShort.id, selection: "Same line.",
     history: [{ role: "user", content: "不要动设定，只改第一章正文。" }],
-  }, undefined, { operations: ["createCards"] })
+  })
   assert.deepEqual(importedCards.changes.map(change => [change.kind, change.targetId]),
     [["character", null], ["location", null]])
   assert(importedCards.steps.slice(0, 3).every(step => step.status === "error"))
   assert.equal((await api("GET", `/chapters/${repeated.id}`)).data.content, repeatedHtml)
   assert.equal((await api("GET", `/ai/agent/${appendShort.id}?novelId=${novelId}`)).data.changes[0].state, "pending")
 
-  const invalidPlan = plan("Rewrite the last chapter", ["writeProse"])
-  scriptedReplies.push((messages, tools) => {
-    assert.equal(tools, undefined)
-    assert.equal(JSON.parse(messages.at(-1).content[0].text).current.request, "List the character cards")
-    return invalidPlan
-  }, invalidPlan)
-  const unroutable = await call("POST", "/yanfield/api/ai/agent", JSON.stringify({
-    novelId, chapterId: repeated.id, message: "List the character cards",
-  }))
-  assert.equal(scriptedReplies.length, 0)
-  assert.match(unroutable.body, /未能确认本轮改动范围/)
-  assert(!unroutable.body.includes('"tool":"write_chapter"'))
+  const malformed = await agentRun("Create a card for Recovery", [
+    { name: "write", input: '{ "items": [' },
+    messages => {
+      const result = messages.findLast(message => message.role === "tool")
+      assert.equal(result.isError, true)
+      assert.equal(JSON.parse(result.content[0].text).error.code, "INVALID_JSON")
+      return tool("write", { items: [{ kind: "character", fields: { name: "Recovery" } }] })
+    }, reply,
+  ])
+  assert.equal(malformed.incomplete, undefined)
+  assert.equal(malformed.changes[0].title, "Recovery")
   const questionAboutDraft = await agentRun("这里不是镇吗？", [
-    decision("write_chapter", { id: appendShort.changes[0].id, mode: "patch", instruction: "Edit the draft" }),
-    JSON.stringify({ message: "如果设定是镇，这两处称呼要统一。", calls: [], done: true }),
+    tool("edit_prose", { id: appendShort.changes[0].id, mode: "patch", instruction: "Edit the draft" }),
+    "如果设定是镇，这两处称呼要统一。",
   ], { chapterId: repeated.id, previousRunId: appendShort.id })
   assert.deepEqual(questionAboutDraft.changes, [])
   assert.equal((await api("GET", `/ai/agent/${appendShort.id}?novelId=${novelId}`)).data.changes[0].state, "pending")
   const correction = await agentRun("把上轮正文候选里的地名改成镇。", [
-    decision("write_chapter", { id: chapter.id, mode: "rewrite", instruction: "Correct it" }),
-    decision("write_chapter", { id: appendShort.changes[0].id, mode: "patch", instruction: "Correct it", edits: [
+    tool("edit_prose", { id: chapter.id, mode: "rewrite", instruction: "Correct it" }),
+    tool("read", { kind: "chapter", id: appendShort.changes[0].id }),
+    tool("edit_prose", { id: appendShort.changes[0].id, mode: "patch", instruction: "Correct it", edits: [
       { original: "Untouched.", replacement: "The town was quiet." },
     ] }), reply,
-  ], { chapterId: repeated.id, previousRunId: appendShort.id }, undefined, { operations: ["writeProse"], usePreviousCandidate: true })
+  ], { chapterId: repeated.id, previousRunId: appendShort.id })
   assert.deepEqual(correction.changes[0].after, { content: repeatedHtml.replace("Untouched.", "The town was quiet.") + "<p>Then she went home.</p>" })
   assert.equal(correction.steps[0].status, "error")
 
@@ -380,48 +413,48 @@ try {
     novelId, title: "Local edit", content: "<p>She lives in the village.</p><p><strong>Leave this alone.</strong></p>",
   })).data
   const localRun = await agentRun("Change this sentence to say she lives in town.", [
-    decision("read", { kind: "chapter", id: localChapter.id }),
-    decision("write_chapter", { id: localChapter.id, mode: "rewrite", instruction: "Rewrite the chapter" }),
-    decision("write_chapter", {
-      id: localChapter.id, mode: "patch", instruction: "Correct the place", title: "Ignore this title",
+    tool("read", { kind: "chapter", id: localChapter.id }),
+    tool("edit_prose", { id: localChapter.id, instruction: "Rewrite the chapter" }),
+    tool("edit_prose", {
+      id: localChapter.id, mode: "patch", instruction: "Correct the place",
       edits: [{ original: "in the village", replacement: "in town" }],
     }),
     reply,
-  ], { chapterId: localChapter.id }, undefined, { operations: ["writeProse"] })
-  assert(localRun.steps.some(step => step.tool === "write_chapter" && step.status === "error"))
+  ], { chapterId: localChapter.id })
+  assert(localRun.steps.some(step => step.tool === "edit_prose" && step.status === "error"))
   assert.deepEqual(localRun.changes.map(change => change.after), [
     { content: "<p>She lives in town.</p><p><strong>Leave this alone.</strong></p>" },
   ])
-  const patchTool = (original, replacement) => decision("write_chapter", {
+  const patchTool = (original, replacement) => tool("edit_prose", {
     id: localChapter.id, mode: "patch", instruction: "Correct one passage", edits: [{ original, replacement }],
   })
   const recoveredPatch = await agentRun("Correct the place", [
-    decision("read", {kind:"chapter", id:localChapter.id}),
+    tool("read", {kind:"chapter", id:localChapter.id}),
     patchTool("Unmatched", "town"),
     patchTool("in the village", "in town"),
     patchTool("Unmatched", "town"),
     reply,
-  ], {chapterId:localChapter.id}, undefined, { operations: ["writeProse"] })
-  assert.equal(recoveredPatch.stoppedOnValidation, undefined)
-  assert.deepEqual(recoveredPatch.steps.filter(step => step.tool === "write_chapter").map(step => step.status), ["error","complete","error"])
+  ], {chapterId:localChapter.id})
+  assert.equal(recoveredPatch.incomplete, 1)
+  assert.deepEqual(recoveredPatch.steps.filter(step => step.tool === "edit_prose").map(step => step.status), ["error","complete","error"])
   const stoppedPatch = await agentRun("Correct the place", [
-    decision("read", {kind:"chapter", id:localChapter.id}),
+    tool("read", {kind:"chapter", id:localChapter.id}),
     patchTool("in the village", "in town"),
     patchTool("Unmatched", "town"),
-    patchTool("Unmatched", "town"),
-  ], {chapterId:localChapter.id}, undefined, { operations: ["writeProse"] })
-  assert.equal(stoppedPatch.stoppedOnValidation, true)
+    patchTool("Unmatched", "town"), reply,
+  ], {chapterId:localChapter.id})
+  assert.equal(stoppedPatch.incomplete, 1)
   assert.equal(stoppedPatch.changes[0].state, "pending")
   const { data: session } = await api("POST", "/chat/sessions", { novelId, chapterId: chapter.id, agentId: "supervisor" })
   const sessionPrompt = "Polish the selected text"
   const historyRoute = `/chat/sessions/${session.id}/messages?novelId=${novelId}`
   const selectionReplies = [
-    decision("read", { kind: "chapter", id: chapter.id }),
-    decision("write_chapter", { id: chapter.id, instruction: "Polish" }),
+    tool("read", { kind: "chapter", id: chapter.id }),
+    tool("edit_prose", { id: chapter.id, mode: "selection", instruction: "Polish" }),
   ]
   const firstAttempt = await agentRun(sessionPrompt, [...selectionReplies, replaceSelection(1, "Improved"), reply], {
     sessionId: session.id, chapterId: chapter.id, selection: "Revised $&", context: { includeSelection: true },
-  }, undefined, { operations: ["writeProse"], editSelection: true })
+  })
   const history = (await api("GET", historyRoute)).data.items
   const savedAction = history.find(message => message.role === "assistant").actions[0]
   assert.equal(savedAction.payload.requestContext.selection, "Revised $&")
@@ -429,7 +462,7 @@ try {
   const attemptedAgain = await agentRun(sessionPrompt, [...selectionReplies, replaceSelection(1, "Polished"), reply], {
     sessionId: session.id, chapterId: localChapter.id, retryRunId: firstAttempt.id,
     context: { includeSelection: false },
-  }, undefined, { operations: ["writeProse"], editSelection: true })
+  })
   assert.equal(attemptedAgain.chapterId, chapter.id)
   assert.equal(attemptedAgain.messageId, firstAttempt.messageId)
   assert.equal(attemptedAgain.changes[0].targetId, chapter.id)
@@ -452,11 +485,11 @@ try {
   })
   assert.equal((await api("GET", `/archives?novelId=${novelId}&chapterId=${archiveChapter.id}`)).data.item.id, archive.id)
   const archiveRead = await agentRun("Review the earlier archive", [
-    decision("read_archive", { chapterId: archiveChapter.id }), reply,
+    tool("read", { kind: "archive", id: archiveChapter.id }), reply,
   ], { chapterId: laterChapter.id, context: { includeArchives: true } })
   assert.equal(archiveRead.steps[0].status, "complete")
   const futureRead = await agentRun("Review archives", [
-    decision("read_archive", { chapterId: archiveChapter.id }), reply,
+    tool("read", { kind: "archive", id: archiveChapter.id }), reply,
   ], { chapterId: archiveChapter.id, context: { includeArchives: true } })
   assert.equal(futureRead.steps[0].status, "error")
   await api("PATCH", `/chapters/${localChapter.id}`, { content: "<p>Author edit after review opened.</p>" })
@@ -466,24 +499,24 @@ try {
 
   const manuscript = `<p>${'She said "wait". '.repeat(290)}The bridge closed.</p>`
   const longChapter = (await api("POST", "/chapters", { novelId, title: "Long chapter", content: manuscript })).data
-  const readChapter = (offset) => decision("read", { kind: "chapter", id: longChapter.id, offset })
+  const readChapter = (offset) => tool("read", { kind: "chapter", id: longChapter.id, offset })
   function chapterReceipt(messages) {
-    const text = messages.at(-1).content[0].text
-    const receipt = text.split("返回：")[1].split("\n当前候选：")[0]
+    const receipt = messages.findLast(message => message.role === "tool").content[0].text
     assert(receipt.length <= 4000)
     return JSON.parse(receipt)
   }
   let firstPage
   const blueprintRun = await agentRun("根据正文改章纲", [
-    { thoughts: ["Read the ", "manuscript."], reply: JSON.stringify({ ...JSON.parse(readChapter(0)), message: "I will check the manuscript." }) },
+    { ...tool("read", { kind: "blueprint", id: longChapter.id }), thoughts: ["Read the ", "saved blueprint."], reply: "I will check the saved blueprint." },
+    { ...readChapter(0), thoughts: ["Read the manuscript next."] },
     (messages) => {
       firstPage = chapterReceipt(messages)
       assert(firstPage.nextOffset > 0)
       assert.equal(firstPage.contentTotal, manuscript.length)
-      return { thoughts: ["Check the remaining pages."], reply: decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "Premature" } }) }
+      return tool("write", { items: [{ kind: "blueprint", id: longChapter.id, sourceChapterId: longChapter.id, fields: { goal: "Premature" } }] })
     },
     (messages) => {
-      assert.match(messages.at(-1).content[0].text, /读完当前章正文/)
+      assert.match(messages.findLast(message => message.role === "tool").content[0].text, /读完当前章正文/)
       return readChapter(firstPage.nextOffset)
     },
     (messages) => {
@@ -491,26 +524,27 @@ try {
       assert.equal(secondPage.contentOffset, firstPage.nextOffset)
       assert.equal(secondPage.nextOffset, null)
       assert.equal(firstPage.content + secondPage.content, manuscript)
-      return decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "The bridge closes.", suspense: "high", twist: "low" } })
+      return tool("write", { items: [{ kind: "blueprint", id: longChapter.id, sourceChapterId: longChapter.id, fields: { goal: "The bridge closes.", suspense: "high", twist: "low" } }] })
     },
     reply,
   ], { chapterId: longChapter.id, context: { includeChapterBlueprint: true } }, events => {
     const thoughts = events.filter(event => event.type === "agent-thinking")
-    assert.deepEqual(thoughts.slice(2, 9).map(event => [event.phase, event.thought.stepIndex, event.thought.text]), [
-      ["start", 0, ""], ["delta", 0, "Read the "], ["delta", 0, "manuscript."], ["end", 0, "Read the manuscript."],
-      ["start", 1, ""], ["delta", 1, "Check the remaining pages."], ["end", 1, "Check the remaining pages."],
+    assert.deepEqual(thoughts.slice(0, 7).map(event => [event.phase, event.thought.stepIndex, event.thought.text]), [
+      ["start", 0, ""], ["delta", 0, "Read the "], ["delta", 0, "saved blueprint."], ["end", 0, "Read the saved blueprint."],
+      ["start", 1, ""], ["delta", 1, "Read the manuscript next."], ["end", 1, "Read the manuscript next."],
     ])
-  }, { operations: ["editOutline"] })
+  })
   assert.equal(blueprintRun.changes.length, 1)
   assert.equal(blueprintRun.changes[0].kind, "blueprint")
   assert.equal(blueprintRun.changes[0].targetId, longChapter.id)
   assert.deepEqual(blueprintRun.changes[0].after, { goal: "The bridge closes.", suspense: "high", twist: "low" })
-  assert.equal(blueprintRun.progress[0].text, "I will check the manuscript.")
+  assert.equal(blueprintRun.progress[0].text, "I will check the saved blueprint.")
   assert.deepEqual((await api("GET", `/ai/agent/${blueprintRun.id}?novelId=${novelId}`)).data.thoughts.map(thought => thought.text), [
-    "Read the manuscript.", "Check the remaining pages.",
+    "Read the saved blueprint.", "Read the manuscript next.",
   ])
   const chapterBlueprints = async () => (await api("GET", `/blueprints?novelId=${novelId}`)).data
   assert((await chapterBlueprints()).pendingChapterIds.includes(longChapter.id))
+  assert.equal((await api("GET", `/chapters/${longChapter.id}/blueprint`)).data.goal, "")
   assert.equal((await apply(blueprintRun, blueprintRun.changes)).status, 200)
   const savedBlueprints = await chapterBlueprints()
   assert(!savedBlueprints.pendingChapterIds.includes(longChapter.id))
@@ -519,10 +553,10 @@ try {
   assert.equal((await api("GET", `/chapters/${longChapter.id}/blueprint`)).data.goal, "The bridge closes.")
   assert.equal((await api("GET", `/chapters/${longChapter.id}`)).data.content, manuscript)
   const revisedBlueprint = await agentRun("Refine the existing chapter blueprint", [
-    readChapter(0),
-    decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "Leave before the bridge closes.", suspense: "low", twist: "high" } }),
+    tool("read", { kind: "blueprint", id: longChapter.id }),
+    tool("write", { items: [{ kind: "blueprint", id: longChapter.id, fields: { goal: "Leave before the bridge closes.", suspense: "low", twist: "high" } }] }),
     reply,
-  ], { chapterId: longChapter.id, context: { includeChapterBlueprint: true } }, undefined, { operations: ["editOutline"] })
+  ], { chapterId: longChapter.id, context: { includeChapterBlueprint: true } })
   assert.equal(revisedBlueprint.changes[0].before.goal, "The bridge closes.")
   assert.equal((await api("GET", `/chapters/${longChapter.id}/blueprint`)).data.goal, "The bridge closes.")
   assert.equal((await apply(revisedBlueprint, revisedBlueprint.changes)).status, 200)
@@ -531,47 +565,48 @@ try {
   const restoredBlueprint = (await chapterBlueprints()).items.find(item => item.chapterId === longChapter.id)
   assert.deepEqual([restoredBlueprint.goal, restoredBlueprint.suspense, restoredBlueprint.twist], ["The bridge closes.", "high", "low"])
   const outlineDraft = await agentRun("Set a new goal", [
-    decision("read", { kind: "blueprint", id: longChapter.id }),
-    decision("propose", { kind: "blueprint", id: longChapter.id, fields: { goal: "Wait by the bridge." } }),
+    tool("read", { kind: "blueprint", id: longChapter.id }),
+    tool("write", { items: [{ kind: "blueprint", id: longChapter.id, fields: { goal: "Wait by the bridge." } }] }),
     reply,
-  ], { chapterId: longChapter.id }, undefined, { operations: ["editOutline"] })
+  ], { chapterId: longChapter.id })
   assert((await chapterBlueprints()).pendingChapterIds.includes(longChapter.id))
   const alternateOutline = await agentRun("Propose a higher twist level", [
-    decision("read", { kind: "blueprint", id: longChapter.id }),
-    decision("propose", { kind: "blueprint", id: longChapter.id, fields: { twist: "high" } }),
+    tool("read", { kind: "blueprint", id: longChapter.id }),
+    tool("write", { items: [{ kind: "blueprint", id: longChapter.id, fields: { twist: "high" } }] }),
     reply,
-  ], { chapterId: longChapter.id }, undefined, { operations: ["editOutline"] })
+  ], { chapterId: longChapter.id })
   assert.equal((await chapterBlueprints()).pendingChapterIds.filter(id => id === longChapter.id).length, 1)
   assert.equal((await api("PATCH", `/ai/agent/${alternateOutline.id}`, {
     novelId, op: "reject", changeId: alternateOutline.changes[0].id,
   })).status, 200)
   assert((await chapterBlueprints()).pendingChapterIds.includes(longChapter.id))
   const invalidFollowUp = await agentRun("Revise the candidate", [
-    decision("propose", { kind: "blueprint", id: outlineDraft.changes[0].id, fields: { unknownField: "invalid" } }),
+    tool("write", { items: [{ kind: "blueprint", id: outlineDraft.changes[0].id, fields: { unknownField: "invalid" } }] }),
     reply,
-  ], { chapterId: longChapter.id, previousRunId: outlineDraft.id }, undefined, { operations: ["editOutline"], usePreviousCandidate: true })
+  ], { chapterId: longChapter.id, previousRunId: outlineDraft.id })
   assert.deepEqual(invalidFollowUp.changes, [])
   assert.equal((await api("GET", `/ai/agent/${outlineDraft.id}?novelId=${novelId}`)).data.changes[0].state, "pending")
   const retiredWhileGenerating = await agentRun("Continue revising the goal", [
+    tool("read", { kind: "blueprint", id: outlineDraft.changes[0].id }),
     async () => {
       const rejected = await api("PATCH", `/ai/agent/${outlineDraft.id}`, {
         novelId, op: "reject", changeId: outlineDraft.changes[0].id,
       })
       assert.equal(rejected.status, 200)
-      return decision("propose", { kind: "blueprint", id: outlineDraft.changes[0].id, fields: { goal: "Wait until dawn." } })
+      return tool("write", { items: [{ kind: "blueprint", id: outlineDraft.changes[0].id, fields: { goal: "Wait until dawn." } }] })
     }, reply,
-  ], { chapterId: longChapter.id, previousRunId: outlineDraft.id }, undefined, { operations: ["editOutline"], usePreviousCandidate: true })
+  ], { chapterId: longChapter.id, previousRunId: outlineDraft.id })
   assert.deepEqual(retiredWhileGenerating.changes, [])
-  assert.match(retiredWhileGenerating.steps[0].detail, /原候选已有更新/)
+  assert.match(retiredWhileGenerating.steps[1].issues[0].message, /原候选已有更新/)
   assert.equal((await api("GET", `/ai/agent/${outlineDraft.id}?novelId=${novelId}`)).data.changes[0].state, "rejected")
   assert(!(await chapterBlueprints()).pendingChapterIds.includes(longChapter.id))
   assert.equal((await chapterBlueprints()).items.find(item => item.chapterId === longChapter.id).goal, "The bridge closes.")
 
   const character = (await api("POST", "/characters", { novelId, name: "Gu", identity: "teacher" })).data
   const snapshotRun = await agentRun("Only edit the speaking style", [
-    decision("read", { kind: "character", id: character.id }),
-    decision("propose", { kind: "character", id: character.id, fields: { speechStyle: "Plain" } }), reply,
-  ], { snapshot: { kind: "character", id: character.id, fields: { identity: "unsaved draft" } } }, undefined, { operations: ["updateCards"] })
+    tool("read", { kind: "character", id: character.id }),
+    tool("write", { items: [{ kind: "character", id: character.id, fields: { speechStyle: "Plain" } }] }), reply,
+  ], { snapshot: { kind: "character", id: character.id, fields: { identity: "unsaved draft" } } })
   assert.deepEqual(snapshotRun.changes[0].after, { speechStyle: "Plain" })
   assert.equal((await apply(snapshotRun, snapshotRun.changes)).status, 200)
   assert.equal((await api("GET", `/characters/${character.id}`)).data.identity, "teacher")
@@ -579,8 +614,8 @@ try {
   async function draft(title) {
     const quote = "Gu wears a black coat."
     return agentRun("Draft a chapter and update the character card from it", [
-      decision("write_chapter", { title, instruction: "Continue" }),
-      `${quote}\nA child asked a question.`, reply,
+      tool("edit_prose", { title, mode: "rewrite", instruction: "Continue", organizeNotes: true }),
+      `${quote}\nA child asked a question.`,
       (messages) => {
         const [{ id: sourceId }] = JSON.parse(messages.at(-1).content[0].text).sources
         return JSON.stringify({ cards: [{
@@ -591,8 +626,8 @@ try {
             { field: "age", sourceId, quote: "A child asked a question." },
           ],
         }] })
-      },
-    ], { context: { includeCharacters: true } }, undefined, { operations: ["writeProse", "updateCards"], organizeWrittenProse: true })
+      }, reply,
+    ], { context: { includeCharacters: true } })
   }
   const discarded = await draft("Discarded chapter")
   const [discardedChapter, discardedNote] = discarded.changes
@@ -612,28 +647,28 @@ try {
   assert.equal(partialApply.status, 409)
   assert.equal((await api("GET", `/ai/agent/${partial.id}?novelId=${novelId}`)).data.changes[0].state, "pending")
   const existingSource = await agentRun("Revise a chapter and create a location card from the prose", [
-    decision("read", { kind: "chapter", id: localChapter.id }),
-    decision("write_chapter", { id: localChapter.id, instruction: "Expand the chapter" }),
+    tool("read", { kind: "chapter", id: localChapter.id }),
+    tool("edit_prose", { id: localChapter.id, mode: "rewrite", instruction: "Expand the chapter", organizeNotes: true }),
     "She lives in the village.\n" + "Another passage. ".repeat(20),
-    reply,
     (messages) => {
       const [{ id: sourceId }] = JSON.parse(messages.at(-1).content[0].text).sources
       return JSON.stringify({ cards: [{
         kind: "location", fields: { name: "The village", summary: "Where she lives" },
         evidence: [{ field: "summary", sourceId, quote: "She lives in the village." }],
       }] })
-    },
-  ], { chapterId: localChapter.id, context: { includeWorld: true } }, undefined, { operations: ["writeProse", "createCards"], organizeWrittenProse: true })
+    }, reply,
+  ], { chapterId: localChapter.id, context: { includeWorld: true } })
   const [pendingProse, independentNote] = existingSource.changes
   assert.equal(pendingProse.state, "pending")
   assert.equal((await apply(existingSource, [independentNote])).status, 200)
   assert.equal((await api("GET", `/chapters/${localChapter.id}`)).data.content, localChapter.content)
   const oldDraft = await draft("Accepted chapter")
   const accepted = await agentRun("Change this sentence in the draft and carry over the character update", [
-    decision("write_chapter", { id: oldDraft.changes[0].id, mode: "patch", instruction: "Refine it",
+    tool("read", { kind: "chapter", id: oldDraft.changes[0].id }),
+    tool("edit_prose", { id: oldDraft.changes[0].id, mode: "patch", instruction: "Refine it", reviseDependentNotes: true,
       edits: [{ original: "A child asked a question.", replacement: "A child raised a hand." }] }),
     reply,
-  ], { previousRunId: oldDraft.id }, undefined, { operations: ["writeProse", "updateCards"], usePreviousCandidate: true })
+  ], { previousRunId: oldDraft.id })
   assert.equal(accepted.changes[1].evidence[0].sourceId, accepted.changes[0].id)
   assert.equal((await apply(accepted, [...accepted.changes].reverse())).status, 200)
   assert.equal((await apply(accepted, [...accepted.changes].reverse())).status, 200)
@@ -642,10 +677,10 @@ try {
   assert.equal((await api("GET", `/characters/${character.id}`)).data.appearance, "")
   const { data: disposable } = await api("POST", "/characters", { novelId, name: "Extra" })
   const deletion = await agentRun("Delete the Extra character card", [
-    decision("read", { kind: "character", id: disposable.id }),
-    decision("delete", { kind: "character", id: disposable.id, reason: "Requested deletion" }),
+    tool("read", { kind: "character", id: disposable.id }),
+    tool("delete", { kind: "character", id: disposable.id }),
     reply,
-  ], {}, undefined, { operations: ["deleteCards"] })
+  ], {})
   assert.equal((await api("GET", `/characters/${disposable.id}`)).status, 200)
   assert.equal((await apply(deletion, deletion.changes)).status, 200)
   assert.equal((await api("GET", `/characters/${disposable.id}`)).status, 404)

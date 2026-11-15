@@ -594,4 +594,8 @@ export const ai: Record<string, TranslateValue> = {
     "A custom persona, role, and voice for a fixed writing workflow.",
   "请先在设置里定义我的人设与职责，然后我们就可以开始了。":
     "Define my persona and role in Settings first, and we can get started.",
+  "有 {count} 项操作未完成，详情见执行记录。": "Unfinished operations: {count}. See the execution log.",
+  "候选已准备，等待确认": "Change prepared for review",
+  "{accepted} 项候选已准备，{failed} 项未完成": "{accepted} ready for review · {failed} unfinished",
+  "本轮已达到处理步数上限。": "This turn reached its operation limit.",
 }

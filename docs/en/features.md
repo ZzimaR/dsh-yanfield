@@ -66,7 +66,7 @@ Panel layout:
 - When the model streams reasoning, the assistant shows the latest three lines. Once the model starts replying or moves on to a tool, expand **Reasoning** to read the full text for that round.
 - Applying a change in the manuscript review updates its status in chat. Open **Activity log** to see individual tool results and the materials read.
 - The active conversation stays open when switching chapters within a book. New messages use the current chapter as context, and tasks in progress keep the chapter specified when they were sent.
-- Each request is scoped before the assistant gets its editing tools. It can use prose to build cards while leaving the manuscript intact. Ask for multiple types of changes together when you need them. Use **Keep editing** on the proposal you want to revise.
+- The assistant uses your latest request to choose whether to search, read, prepare note or prose edits, or prepare a deletion. Manuscript passages can serve as sources for new cards. Ask for multiple types of changes together when you need them. Use **Keep editing** on the proposal you want to revise.
 - The continuation, expansion, polishing, and AI-tone cleanup shortcuts in the manuscript toolbar use their corresponding enabled presets during prose generation. Presets guide the writing, and the current request determines what can change.
 - The assistant submits batches of note additions or edits together. Each item is validated independently. The activity log shows any failed items, and successful proposals stay available for review below the reply.
 - Retrying a task from conversation history uses its original chapter. Tasks created with this version also retain the selection, references, and context settings.

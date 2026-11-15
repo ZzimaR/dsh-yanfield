@@ -18,7 +18,7 @@ export interface AgentChange {
   appliedId?: string;
   state: "pending" | "applied" | "rejected" | "reverted";
 }
-export interface AgentStep { id: string; label: string; detail: string; detailValues?: Record<string, string | number>; status: "running" | "complete" | "error"; tool?:string; targets?: (AgentReference & {changeId?:string})[] }
+export interface AgentStep { id: string; label: string; detail: string; detailValues?: Record<string, string | number>; status: "running" | "complete" | "partial" | "error"; issues?: { title: string; message: string; fields?: { path: string; message: string }[] }[]; tool?:string; targets?: (AgentReference & {changeId?:string})[] }
 export interface AgentReference { kind: EntityKind; id: string; title: string }
 export interface AgentThought {
   id: string
@@ -43,6 +43,7 @@ export interface AgentRun {
   materialPolicy?: "auto" | "skip";
   summary: string; error: string; steps: AgentStep[]; changes: AgentChange[];
   recap?: boolean;
+  incomplete?: number;
   stoppedOnValidation?: boolean;
   answering?: boolean;
   references: AgentReference[]; usage: AiUsage; model: string; provider: string;

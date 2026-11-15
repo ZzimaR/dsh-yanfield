@@ -53,7 +53,7 @@ Path alias: `@/` means `src/yanfield/`. Use this alias for imports from the writ
 - **Host half** (`src/host.ts`): exports `{ name, apply }`; mounts `/yanfield/*` on the DSH `webServer`, reuses Harness session auth, and bridges models/account lazily via `ctx.inject(["llm"], …)`.
 - **Routes**: `src/yanfield/app/api/**/route.ts` are scanned by `scripts/build.mjs` into `src/generated/routes.js`. `src/http.ts` dispatches to them.
 - **Database**: SQLite, default `$DSH_HOME/yanfield/yanfield.db` (override with `YANFIELD_DB_PATH` or the plugin `dataDir` config). The database is the source of truth; the UI does not keep a separate draft copy.
-- **AI flow**: SSE endpoint → `runAgent` decision loop (max 12 rounds) → read notes / propose changes → candidates streamed to the UI → the author keeps or reverts each prose block or note change. Accepted changes are written by explicit API calls.
+- **AI flow**: SSE endpoint → `runAgent` native tool loop (max 20 rounds) → search/read material and stage changes → candidates streamed to the UI → the author keeps or reverts each prose block or note change. Accepted changes are written by explicit API calls.
 
 ## 4. Build, test, and local development
 

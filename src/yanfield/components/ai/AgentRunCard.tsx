@@ -212,7 +212,7 @@ export function AgentRunCard({runId,novelId,initial,thought,disabled=false,onCon
         <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] ${entityTone(c.kind)}`}>{tr(ENTITY_LABEL[c.kind])}</span>
         <span className="ml-auto shrink-0 text-[10px] text-ink-4">{c.state==="applied"?(deleting?tr("已删除"):tr("已应用")):c.state==="reverted"?tr("已撤回"):c.state==="rejected"?tr("已丢弃"):deleting?<span className="text-danger">{tr("删除整条")}</span>:c.before?tr("修改"):tr("新建")}</span>
       </div>
-      {c.reason?<p className="mt-1.5 text-[11px] leading-relaxed text-ink-3">{c.reason}</p>:null}
+      {c.reason && !run.request.includes(c.reason)?<p className="mt-1.5 text-[11px] leading-relaxed text-ink-3">{c.reason}</p>:null}
       {deleting
         ? <div className="mt-2 rounded-lg border border-danger/20 bg-danger/[0.03] p-2.5 opacity-80"><MaterialPreview kind={c.kind as "character"|"world"|"location"|"foreshadow"} fields={c.before??{}} showTitle={false}/></div>
         : <div className="scroll-thin mt-2.5 max-h-80 space-y-2.5 overflow-y-auto pr-1">
@@ -244,6 +244,7 @@ export function AgentRunCard({runId,novelId,initial,thought,disabled=false,onCon
     <AgentProgress run={run} thought={running ? thought : undefined} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
     {(running || revealing) && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}
     {showReply?<AgentReply text={summary} length={replyLength}/>:null}
+    {settled && Boolean(run.incomplete)?<p className="px-1 py-1 text-[12px] text-danger" role="status">{tr("有 {count} 项操作未完成，详情见执行记录。",{count:run.incomplete!})}</p>:null}
     {settled && validationStopped?<p className="px-1 py-1 text-[13px] leading-relaxed text-ink-2" role="status">{
       applied.length ? tr("已应用 {count} 项改动。", { count:applied.length })
         : pending.length ? tr("已准备 {count} 项候选，等待你确认。", { count:pending.length })
@@ -284,10 +285,14 @@ export function AgentRunCard({runId,novelId,initial,thought,disabled=false,onCon
         </div>
         {recordTab==="steps" ?
         <ol className="my-2 space-y-3 border-l border-line pl-3">{run.steps.map((step,index)=><li key={step.id}>
-          <div className={`flex items-center gap-1.5 text-[12px] ${step.status==="error"?"text-danger":"text-ink-3"}`}>
-            {step.status==="running"?<Loader2 className="size-3 animate-spin"/>:step.status==="error"?<CircleAlert className="size-3"/>:<Check className="size-3"/>}
+          <div className={`flex items-center gap-1.5 text-[12px] ${(step.status==="error"||step.status==="partial")?"text-danger":"text-ink-3"}`}>
+            {step.status==="running"?<Loader2 className="size-3 animate-spin"/>:(step.status==="error"||step.status==="partial")?<CircleAlert className="size-3"/>:<Check className="size-3"/>}
             <span>{tr(step.label)}</span>
           </div>
+          {step.issues?.length?<ul className="mt-1 space-y-1 text-danger">{step.issues.map((issue,index)=><li key={index} className="break-words">
+            {issue.title ? `${issue.title} · ` : ""}{tr(issue.message)}
+            {issue.fields?.map((field,fieldIndex)=><span key={fieldIndex} className="block text-ink-3">{field.path} · {field.message}</span>)}
+          </li>)}</ul>:null}
           {step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}
           {step.detail && (step.detailValues || step.status==="error" || step.detail!==run.steps[index-1]?.detail)?<p className="mt-1 whitespace-pre-line leading-relaxed text-ink-4">{tr(step.detail, step.detailValues && {
             ...step.detailValues,
@@ -296,13 +301,13 @@ export function AgentRunCard({runId,novelId,initial,thought,disabled=false,onCon
         </li>)}</ol> : <div className="flex flex-wrap gap-1.5">{run.references.map(chip)}</div>}
       </div>
     </Sheet>:null}
-    {error||run.error?<p role="alert" className="mx-3 mb-3 rounded bg-danger/5 p-2 text-[11px] leading-relaxed text-danger"><CircleAlert className="mr-1 inline size-3"/>{error||run.error}</p>:null}
+    {error||run.error?<p role="alert" className="mx-3 mb-3 rounded bg-danger/5 p-2 text-[11px] leading-relaxed text-danger"><CircleAlert className="mr-1 inline size-3"/>{tr(error||run.error)}</p>:null}
     {run.errorCode?<details className="mx-3 mb-3 rounded-md border border-line p-2 text-[11px] text-ink-3">
       <summary className="cursor-pointer">{tr("调试详情 · {detail}",{detail:run.errorCode||(run.diagnostics?.length?tr("已自动修复的协议错误"):tr("旧任务未记录错误码"))})}</summary>
       <p className="mt-2 break-all">{tr("任务 ID：{id}",{id:run.id})}</p>
       <p className="mt-1">{tr("模型：{provider} / {model}",{provider:run.provider,model:run.model})}</p>
       {run.error && !run.errorCode && !run.diagnostics?.length?<p className="mt-2">{tr("此任务由旧版执行器生成，没有保存原始返回或具体校验错误，无法补回历史调试详情。更新后的新任务会记录这些信息。")}</p>:null}
-      <p className="mt-1">{tr("以下仅包含模型返回的脱敏片段和校验结果，不包含请求密钥。预览可能含作品内容。")}</p>
+      {run.diagnostics?.length ? <p className="mt-1">{tr("以下仅包含模型返回的脱敏片段和校验结果，不包含请求密钥。预览可能含作品内容。")}</p> : null}
       {run.diagnostics?.map((diagnostic,index)=><details key={index} className="mt-2 border-t border-line pt-2">
         <summary className="cursor-pointer">{tr("第 {round} 轮 · 第 {attempt} 次 · {code} · {chars} 字符",{round:diagnostic.round,attempt:diagnostic.attempt,code:diagnostic.code,chars:diagnostic.responseChars})}</summary>
         <ul className="my-2 space-y-1">{diagnostic.issues.map((issue,i)=><li key={i} className="break-words">{issue.path} · {issue.code}：{issue.message}</li>)}</ul>

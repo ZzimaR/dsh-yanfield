@@ -432,15 +432,15 @@ function novelOutlineFromRow(r: Row): NovelOutline {
   };
 }
 
-export function getNovelOutline(novelId: ID): NovelOutline {
+export function getNovelOutline(novelId: ID, persist = true): NovelOutline {
   const row = get<Row>("SELECT * FROM novel_outlines WHERE novel_id = ?", [novelId]);
   if (row) return novelOutlineFromRow(row);
   const now = nowIso();
   const data: NovelOutline = {
-    id: uid("outline"), novelId, premise: "", theme: "", tone: "", mainPlot: "",
+    id: persist ? uid("outline") : novelId, novelId, premise: "", theme: "", tone: "", mainPlot: "",
     subplots: [], characterArcs: [], worldRules: [], ending: "", hooks: [], updatedAt: now,
   };
-  run("INSERT INTO novel_outlines (id,novel_id,updated_at) VALUES (?,?,?)", [data.id, novelId, now]);
+  if (persist) run("INSERT INTO novel_outlines (id,novel_id,updated_at) VALUES (?,?,?)", [data.id, novelId, now]);
   return data;
 }
 
@@ -468,16 +468,16 @@ function volumeOutlineFromRow(r: Row): VolumeOutline {
   };
 }
 
-export function getVolumeOutline(volumeId: ID): VolumeOutline {
+export function getVolumeOutline(volumeId: ID, persist = true): VolumeOutline {
   const row = get<Row>("SELECT * FROM volume_outlines WHERE volume_id = ?", [volumeId]);
   if (row) return volumeOutlineFromRow(row);
   const vol = getVolume(volumeId);
   const now = nowIso();
   const data: VolumeOutline = {
-    id: uid("outline"), volumeId, novelId: vol?.novelId ?? "", summary: "", arcGoal: "",
+    id: persist ? uid("outline") : volumeId, volumeId, novelId: vol?.novelId ?? "", summary: "", arcGoal: "",
     keyEvents: [], foreshadowPlan: [], updatedAt: now,
   };
-  run("INSERT INTO volume_outlines (id,volume_id,novel_id,updated_at) VALUES (?,?,?,?)", [data.id, volumeId, data.novelId, now]);
+  if (persist) run("INSERT INTO volume_outlines (id,volume_id,novel_id,updated_at) VALUES (?,?,?,?)", [data.id, volumeId, data.novelId, now]);
   return data;
 }
 
@@ -511,17 +511,17 @@ function blueprintFromRow(r: Row): ChapterBlueprint {
   };
 }
 
-export function getBlueprint(chapterId: ID): ChapterBlueprint {
+export function getBlueprint(chapterId: ID, persist = true): ChapterBlueprint {
   const row = get<Row>("SELECT * FROM chapter_blueprints WHERE chapter_id = ?", [chapterId]);
   if (row) return blueprintFromRow(row);
   const ch = getChapter(chapterId);
   const now = nowIso();
   const data: ChapterBlueprint = {
-    id: uid("bp"), chapterId, novelId: ch?.novelId ?? "", goal: "", pov: "", conflict: "",
+    id: persist ? uid("bp") : chapterId, chapterId, novelId: ch?.novelId ?? "", goal: "", pov: "", conflict: "",
     emotionalArc: "", scenes: [], plotPoints: [], hooks: [], suspense: "medium", twist: "medium",
     targetWords: 2500, notes: "", updatedAt: now,
   };
-  run("INSERT INTO chapter_blueprints (id,chapter_id,novel_id,updated_at) VALUES (?,?,?,?)", [data.id, chapterId, data.novelId, now]);
+  if (persist) run("INSERT INTO chapter_blueprints (id,chapter_id,novel_id,updated_at) VALUES (?,?,?,?)", [data.id, chapterId, data.novelId, now]);
   return data;
 }
 

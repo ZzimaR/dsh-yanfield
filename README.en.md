@@ -102,7 +102,7 @@ Both real routes can be switched in Settings; an unavailable route explains why 
 - `@` to reference chapters, characters, settings, foreshadowing and archives; context budget and per-section preview
 - Progress steps keep their order, the current step updates in place, and autoscroll pauses while you read back
 - Prose changes are reviewed inline (green insertions, red deletions); note changes are compared field by field
-- The current request determines which changes the assistant can propose. Card creation produces card proposals only. Request both prose and note updates to extract evidence-backed notes from the new draft
+- The assistant finds and reads material as needed, then prepares changes for review. You can review successful changes in a batch and check any failures in the execution log. Ask for notes alongside new prose to get note proposals with source quotes you can verify
 - Save frequently used instructions as prompt presets. The toolbar's continuation, expansion, polishing, and AI-tone cleanup shortcuts use the corresponding presets
 
 

@@ -23,9 +23,11 @@ export function redactProviderEndpoint(endpoint: string): string {
   return endpoint.replace(/([?&](?:key|api_key|token)=)[^&]*/gi, "$1[redacted]");
 }
 
+export interface NativeToolCall { id: string; name: string; input: string }
+
 export interface AiMessage {
   role: "system" | "user" | "assistant" | "tool";
-  toolCalls?: { id: string; name: string; args: Record<string, unknown> }[];
+  toolCalls?: NativeToolCall[];
   toolCallId?: string;
   toolError?: boolean;
   content: string;
@@ -43,7 +45,7 @@ export interface CompletionRequest {
   outputFormat?: "json";
   disableThinking?: boolean;
   thinkingLevel?: ThinkingLevel;
-  decisionTools?: {name:string;description:string;parameters:Record<string,unknown>}[];
+  tools?: {name:string;description:string;parameters:Record<string,unknown>}[];
   signal?: AbortSignal;
 }
 
@@ -54,9 +56,10 @@ export function assertCompletionWithinWindow(request: CompletionRequest): void {
   if (!contextWindow || contextWindow <= 0) return;
 
   const inputTokens = request.messages.reduce(
-    (sum, message) => sum + estimateTokens(message.content) + estimateTokens(message.reasoning_content ?? "") + 4,
+    (sum, message) => sum + estimateTokens(message.content) + estimateTokens(message.reasoning_content ?? "") +
+      (message.toolCalls?.reduce((size, call) => size + estimateTokens(call.name + call.input), 0) ?? 0) + 4,
     0,
-  ) + (request.decisionTools?.length ? estimateTokens(JSON.stringify(request.decisionTools)) : 0);
+  ) + (request.tools?.length ? estimateTokens(JSON.stringify(request.tools)) : 0);
   const outputReserve = request.maxTokens && request.maxTokens > 0
     ? request.maxTokens
     : model.maxOutputTokens ?? 4096;
@@ -74,6 +77,7 @@ export type ProviderChunk =
   | { type: "delta"; text: string }
   | { type: "reasoning"; text: string }
   | { type: "usage"; promptTokens: number; completionTokens: number; cachedInputTokens?:number; cost?:{amount:number;currency:"USD"|"CNY"} }
+  | { type: "tool-calls"; calls: NativeToolCall[] }
   | { type: "done" };
 
 const OUTPUT_LIMIT_MESSAGE="模型输出因长度限制被截断，内容尚未完成。输出设为 0 时使用服务商默认额度，仍可能达到限制；无需为测试连接修改此设置。长篇写作可在聊天上下文或设置中提高「单次输出上限」，并检查模型的输出与上下文容量；长篇也可分章生成。已接收的内容仍保留在预览中。";
@@ -89,6 +93,7 @@ export function isInvalidToolInputError(error: unknown): boolean {
 const DEFAULT_BASE: Record<ProviderConfig["kind"], string> = {
   deepseek: "https://api.deepseek.com",
   demo: "",
+  harness: "",
 };
 
 function trimUrl(url: string): string {
@@ -249,7 +254,6 @@ async function* streamOpenAiCompatible(request: CompletionRequest): AsyncGenerat
   const reasoning = isReasoningModel(model);
   const params=thinkingParameters(provider,model,request.thinkingLevel);
   const profile=thinkingProfile(provider,model);
-  const thinking=profile.adapter==="deepseek" && request.thinkingLevel!=="off" && (Object.keys(params).length>0 || request.thinkingLevel==="default");
   const response = await fetch(openAiChatUrl(provider), {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders(provider) },
@@ -258,15 +262,15 @@ async function* streamOpenAiCompatible(request: CompletionRequest): AsyncGenerat
       messages: messages.map(({ role, content, reasoning_content, toolCalls, toolCallId }) => ({
         role, content, reasoning_content, tool_call_id: toolCallId,
         tool_calls: toolCalls?.map(call => ({
-          id: call.id, type: "function", function: { name: call.name, arguments: JSON.stringify(call.args) },
+          id: call.id, type: "function", function: { name: call.name, arguments: call.input },
         })),
       })),
       stream: true,
       stream_options: { include_usage: true },
       ...(request.disableThinking&&!reasoning&&profile.adapter==="deepseek"&&!request.thinkingLevel?{thinking:{type:"disabled"}}:{}),
-      ...(request.decisionTools?{
-        tools:request.decisionTools.map(tool=>({type:"function",function:tool})),
-        tool_choice:thinking?"auto":"required",
+      ...(request.tools?{
+        tools:request.tools.map(tool=>({type:"function",function:tool})),
+        tool_choice:"auto",
         ...(profile.adapter==="deepseek"&&!request.thinkingLevel?{thinking:{type:"disabled"}}:{})
       }:request.outputFormat === "json" ? {response_format:{type:"json_object"}} : {}),
       ...params,
@@ -283,7 +287,6 @@ async function* streamOpenAiCompatible(request: CompletionRequest): AsyncGenerat
 
   let outputLimited = false;
   const functionCalls=new Map<number,{id:string;name:string;arguments:string}>();
-  let fallbackText="";
   for await (const payload of readSse(response)) {
     if (payload === "[DONE]") break;
     const json = safeJson(payload);
@@ -297,16 +300,16 @@ async function* streamOpenAiCompatible(request: CompletionRequest): AsyncGenerat
       const reasoning = pickString(delta.reasoning_content) || pickString(delta.reasoning);
       if (reasoning) yield { type: "reasoning", text: reasoning };
       const text = pickString(delta.content);
-      if(request.decisionTools){
-        fallbackText+=text;
-        if(Array.isArray(delta.tool_calls))for(const item of delta.tool_calls){
+      if (text) yield { type: "delta", text };
+      if (request.tools && Array.isArray(delta.tool_calls)) {
+        for (const item of delta.tool_calls) {
           const entry=asRecord(item),fn=asRecord(entry?.function);
           if(!entry||!fn)continue;
           const index=typeof entry.index==="number"?entry.index:0;
           const call=functionCalls.get(index)||{id:"",name:"",arguments:""};
           call.id ||= pickString(entry.id);call.name+=pickString(fn.name);call.arguments+=pickString(fn.arguments);functionCalls.set(index,call);
         }
-      }else if (text) yield { type: "delta", text };
+      }
     }
     const usage = asRecord(get(json, "usage"));
     if (usage) {
@@ -320,17 +323,7 @@ async function* streamOpenAiCompatible(request: CompletionRequest): AsyncGenerat
     }
   }
   if(outputLimited && request.purpose!=="connection-test") throw new ProviderError(OUTPUT_LIMIT_MESSAGE);
-  if(request.decisionTools){
-    if(functionCalls.size){
-      const calls=[...functionCalls.entries()].sort((a,b)=>a[0]-b[0]).map(([,call])=>call);
-      if(calls.some(call=>!request.decisionTools!.some(tool=>tool.name===call.name)))throw new ProviderError("模型返回了非预期的规划函数，未执行任何工具");
-      const parse=(value:string):unknown=>{try{return JSON.parse(value);}catch{return value;}};
-      const reply=calls.find(call=>call.name==="respond");
-      const response=reply?parse(reply.arguments):null;
-      const planned=calls.filter(call=>call.name!=="respond").map(call=>({id:call.id||undefined,name:call.name,args:parse(call.arguments)}));
-      yield {type:"delta",text:JSON.stringify({message:reply?(response&&typeof response==="object"&&"message" in response?response.message:null):fallbackText,calls:planned,done:!!reply&&!planned.length})};
-    }else if(fallbackText)yield {type:"delta",text:thinking?JSON.stringify({message:fallbackText,calls:[],done:true}):fallbackText};
-  }
+  if (functionCalls.size) yield { type: "tool-calls", calls: completeToolCalls(functionCalls) };
 }
 
 /* ------------------------------ 离线演示 Provider ------------------------------ */
@@ -504,13 +497,21 @@ function harnessMessages(messages: AiMessage[]): unknown[] {
     content: [
       ...(message.content ? [{ type: "text", text: message.content }] : []),
       ...(message.toolCalls ?? []).map(call => ({
-        type: "tool-call", id: call.id, name: call.name, arguments: JSON.stringify(call.args),
+        type: "tool-call", id: call.id, name: call.name, arguments: call.input,
       })),
     ],
     source: message.role === "tool" ? { kind: "tool", callId: message.toolCallId }
       : { kind: message.role === "system" ? "system-prompt" : message.role === "assistant" ? "model" : "user" },
     ...(message.role === "tool" ? { toolCallId: message.toolCallId, isError: message.toolError } : {}),
   }));
+}
+
+function completeToolCalls(fragments: Map<number, { id: string; name: string; arguments: string }>): NativeToolCall[] {
+  return [...fragments.entries()].sort(([a], [b]) => a - b).map(([, call]) => ({
+    id: call.id || randomId(),
+    name: call.name,
+    input: call.arguments,
+  }))
 }
 
 function randomId(): string {
@@ -533,7 +534,7 @@ function numberField(record: Record<string, unknown>, key: string): number | und
 async function* streamHarness(request: CompletionRequest): AsyncGenerator<ProviderChunk> {
   const bridge = getHarnessBridge();
   if (!bridge) throw new ProviderError("DeepSeek Harness 的模型服务还没有就绪", 503);
-  const tools = request.decisionTools?.map((tool) => ({
+  const tools = request.tools?.map((tool) => ({
     name: tool.name,
     description: tool.description,
     parameters: tool.parameters,
@@ -550,14 +551,12 @@ async function* streamHarness(request: CompletionRequest): AsyncGenerator<Provid
   };
   let outputLimited = false;
   const functionCalls = new Map<number, { id: string; name: string; arguments: string }>();
-  let fallbackText = "";
   try {
     for await (const raw of bridge.stream(input)) {
       const chunk = raw && typeof raw === "object" ? raw as Record<string, unknown> : null;
       if (!chunk || typeof chunk.type !== "string") continue;
       if (chunk.type === "text-delta" && typeof chunk.text === "string") {
-        if (request.decisionTools) fallbackText += chunk.text;
-        else yield { type: "delta", text: chunk.text };
+        yield { type: "delta", text: chunk.text };
       } else if (chunk.type === "reasoning-delta" && typeof chunk.text === "string") {
         yield { type: "reasoning", text: chunk.text };
       } else if (chunk.type === "tool-call-delta") {
@@ -599,26 +598,7 @@ async function* streamHarness(request: CompletionRequest): AsyncGenerator<Provid
     throw new ProviderError(message);
   }
   if (outputLimited && request.purpose !== "connection-test") throw new ProviderError(OUTPUT_LIMIT_MESSAGE);
-  if (request.decisionTools) {
-    if (functionCalls.size) {
-      const calls = [...functionCalls.entries()].sort((a, b) => a[0] - b[0]).map(([, call]) => call);
-      if (calls.some((call) => !request.decisionTools!.some((tool) => tool.name === call.name))) {
-        throw new ProviderError("模型返回了非预期的规划函数，未执行任何工具");
-      }
-      const parse = (value: string): unknown => {
-        try { return JSON.parse(value); } catch { return value; }
-      };
-      const reply = calls.find((call) => call.name === "respond");
-      const response = reply ? parse(reply.arguments) : null;
-      const planned = calls.filter((call) => call.name !== "respond").map((call) => ({ id:call.id||undefined, name: call.name, args: parse(call.arguments) }));
-      const message = reply && response && typeof response === "object" && "message" in response
-        ? (response as { message?: unknown }).message
-        : fallbackText;
-      yield { type: "delta", text: JSON.stringify({ message, calls: planned, done: Boolean(reply) && planned.length === 0 }) };
-    } else if (fallbackText) {
-      yield { type: "delta", text: fallbackText };
-    }
-  }
+  if (functionCalls.size) yield { type: "tool-calls", calls: completeToolCalls(functionCalls) };
 }
 
 /* ------------------------------ 统一入口 ------------------------------ */
@@ -746,7 +726,7 @@ export async function listProviderModels(
     }
     return { models: unique, endpoint: url };
   } catch (error) {
-    if (error instanceof ProviderError) throw error;
+    if (error instanceof ProviderError || (error instanceof Error && error.name === "AbortError")) throw error;
     const raw = error instanceof Error ? error.message : "拉取模型列表失败";
     throw new ProviderError(
       /aborted|abort/i.test(raw)
