@@ -74,7 +74,7 @@ Unlimited by default: DeepSeek's window is 1,048,576 tokens, so Yanfield carries
 | --- | --- |
 | Decision rounds skip thinking | Tool selection and argument writing are structured output |
 | Short tasks drop a tier | Selections, ≤800 words, or instructions like "only this paragraph / polish / one sentence" use low reasoning |
-| Note organizing is conditional | Only runs for a new chapter or a ≥120-character prose change |
+| Note extraction is on request | Runs when the author asks for both prose and notes derived from the new draft |
 | Tool results are truncated | Oversized reads are cut with paging hints instead of being re-sent every round |
 | Batched steps | The prompt asks the model to merge parallel reads and edits into one round |
 | Cache-friendly ordering | Stable notes first, current prose and task last; cache hit rate is usually above 80% |

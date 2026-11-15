@@ -26,6 +26,7 @@ import { useHotkeys, useLocalStorageState, useResizePanel, useYanfieldPanelBound
 import { applySurfaceDataset, applyTheme, readSurfaceTheme } from "@/lib/ui/theme";
 import type { AppSettings, Chapter } from "@/lib/types";
 import { CommandPalette } from "./CommandPalette";
+import { stashPendingCodexCard } from "./CodexPanel";
 import {
   autoReviewChange,
   reviewKey,
@@ -424,7 +425,17 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
       void openReviewRef.current(value.run, value.changeId, false).catch(() => {});
     };
     const navigate = (event: Event) => {
-      const value = (event as CustomEvent<{ kind: string; id: string }>).detail;
+      const value = (event as CustomEvent<{ kind: string; id: string; novelId?: string }>).detail;
+      if (value.novelId && value.novelId !== novelId) return;
+      if (value.kind === "character" || value.kind === "world" || value.kind === "location" || value.kind === "foreshadow") {
+        const pending = { novelId, id: value.id, kind: value.kind } as const;
+        stashPendingCodexCard(pending);
+        setTab("codex");
+        if (isDesktop) setLeftOpen(true);
+        else setDrawerLeftOpen(true);
+        window.setTimeout(() => window.dispatchEvent(new CustomEvent("yanfield:open-card", { detail: pending })), 0);
+        return;
+      }
       if (value.kind === "chapter" || value.kind === "blueprint") {
         setReview(null);
         // A newly applied chapter may not be in the stale directory yet. Refresh before
@@ -445,7 +456,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
       window.removeEventListener("yanfield:agent-review", open);
       window.removeEventListener("yanfield:agent-navigate", navigate);
     };
-  }, [novelId, flush, setChapterId, actions, setReview, setTab, setLeftOpen, syncChapterRoute]);
+  }, [novelId, flush, setChapterId, actions, setReview, setTab, setLeftOpen, isDesktop, syncChapterRoute]);
 
   // 助手一改完正文（任务进入 ready 且有待确认正文候选），直接把内联 diff 打开在写作区，
   // 不再要求作者先点卡片里的「在正文中审阅改动」。已关闭/已打开过的改动不会重复弹出。

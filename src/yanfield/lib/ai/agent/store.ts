@@ -39,6 +39,18 @@ export function listRuns(novelId: string): AgentRun[] {
   return all<{data:string}>("SELECT data FROM agent_runs WHERE novel_id=? ORDER BY created_at DESC LIMIT 30",[novelId]).map(r=>JSON.parse(r.data));
 }
 
+export function pendingBlueprintChapterIds(novelId: string): string[] {
+  return all<{ chapterId: string }>(`
+    SELECT DISTINCT json_extract(change.value, '$.targetId') AS chapterId
+    FROM agent_runs, json_each(agent_runs.data, '$.changes') AS change
+    WHERE agent_runs.novel_id = ?
+      AND json_extract(agent_runs.data, '$.status') <> 'running'
+      AND json_extract(change.value, '$.kind') = 'blueprint'
+      AND json_extract(change.value, '$.state') = 'pending'
+      AND json_type(change.value, '$.targetId') = 'text'
+  `, [novelId]).map(row => row.chapterId)
+}
+
 /** Outline getters in repo create empty rows. Probe first so agent reads are truly read-only. */
 export function readEntity(kind: EntityKind, id: string, novelId: string): Fields | null {
   let result: unknown;
@@ -127,7 +139,7 @@ function assertDeletable(kind: EntityKind, id: string, novelId: string, alsoDele
   }
   if (kind !== "world") return;
   const children = repo.listWorld(novelId).filter(w=>w.parentId===id && !alsoDeleting.has(w.id));
-  if (children.length) throw new ApiError(`「${repo.getWorld(id)?.title||"该设定"}」下还有子设定（${children.slice(0,3).map(w=>w.title).join("、")}${children.length>3?"等":""}），请先删除或移走子设定`,409);
+  if (children.length) throw new ApiError("该设定还有子设定，请先移走或删除子设定", 409);
 }
 
 /** Deletion is staged like any edit: the full saved row is kept as `before` for version checks and undo. */
@@ -186,7 +198,7 @@ function deleteEntity(kind: EntityKind, id: string): void {
   else if (kind==="foreshadow") repo.deleteForeshadow(id);
 }
 
-function validateLinks(kind: EntityKind, patch: Fields, novelId: string, targetId: string | null): void {
+export function validateLinks(kind: EntityKind, patch: Fields, novelId: string, targetId: string | null): void {
   if (kind === "chapter" && patch.volumeId && repo.getVolume(String(patch.volumeId))?.novelId!==novelId) throw new ApiError("所属卷无效",400);
   if (kind === "world" && patch.parentId) {
     let parent = String(patch.parentId);

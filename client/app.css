@@ -33,6 +33,21 @@
   color: var(--ink);
 }
 
+/* DSH 侧栏收起时，宿主把侧栏按钮和新会话按钮移到面板左上角。 */
+.yf-editor-header {
+  padding-left: calc(var(--dsh-frame-leading-clearance, 0px) + 0.5rem);
+}
+
+/* macOS DSH 把写作台延伸进原生标题栏的位置。空白处拖窗，按钮和链接照常点击。 */
+:host-context(html[data-platform="darwin"]:not([data-fullscreen])) .yf-editor-header {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+:host-context(html[data-platform="darwin"]:not([data-fullscreen])) .yf-editor-header :is(button, a[href]) {
+  -webkit-app-region: no-drag;
+}
+
 .yf-app .h-dvh {
   height: 100% !important;
   max-height: 100%;

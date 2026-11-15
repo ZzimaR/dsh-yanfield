@@ -1,25 +1,31 @@
 "use client";
 import * as React from "react";
-import { BookOpen, User, MapPin, MapPinned, Bookmark, FolderOpen, Layers3, Check, ChevronDown, CircleAlert, Loader2, RotateCcw } from "lucide-react";
+import { BookOpen, User, MapPin, MapPinned, Bookmark, FolderOpen, Check, ChevronDown, CircleAlert, Loader2, RotateCcw } from "lucide-react";
 import { copyText } from "@/lib/ui/clipboard";
 import { entityTone } from "@/lib/ui/entity-tone";
 import { AgentProgress } from "./AgentProgress";
 import { AgentReply, useAgentReplyReveal } from "./AgentReply";
 import { MaterialPreview } from "@/components/cards/MaterialPreview";
-import { Button, Markdown, Sheet, useToast } from "@/components/ui/kit";
-import { apiGet, apiPatch, useDataChanged } from "@/lib/client/api";
+import { Button, ConfirmDialog, Markdown, Sheet, useToast } from "@/components/ui/kit";
+import { apiGet, apiPatch, notifyDataChanged, useDataChanged } from "@/lib/client/api";
 import { useEditorBridge } from "@/lib/editor/bridge";
 import { countWords, stripHtml } from "@/lib/ui/cn";
 import { diffInline } from "@/lib/diff/blocks";
 import { AGENT_COMMIT_CHANGED, AGENT_UPDATED,broadcastRun,commitAgent,isAgentCommitting,openAgentReview } from "@/lib/ai/agent/client";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
-import { ENTITY_LABEL, FIELD_LABEL, type AgentChange, type AgentRun, type AgentReference } from "@/lib/ai/agent/types";
+import { ENTITY_LABEL, FIELD_LABEL, type AgentChange, type AgentRun, type AgentReference, type AgentThought } from "@/lib/ai/agent/types";
 import { t, useT } from "@/lib/i18n";
+import { BLUEPRINT_TENSION_LABEL } from "@/lib/types";
+
+const entityIcons = { character: User, location: MapPinned, world: MapPin, foreshadow: Bookmark };
 
 function display(value:unknown):string {
   if(value===null||value===undefined||value==="") return t("未填写");
   if(Array.isArray(value)) return value.map(v=>typeof v==="string"?v:JSON.stringify(v)).join("\n");
   return typeof value==="object"?JSON.stringify(value,null,2):String(value);
+}
+function displayTension(value: unknown): string {
+  return value === "low" || value === "medium" || value === "high" ? t(BLUEPRINT_TENSION_LABEL[value]) : display(value);
 }
 function displayScenes(value:unknown):string {
   if(!Array.isArray(value)||!value.length)return t("未填写");
@@ -52,11 +58,14 @@ export function FieldChange({before,after,format=display}:{before:unknown;after:
     <div className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/35 bg-jade/[0.035] px-2.5 py-2 text-ink-2"><span className="mr-2 text-[10px] text-jade">{tr("改")}</span>{segments.filter(x=>x.type!=="del").map((s,i)=><span key={i} className={s.type==="add"?"bg-jade/15 text-jade":""}>{s.text}</span>)}</div>
   </div>;
 }
-export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{runId:string;novelId:string;initial?:AgentRun;disabled?:boolean;onContinue?:(text:string)=>void}) {
+export function AgentRunCard({runId,novelId,initial,thought,disabled=false,onContinue}:{runId:string;novelId:string;initial?:AgentRun;thought?:AgentThought;disabled?:boolean;onContinue?:(text:string, runId:string)=>void}) {
   const [run,setRun]=React.useState<AgentRun|undefined>(initial);
   const [error,setError]=React.useState("");
   const [expanded,setExpanded]=React.useState<string|null>(null);
-  const materialNodes=React.useRef<Record<string,HTMLDivElement|null>>({});
+  const [expandedMaterial,setExpandedMaterial]=React.useState<string|null>(null);
+  const [confirmation,setConfirmation]=React.useState<{ op: "delete" | "discard"; changes: AgentChange[] } | null>(null);
+  const materialDetailsId=React.useId();
+  const materialButtons=React.useRef<Record<string,HTMLButtonElement|null>>({});
   const [picked,setPicked]=React.useState<Record<string,boolean>>({});
   const [fields,setFields]=React.useState<Record<string,string[]>>({});
   const [localBusy,setBusy]=React.useState(false);
@@ -129,17 +138,26 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
     return result;
   });
   const selected=pending.filter(isPicked);
+  const reviewMaterial=materials.find(c=>c.id===expandedMaterial);
+  const applySelection=(changes:AgentChange[])=>{
+    if(changes.some(c=>c.op==="delete"))setConfirmation({op:"delete",changes});
+    else void apply(changes);
+  };
+  const navigateTo=(kind:AgentReference["kind"],id:string)=>{
+    window.dispatchEvent(new CustomEvent("yanfield:agent-navigate",{detail:{kind,id,novelId:run.novelId}}));
+  };
   const openTarget=(target:AgentReference & {changeId?:string})=>{
     const candidate=run.changes.find(c=>c.id===(target.changeId||target.id));
     if(candidate && (!candidate.appliedId||candidate.op==="delete")){
       if(candidate.kind==="chapter"){openAgentReview(run,candidate.id);return;}
-      setExpanded(candidate.id);window.setTimeout(()=>materialNodes.current[candidate.id]?.scrollIntoView({block:"nearest",behavior:"smooth"}),0);return;
+      if(!materials.includes(candidate))return;
+      setRecordOpen(false);
+      setExpandedMaterial(candidate.id);
+      window.requestAnimationFrame(()=>materialButtons.current[candidate.id]?.focus());
+      return;
     }
-    const id=candidate?.appliedId||target.id;
-    if(["world","character","location","foreshadow"].includes(target.kind))window.dispatchEvent(new CustomEvent("yanfield:open-card",{detail:{kind:target.kind,id,novelId:run.novelId}}));
-    else window.dispatchEvent(new CustomEvent("yanfield:agent-navigate",{detail:{kind:target.kind,id}}));
+    navigateTo(target.kind,candidate?.appliedId||target.id);
   };
-  // 作者的诉求：任务卡里所有候选与资料改动都要常驻可见，只有执行过程、调试详情这类诊断信息才折叠。
   const chapterCard=(c:AgentChange)=>{
     const isPending=c.state==="pending";
     const afterWords=countWords(String(c.after.content||""));
@@ -161,49 +179,78 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
       <Button className="mt-1 w-full justify-center" size="sm" variant="ghost" disabled={running||busy||disabled} onClick={()=>openAgentReview(run,c.id)}>{isPending?tr("在正文中审阅改动"):tr("查看历史改动")}</Button>
     </div>;
   };
-  const materialCard=(c:AgentChange)=>{
+  const materialChip=(c:AgentChange)=>{
+    const title=c.title||tr(ENTITY_LABEL[c.kind]);
+    const isOpen=reviewMaterial?.id===c.id;
+    const Icon=entityIcons[c.kind as keyof typeof entityIcons]??BookOpen;
+    const status=c.op==="delete"?(c.state==="applied"?tr("已删除"):tr("删除整条"))
+      :c.state==="applied"?tr("已应用"):c.before?tr("修改"):tr("新建");
+    return <div key={c.id} className={`inline-flex max-w-full items-center rounded-md border ${entityTone(c.kind)} ${isOpen?"ring-1 ring-current":""}`}>
+      {c.state==="pending"?<input className="ml-2 size-3 shrink-0 accent-current" aria-label={tr("选择{title}",{title})} type="checkbox" checked={isPicked(c)} disabled={busy||running||disabled} onChange={e=>setPicked(p=>({...p,[c.id]:e.target.checked}))}/>:null}
+      <button ref={node=>{materialButtons.current[c.id]=node;}} type="button" aria-expanded={isOpen} aria-controls={materialDetailsId}
+        className="inline-flex min-h-7 min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-left text-[11px] font-medium hover:bg-current/5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-current"
+        title={tr("{kind} · {title}",{kind:`${status} · ${tr(ENTITY_LABEL[c.kind])}`,title})}
+        onClick={()=>setExpandedMaterial(isOpen?null:c.id)}>
+        <Icon aria-hidden className="size-3 shrink-0"/>
+        <span className="truncate">{title}</span>
+        {c.state==="applied"&&c.op!=="delete"?<Check aria-hidden className="size-3 shrink-0 text-jade"/>:null}
+        {c.op==="delete"?<span className="shrink-0 text-[10px] text-danger">{status}</span>:null}
+        <ChevronDown aria-hidden className={`size-3 shrink-0 opacity-65 ${isOpen?"rotate-180":""}`}/>
+      </button>
+    </div>;
+  };
+  const materialDetails=(c:AgentChange)=>{
     const isPending=c.state==="pending";
     const keys=Object.keys(c.after);
     const chosen=fields[c.id]??keys;
     const deleting=c.op==="delete";
-    return <div key={c.id} ref={node=>{materialNodes.current[c.id]=node;}} className="scroll-mt-4 border-t border-line/60 px-4 py-3.5">
+    const title=c.title||tr(ENTITY_LABEL[c.kind]);
+    const targetId=c.appliedId||c.targetId;
+    return <div key={c.id} className="border-t border-line/60 px-3 py-3">
       <div className="flex flex-wrap items-center gap-2">
-        {isPending?<input aria-label={tr("选择{title}",{title:c.title})} type="checkbox" checked={isPicked(c)} disabled={busy||running||disabled} onChange={e=>setPicked(p=>({...p,[c.id]:e.target.checked}))}/>:<Check className="size-3 text-jade"/>}
-        <span className="min-w-0 truncate text-[13px] font-medium text-ink">{c.title}</span>
+        <span className="min-w-0 break-words text-[13px] font-medium text-ink">{title}</span>
         <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] ${entityTone(c.kind)}`}>{tr(ENTITY_LABEL[c.kind])}</span>
         <span className="ml-auto shrink-0 text-[10px] text-ink-4">{c.state==="applied"?(deleting?tr("已删除"):tr("已应用")):c.state==="reverted"?tr("已撤回"):c.state==="rejected"?tr("已丢弃"):deleting?<span className="text-danger">{tr("删除整条")}</span>:c.before?tr("修改"):tr("新建")}</span>
       </div>
-      {c.reason?<p className="mt-1.5 text-[11px] leading-relaxed text-ink-3">{c.reason}</p>:null}
+      {c.reason && !run.request.includes(c.reason)?<p className="mt-1.5 text-[11px] leading-relaxed text-ink-3">{c.reason}</p>:null}
       {deleting
         ? <div className="mt-2 rounded-lg border border-danger/20 bg-danger/[0.03] p-2.5 opacity-80"><MaterialPreview kind={c.kind as "character"|"world"|"location"|"foreshadow"} fields={c.before??{}} showTitle={false}/></div>
         : <div className="scroll-thin mt-2.5 max-h-80 space-y-2.5 overflow-y-auto pr-1">
-            {keys.map(key=><div key={key}>
+            {keys.map(key=>{
+              const format = key === "scenes" ? displayScenes
+                : key === "suspense" || key === "twist" ? displayTension : display;
+              return <div key={key}>
               <label className="mb-1 flex items-center gap-1.5 text-[10.5px] text-ink-3">{isPending?<input type="checkbox" checked={chosen.includes(key)} disabled={busy||running||disabled} onChange={e=>setFields(p=>({...p,[c.id]:e.target.checked?[...chosen,key]:chosen.filter(k=>k!==key)}))}/>:null}{FIELD_LABEL[key]?tr(FIELD_LABEL[key]):key}</label>
-              {c.before?<FieldChange before={c.before[key]} after={c.after[key]} format={key==="scenes"?displayScenes:display}/>:<p className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/25 bg-jade/[0.035] px-2.5 py-2 text-[12px] leading-[1.85] text-ink-2">{(key==="scenes"?displayScenes:display)(c.after[key])}</p>}
-            </div>)}
+              {c.before?<FieldChange before={c.before[key]} after={c.after[key]} format={format}/>:<p className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/25 bg-jade/[0.035] px-2.5 py-2 text-[12px] leading-[1.85] text-ink-2">{format(c.after[key])}</p>}
+            </div>;
+            })}
           </div>}
       {c.evidence?.length?<details className="mt-2 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("原文依据 · {count}",{count:c.evidence.length})}</summary><div className="mt-2 space-y-2">{c.evidence.map((e,i)=><blockquote key={i} className="border-l-2 border-jade/25 pl-2.5 leading-relaxed"><span className="mb-1 block text-[10px] text-jade">{e.field&&FIELD_LABEL[e.field]?`${tr(FIELD_LABEL[e.field])} · `:""}{e.title}{` · ${evidenceLabel(run,e)}`}</span>{e.quote}</blockquote>)}</div></details>:null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        {isPending?<button type="button" className="text-[10px] text-ink-4 hover:text-danger" disabled={running||busy||disabled} onClick={()=>void mutate(()=>apiPatch<AgentRun>(`/api/ai/agent/${run.id}`,{op:"reject",changeId:c.id,novelId:run.novelId}))}>{tr("丢弃此项")}</button>:null}
-        {(c.appliedId||c.targetId)&&!deleting?<button type="button" className="inline-flex items-center gap-1 text-[11px] text-accent" onClick={()=>window.dispatchEvent(new CustomEvent("yanfield:open-card",{detail:{kind:c.kind,id:c.appliedId||c.targetId,novelId:run.novelId}}))}><FolderOpen className="size-3"/>{isPending?tr("打开原资料"):tr("打开资料")}</button>:null}
-        {isPending?<Button className={`ml-auto ${deleting?"text-danger":""}`} size="sm" disabled={running||busy||disabled||(!deleting&&!chosen.length)} onClick={()=>void apply([c])}>{deleting?tr("确认删除"):tr("应用此项")}</Button>:null}
+        {isPending?<button type="button" className="text-[10px] text-ink-4 hover:text-danger" disabled={running||busy||disabled} onClick={()=>setConfirmation({op:"discard",changes:[c]})}>{tr("丢弃此项")}</button>:null}
+        {targetId&&!deleting?<button type="button" className="inline-flex items-center gap-1 text-[11px] text-accent" onClick={()=>navigateTo(c.kind,targetId)}><FolderOpen className="size-3"/>{isPending?tr("打开原资料"):tr("打开资料")}</button>:null}
+        {isPending?<Button className={`ml-auto ${deleting?"text-danger":""}`} size="sm" disabled={running||busy||disabled||(!deleting&&!chosen.length)} onClick={()=>applySelection([c])}>{deleting?tr("确认删除"):tr("应用此项")}</Button>:null}
       </div>
     </div>;
   };
-  const chip=(target:AgentReference & {changeId?:string})=><button key={target.kind+target.id} type="button" title={tr("{kind} · {title}",{kind:tr(ENTITY_LABEL[target.kind]),title:target.title})} onClick={()=>openTarget(target)} className={`inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition-colors hover:brightness-95 focus-visible:outline-accent ${entityTone(target.kind)}`}>
-    {target.kind==="character"?<User className="size-3 shrink-0"/>:target.kind==="location"?<MapPinned className="size-3 shrink-0"/>:target.kind==="world"?<MapPin className="size-3 shrink-0"/>:target.kind==="foreshadow"?<Bookmark className="size-3 shrink-0"/>:<BookOpen className="size-3 shrink-0"/>}
+  const chip=(target:AgentReference & {changeId?:string})=>{
+    const Icon=entityIcons[target.kind as keyof typeof entityIcons]??BookOpen;
+    return <button key={target.kind+target.id} type="button" title={tr("{kind} · {title}",{kind:tr(ENTITY_LABEL[target.kind]),title:target.title})} onClick={()=>openTarget(target)} className={`inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition-colors hover:brightness-95 focus-visible:outline-accent ${entityTone(target.kind)}`}>
+    <Icon aria-hidden className="size-3 shrink-0"/>
     <span className="truncate">{target.title}</span><span className="shrink-0 text-[9px] opacity-70">{tr(ENTITY_LABEL[target.kind])}</span>
   </button>;
+  };
   return <div className="min-w-0" data-testid="agent-run-card">
-    <AgentProgress run={run} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
+    <AgentProgress run={run} thought={running ? thought : undefined} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
     {(running || revealing) && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}
     {showReply?<AgentReply text={summary} length={replyLength}/>:null}
+    {settled && Boolean(run.incomplete)?<p className="px-1 py-1 text-[12px] text-danger" role="status">{tr("有 {count} 项操作未完成，详情见执行记录。",{count:run.incomplete!})}</p>:null}
     {settled && validationStopped?<p className="px-1 py-1 text-[13px] leading-relaxed text-ink-2" role="status">{
       applied.length ? tr("已应用 {count} 项改动。", { count:applied.length })
         : pending.length ? tr("已准备 {count} 项候选，等待你确认。", { count:pending.length })
           : tr("本轮未生成可审阅的改动。可在执行记录里查看原因。")
     }</p>:null}
-    {settled && run.recap && pending.length && !validationStopped ? <div className="space-y-2 px-4 py-3 text-[13px] leading-relaxed text-ink-2">
+    {settled && run.recap && pending.length && !validationStopped && !materials.length ? <div className="space-y-2 px-4 py-3 text-[13px] leading-relaxed text-ink-2">
       <p>{tr("已准备 {count} 项候选，等待你确认。", { count: pending.length })}</p>
       <ul className="list-disc space-y-1 pl-4">
         {pending.slice(0, 4).map(change => {
@@ -216,17 +263,14 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
         })}
       </ul>
     </div> : null}
-    {settled && (chapters.length || materials.length) ? <div className="mt-3 overflow-hidden rounded-lg border border-line/80 bg-surface fade-in">
-    {chapters.length?<div>{chapters.map(chapterCard)}</div>:null}
-    {materials.length?<div className="border-t border-line/70">
-      <div className="flex flex-wrap items-center gap-2 bg-paper/25 px-4 py-2.5 text-[11px] text-ink-3">
-        <Layers3 className="size-3.5 text-jade"/>
-        <span>{materials.some(c=>c.state==="pending")?tr("资料待确认"):tr("资料改动")} · {tr("{count} 项",{count:materials.length})}</span>
-        <span className="ml-auto text-[10px] text-ink-4">{[tr("新建 {count}",{count:materials.filter(c=>!c.before).length}),tr("更新 {count}",{count:materials.filter(c=>c.before&&!c.op).length}),...(materials.some(c=>c.op==="delete")?[tr("删除 {count}",{count:materials.filter(c=>c.op==="delete").length})]:[])].join(" · ")}</span>
+    {settled && chapters.length ? <div className="mt-3 overflow-hidden rounded-lg border border-line/80 bg-surface fade-in">{chapters.map(chapterCard)}</div> : null}
+    {settled && materials.length ? <section aria-label={tr("资料改动")} className="mt-3 rounded-lg border border-line/80 bg-surface fade-in">
+      <div className="px-3 py-2.5">
+        <div className="mb-1.5 text-[11px] text-ink-3">{materials.some(c=>c.state==="pending")?tr("资料待确认"):tr("资料改动")} <span className="text-ink-4">· {tr("{count} 项",{count:materials.length})}</span></div>
+        <div className="flex flex-wrap gap-1.5">{materials.map(materialChip)}</div>
       </div>
-      {materials.map(materialCard)}
-    </div>:null}
-    </div> : null}
+      <div id={materialDetailsId} hidden={!reviewMaterial}>{reviewMaterial && materialDetails(reviewMaterial)}</div>
+    </section> : null}
     {settled && (run.steps.length || run.references.length || applied.length) ? <div className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1">
       {run.steps.length || run.references.length ? <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-[11px]" onClick={()=>{setRecordTab(run.steps.length?"steps":"sources");setRecordOpen(true);}}>
         {tr("执行记录")}<span className="tabular-nums text-ink-4">{run.steps.length || run.references.length}</span>
@@ -241,22 +285,29 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
         </div>
         {recordTab==="steps" ?
         <ol className="my-2 space-y-3 border-l border-line pl-3">{run.steps.map((step,index)=><li key={step.id}>
-          <div className={`flex items-center gap-1.5 text-[12px] ${step.status==="error"?"text-danger":"text-ink-3"}`}>
-            {step.status==="running"?<Loader2 className="size-3 animate-spin"/>:step.status==="error"?<CircleAlert className="size-3"/>:<Check className="size-3"/>}
+          <div className={`flex items-center gap-1.5 text-[12px] ${(step.status==="error"||step.status==="partial")?"text-danger":"text-ink-3"}`}>
+            {step.status==="running"?<Loader2 className="size-3 animate-spin"/>:(step.status==="error"||step.status==="partial")?<CircleAlert className="size-3"/>:<Check className="size-3"/>}
             <span>{tr(step.label)}</span>
           </div>
+          {step.issues?.length?<ul className="mt-1 space-y-1 text-danger">{step.issues.map((issue,index)=><li key={index} className="break-words">
+            {issue.title ? `${issue.title} · ` : ""}{tr(issue.message)}
+            {issue.fields?.map((field,fieldIndex)=><span key={fieldIndex} className="block text-ink-3">{field.path} · {field.message}</span>)}
+          </li>)}</ul>:null}
           {step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}
-          {step.detail && (step.status==="error" || step.detail!==run.steps[index-1]?.detail)?<p className="mt-1 leading-relaxed text-ink-4">{tr(step.detail)}</p>:null}
+          {step.detail && (step.detailValues || step.status==="error" || step.detail!==run.steps[index-1]?.detail)?<p className="mt-1 whitespace-pre-line leading-relaxed text-ink-4">{tr(step.detail, step.detailValues && {
+            ...step.detailValues,
+            ...(typeof step.detailValues.kind === "string" ? { kind: tr(step.detailValues.kind) } : {}),
+          })}</p>:null}
         </li>)}</ol> : <div className="flex flex-wrap gap-1.5">{run.references.map(chip)}</div>}
       </div>
     </Sheet>:null}
-    {error||run.error?<p role="alert" className="mx-3 mb-3 rounded bg-danger/5 p-2 text-[11px] leading-relaxed text-danger"><CircleAlert className="mr-1 inline size-3"/>{error||run.error}</p>:null}
+    {error||run.error?<p role="alert" className="mx-3 mb-3 rounded bg-danger/5 p-2 text-[11px] leading-relaxed text-danger"><CircleAlert className="mr-1 inline size-3"/>{tr(error||run.error)}</p>:null}
     {run.errorCode?<details className="mx-3 mb-3 rounded-md border border-line p-2 text-[11px] text-ink-3">
       <summary className="cursor-pointer">{tr("调试详情 · {detail}",{detail:run.errorCode||(run.diagnostics?.length?tr("已自动修复的协议错误"):tr("旧任务未记录错误码"))})}</summary>
       <p className="mt-2 break-all">{tr("任务 ID：{id}",{id:run.id})}</p>
       <p className="mt-1">{tr("模型：{provider} / {model}",{provider:run.provider,model:run.model})}</p>
       {run.error && !run.errorCode && !run.diagnostics?.length?<p className="mt-2">{tr("此任务由旧版执行器生成，没有保存原始返回或具体校验错误，无法补回历史调试详情。更新后的新任务会记录这些信息。")}</p>:null}
-      <p className="mt-1">{tr("以下仅包含模型返回的脱敏片段和校验结果，不包含请求密钥。预览可能含作品内容。")}</p>
+      {run.diagnostics?.length ? <p className="mt-1">{tr("以下仅包含模型返回的脱敏片段和校验结果，不包含请求密钥。预览可能含作品内容。")}</p> : null}
       {run.diagnostics?.map((diagnostic,index)=><details key={index} className="mt-2 border-t border-line pt-2">
         <summary className="cursor-pointer">{tr("第 {round} 轮 · 第 {attempt} 次 · {code} · {chars} 字符",{round:diagnostic.round,attempt:diagnostic.attempt,code:diagnostic.code,chars:diagnostic.responseChars})}</summary>
         <ul className="my-2 space-y-1">{diagnostic.issues.map((issue,i)=><li key={i} className="break-words">{issue.path} · {issue.code}：{issue.message}</li>)}</ul>
@@ -265,8 +316,28 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
       <button type="button" className="mt-2 text-accent underline" onClick={async()=>{try{await copyText(JSON.stringify({runId:run.id,errorCode:run.errorCode,model:run.model,provider:run.provider,diagnostics:run.diagnostics},null,2));toast({title:tr("已复制调试信息"),tone:"success"});}catch{toast({title:tr("复制失败，请手动选中调试详情"),tone:"error"});}}}>{tr("复制调试信息")}</button>
     </details>:null}
     {settled && !discussion && pending.length?<div className="mt-2 flex flex-wrap items-center gap-2">
-      {pending.length?<Button variant="primary" size="sm" className="min-h-9 flex-1 justify-center shadow-none" loading={busy} disabled={disabled||!selected.length||selected.some(c=>fields[c.id]?.length===0)} onClick={()=>void apply(selected)}>{tr("应用选中的 {count} 项",{count:selected.length})}{selected.some(c=>c.op==="delete")?tr("（含删除 {count}）",{count:selected.filter(c=>c.op==="delete").length}):""}</Button>:null}
-      {onContinue && pending.length?<button type="button" className="text-[11px] text-ink-3 hover:text-accent" disabled={busy||disabled} onClick={()=>onContinue("请基于上轮候选继续修改：")}>{tr("继续修改")}</button>:null}
+      {pending.length?<Button variant="primary" size="sm" className="min-h-9 flex-1 justify-center shadow-none" loading={busy} disabled={disabled||!selected.length||selected.some(c=>fields[c.id]?.length===0)} onClick={()=>applySelection(selected)}>{tr("应用选中的 {count} 项",{count:selected.length})}{selected.some(c=>c.op==="delete")?tr("（含删除 {count}）",{count:selected.filter(c=>c.op==="delete").length}):""}</Button>:null}
+      {onContinue && pending.length?<button type="button" className="text-[11px] text-ink-3 hover:text-accent" disabled={busy||disabled} onClick={()=>onContinue(tr("请基于这份候选继续修改："), runId)}>{tr("继续修改")}</button>:null}
     </div>:null}
+    {confirmation?<ConfirmDialog open danger
+      title={tr(confirmation.op==="delete"?"确认删除":"丢弃此项")}
+      description={confirmation.op==="delete"
+        ?tr("应用这些改动将删除 {count} 条资料。应用后可以撤回本轮。",{count:confirmation.changes.filter(c=>c.op==="delete").length})
+        :tr("丢弃「{title}」的候选改动？",{title:confirmation.changes[0].title||tr(ENTITY_LABEL[confirmation.changes[0].kind])})}
+      confirmText={confirmation.op==="delete"?"确认删除":"丢弃此项"}
+      onClose={()=>setConfirmation(null)}
+      onConfirm={()=>{
+        setConfirmation(null);
+        if(confirmation.op==="delete")void apply(confirmation.changes);
+        else {
+          setExpandedMaterial(null);
+          const change = confirmation.changes[0];
+          void mutate(async () => {
+            const result = await apiPatch<AgentRun>(`/api/ai/agent/${run.id}`, { op: "reject", changeId: change.id, novelId: run.novelId });
+            if (change.kind === "blueprint") notifyDataChanged("blueprint-review");
+            return result;
+          });
+        }
+      }}/>:null}
   </div>;
 }

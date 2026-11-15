@@ -178,7 +178,7 @@ export function streamAiChat(req: AiChatRequest, handlers: StreamHandlers): Prom
 }
 
 export function streamAiAgent(req: import("@/lib/ai/agent/types").AgentRequest, handlers: StreamHandlers): Promise<void> {
-  return fetch(apiUrl("/api/ai/agent"), {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(req),signal:handlers.signal}).then(res=>consumeSse(res,handlers));
+  return fetch(apiUrl("/api/ai/agent"), {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ ...req, locale: getYanfieldLocale() }),signal:handlers.signal}).then(res=>consumeSse(res,handlers));
 }
 
 export function streamAiCodex(

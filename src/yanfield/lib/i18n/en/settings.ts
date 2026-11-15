@@ -75,6 +75,7 @@ export const settings: Record<string, TranslateValue> = {
 
   // 提示词预设
   "每个 AI 场景的 system / user 模板都在这里，可改、可停用、可恢复默认（内置预设只读）。": "Every AI scene's system and user templates live here: edit, disable, or reset them (built-in presets are read-only).",
+  "预设供对应的快捷任务和编辑面板使用。自由对话按你这次的要求执行。": "Presets guide their matching shortcuts and editor panels. In chat, the assistant follows the current request.",
   "新建预设": "New preset",
   "共 {total} 个 · 自定义 {custom}": {
     one: "{total} preset · {custom} custom",

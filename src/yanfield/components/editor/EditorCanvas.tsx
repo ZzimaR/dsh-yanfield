@@ -20,6 +20,7 @@ import { StatusMenu } from "./StatusMenu";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { FindReplaceBar } from "./FindReplaceBar";
 import { FindHighlight, revealProsePosition } from "@/lib/editor/find-highlight";
+import { InactiveSelection } from "@/lib/editor/inactive-selection";
 import { isHistoryTransaction } from "@tiptap/pm/history";
 import { FormatToolbar } from "./FormatToolbar";
 import { AgentReview } from "./AgentReview";
@@ -198,6 +199,7 @@ export function EditorCanvas(props: EditorCanvasProps) {
       Placeholder.configure({ placeholder: tr("在这里落笔……写成段落，别写成 PPT。") }),
       Highlight.configure({ multicolor: false }),
       FindHighlight,
+      InactiveSelection,
       CharacterCount,
     ],
     [tr],

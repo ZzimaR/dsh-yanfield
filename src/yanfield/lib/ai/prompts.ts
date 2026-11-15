@@ -109,10 +109,12 @@ export function resolvePreset(
   locale: "zh" | "en" = "zh",
 ): { id: string | null; name: string; systemPrompt: string; userTemplate: string; temperature: number; modelRole: "chat" | "prose" } {
   const byId = presetId ? presets.find((preset) => preset.id === presetId && preset.enabled) : undefined;
-  const byFeature = presets.find((preset) => preset.feature === feature && preset.enabled);
+  const matching = presets.filter((preset) => preset.feature === feature && preset.enabled);
+  const byFeature = matching.find((preset) => "isBuiltin" in preset && preset.isBuiltin === false) ?? matching[0];
   const picked = byId ?? byFeature;
   const localize = (name: string, systemPrompt: string, userTemplate: string) => {
-    const en = locale === "en" ? PRESET_EN[name] : undefined;
+    const builtin = BUILTIN_PRESETS.find(item => item.name === name && item.systemPrompt === systemPrompt && item.userTemplate === userTemplate);
+    const en = locale === "en" && builtin ? PRESET_EN[name] : undefined;
     return {
       systemPrompt: withLanguageDirective(en?.systemPrompt ?? systemPrompt, locale),
       userTemplate: en?.userTemplate ?? userTemplate,
