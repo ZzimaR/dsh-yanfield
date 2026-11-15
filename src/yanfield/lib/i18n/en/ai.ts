@@ -355,6 +355,7 @@ export const ai: Record<string, TranslateValue> = {
   "用量加载中": "Loading usage",
   "由模型决定": "Model default",
   "有新进展 · 回到底部 ↓": "New updates · Back to bottom ↓",
+  "对话消息": "Chat messages",
   "余额": "Balance",
   "余额 {amount}": "Balance {amount}",
   "余额查询失败，请稍后重试": "Failed to check balance; try again later",

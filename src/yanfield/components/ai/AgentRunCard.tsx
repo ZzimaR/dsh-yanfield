@@ -4,7 +4,8 @@ import { BookOpen, User, MapPin, MapPinned, Bookmark, FolderOpen, Check, Chevron
 import { copyText } from "@/lib/ui/clipboard";
 import { entityTone } from "@/lib/ui/entity-tone";
 import { AgentProgress } from "./AgentProgress";
-import { AgentReply, useAgentReplyReveal } from "./AgentReply";
+import { AgentReply } from "./AgentReply";
+import { ThinkingPreview } from "./ThinkingPreview";
 import { MaterialPreview } from "@/components/cards/MaterialPreview";
 import { Button, ConfirmDialog, Markdown, Sheet, useToast } from "@/components/ui/kit";
 import { apiGet, apiPatch, notifyDataChanged, useDataChanged } from "@/lib/client/api";
@@ -58,7 +59,7 @@ export function FieldChange({before,after,format=display}:{before:unknown;after:
     <div className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/35 bg-jade/[0.035] px-2.5 py-2 text-ink-2"><span className="mr-2 text-[10px] text-jade">{tr("改")}</span>{segments.filter(x=>x.type!=="del").map((s,i)=><span key={i} className={s.type==="add"?"bg-jade/15 text-jade":""}>{s.text}</span>)}</div>
   </div>;
 }
-export function AgentRunCard({runId,novelId,initial,thought,disabled=false,onContinue}:{runId:string;novelId:string;initial?:AgentRun;thought?:AgentThought;disabled?:boolean;onContinue?:(text:string, runId:string)=>void}) {
+export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,disabled=false,onContinue}:{runId:string;novelId:string;initial?:AgentRun;thought?:AgentThought;liveReply?:string;streaming?:boolean;disabled?:boolean;onContinue?:(text:string, runId:string)=>void}) {
   const [run,setRun]=React.useState<AgentRun|undefined>(initial);
   const [error,setError]=React.useState("");
   const [expanded,setExpanded]=React.useState<string|null>(null);
@@ -75,18 +76,18 @@ export function AgentRunCard({runId,novelId,initial,thought,disabled=false,onCon
   const busy=localBusy||saving;
   const bridge=useEditorBridge(),{toast}=useToast();
   const tr=useT();
-  const liveRunRef=React.useRef<string | null>(null);
-  if(run?.status==="running") liveRunRef.current=run.id;
   const running=run?.status==="running";
   const validationStopped=run?.stoppedOnValidation || run?.summary.startsWith("同一条改动连续两次没有通过校验");
   const summary=displayAgentReply(validationStopped ? "" : run?.summary??"").split("\n").map(line=>tr(line)).join("\n");
-  const showReply=Boolean(summary.trim() && (!running || run?.answering));
-  const replyLength=useAgentReplyReveal(runId,showReply?summary:"",liveRunRef.current===runId);
-  const revealing=showReply && replyLength<summary.length;
-  const settled=!running && !revealing;
+  const streamedText = streaming ? liveReply?.trimStart() ?? "" : "";
+  const reply = streamedText || (!running || run?.answering ? summary : "");
+  const completedThoughts = React.useMemo(() => run?.thoughts?.map(entry => entry.text.trim()).filter(Boolean).join("\n\n") ?? "", [run?.thoughts]);
+  const thinking = Boolean(streaming && running && (thought || (!run.steps.length && !completedThoughts && !reply)));
+  const settled=!running;
   const receive=React.useCallback((value:AgentRun)=>setRun(current=>!current||current.id!==value.id||value.updatedAt>=current.updatedAt?{...value}:current),[]);
   const refresh=React.useCallback(()=>{void apiGet<AgentRun>(`/api/ai/agent/${runId}?novelId=${encodeURIComponent(novelId)}`).then(receive).catch(e=>setError(e.message));},[runId,novelId,receive]);
-  React.useEffect(()=>{if(initial)receive(initial);else refresh();},[initial,refresh,receive]);
+  React.useLayoutEffect(()=>{if(initial)receive(initial);},[initial,receive]);
+  React.useEffect(()=>{if(!initial)refresh();},[initial,refresh]);
   React.useEffect(()=>{
     const listen=(event:Event)=>{const value=(event as CustomEvent<AgentRun>).detail;if(value.id===runId)receive(value);};
     window.addEventListener(AGENT_UPDATED,listen);return()=>window.removeEventListener(AGENT_UPDATED,listen);
@@ -97,23 +98,6 @@ export function AgentRunCard({runId,novelId,initial,thought,disabled=false,onCon
     window.addEventListener(AGENT_COMMIT_CHANGED,listen);
     return()=>window.removeEventListener(AGENT_COMMIT_CHANGED,listen);
   },[runId]);
-  // 任务一进入 ready 且带待确认正文候选就广播一次；写作区收到后自动打开内联 diff 审阅。
-  // 只广播「刚就绪」的转换，避免刷新页面或回看旧会话时把历史候选自动弹出来。
-  const readyBroadcastRef=React.useRef(new Set<string>());
-  const lastStatusRef=React.useRef<AgentRun["status"]|null>(initial?.status??null);
-  const hadInitialRef=React.useRef(Boolean(initial));
-  React.useEffect(()=>{
-    const previous=lastStatusRef.current;
-    lastStatusRef.current=run?.status??null;
-    if(!run||run.status!=="ready")return;
-    if(previous!=="running"&&!(previous===null&&!hadInitialRef.current))return;
-    if(!run.changes.some(c=>c.kind==="chapter"&&c.state==="pending"))return;
-    // 用 ${run.id}:${updatedAt} 去重：同一版本经轮询/事件多次到达时不会重复广播。
-    const key=`${run.id}:${run.updatedAt}`;
-    if(readyBroadcastRef.current.has(key))return;
-    readyBroadcastRef.current.add(key);
-    broadcastRun(run);
-  },[run]);
   useDataChanged(refresh,["agent"]);
   React.useEffect(()=>{if(run?.status!=="running"||disabled)return;const timer=window.setInterval(refresh,1500);return()=>window.clearInterval(timer);},[run?.status,disabled,refresh]);
   const mutate=async(action:()=>Promise<AgentRun>)=>{
@@ -241,9 +225,12 @@ export function AgentRunCard({runId,novelId,initial,thought,disabled=false,onCon
   </button>;
   };
   return <div className="min-w-0" data-testid="agent-run-card">
-    <AgentProgress run={run} thought={running ? thought : undefined} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
-    {(running || revealing) && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}
-    {showReply?<AgentReply text={summary} length={replyLength}/>:null}
+    {(thinking || completedThoughts) ? <div className="px-1 py-1">
+      <ThinkingPreview text={thinking ? thought?.text ?? "" : completedThoughts} active={thinking} />
+    </div> : null}
+    <AgentProgress run={run} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
+    {running && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}
+    {reply.trim()?<AgentReply text={reply} streaming={Boolean(streamedText)}/>:null}
     {settled && Boolean(run.incomplete)?<p className="px-1 py-1 text-[12px] text-danger" role="status">{tr("有 {count} 项操作未完成，详情见执行记录。",{count:run.incomplete!})}</p>:null}
     {settled && validationStopped?<p className="px-1 py-1 text-[13px] leading-relaxed text-ink-2" role="status">{
       applied.length ? tr("已应用 {count} 项改动。", { count:applied.length })

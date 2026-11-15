@@ -23,6 +23,7 @@ export const editor: Record<string, TranslateValue> = {
   "上一个": "Previous",
   "上一个 (Shift+Enter)": "Previous (Shift+Enter)",
   "上一处": "Previous change",
+  "定位改动": "Go to change",
   "上一章": "Previous chapter",
   "上一章：{title}": "Previous chapter: {title}",
   "上次离开时未能确认保存。数据库内容可能已经变化；恢复后请核对，保存会覆盖当前章节。临时草稿只保存在此浏览器标签页中，不能代替备份。": "Your last session ended before the save was confirmed. The database may have changed since; check the restored text, because saving will overwrite the current chapter. The temporary draft lives only in this browser tab and is no substitute for a backup.",

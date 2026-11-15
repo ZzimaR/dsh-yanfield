@@ -39,6 +39,7 @@ const ctx = {
         if (value && typeof value === "object") {
           for (const text of value.thoughts ?? []) yield { type: "reasoning-delta", text }
           if (value.reply) yield { type: "text-delta", text: value.reply }
+          for (const text of value.deltas ?? []) yield { type: "text-delta", text }
           for (const [index, call] of (value.calls ?? (value.name ? [value] : [])).entries()) {
             const argumentsText = call.input ?? JSON.stringify(call.args)
             const id = `native-${++toolSequence}`
@@ -166,11 +167,18 @@ try {
     return events.findLast((event) => event.type === "agent").run
   }
   const apply = (run, changes) => api("POST", `/ai/agent/${run.id}/apply`, { novelId, selections: changes.map(({ id }) => ({ id })) })
-  const withoutThoughts = await agentRun("Reply without reasoning", [reply], {}, events => {
+  const withoutThoughts = await agentRun("Reply without reasoning", [{ deltas: ["First chunk.", "\n\nSecond chunk."] }], {}, events => {
     assert.deepEqual(events.filter(event => event.type === "agent-thinking").map(event => event.phase), ["start", "end"])
+    const first = events.findIndex(event => event.type === "delta")
+    const summary = events.findIndex(event => event.type === "agent" && event.run.answering)
+    assert(first > 0 && summary > first, "Reply chunks must precede the completed answer")
+    assert.deepEqual(events.slice(first, summary).filter(event => event.type === "delta").map(event => event.text), [
+      "First chunk.", "\n\nSecond chunk.",
+    ])
   })
   assert.equal(withoutThoughts.status, "complete")
   assert.equal(withoutThoughts.thoughts, undefined)
+  assert.equal(withoutThoughts.summary, "First chunk.\n\nSecond chunk.")
   const interruptedThought = await agentRun("Stop in the middle of reasoning", [
     { thoughts: ["Partial thought"], finish: "aborted" },
   ], {}, events => {
@@ -181,9 +189,14 @@ try {
   assert.deepEqual(interruptedThought.changes, [])
 
   const retriedThought = await agentRun("Retry after a truncated model response", [
-    { thoughts: ["First attempt"], finish: "max-tokens" },
+    { thoughts: ["First attempt"], deltas: ["Interrupted reply"], finish: "max-tokens" },
     { thoughts: ["Second attempt"], reply },
-  ])
+  ], {}, events => {
+    const interrupted = events.findIndex(event => event.type === "delta" && event.text === "Interrupted reply")
+    const next = events.findIndex((event, index) => index > interrupted && event.type === "agent-thinking")
+    assert(interrupted >= 0 && next > interrupted)
+    assert.equal(events[next].phase, "start")
+  })
   assert.equal(retriedThought.status, "complete")
   assert.deepEqual(retriedThought.thoughts.map(thought => thought.text), ["First attempt", "Second attempt"])
   assert.equal(retriedThought.summary, reply)
@@ -428,6 +441,16 @@ try {
   const patchTool = (original, replacement) => tool("edit_prose", {
     id: localChapter.id, mode: "patch", instruction: "Correct one passage", edits: [{ original, replacement }],
   })
+  const readLocalChapter = tool("read", { kind: "chapter", id: localChapter.id })
+  const cappedPatch = await agentRun("Correct the place before reviewing the rest", [
+    readLocalChapter,
+    patchTool("in the village", "in town"),
+    ...Array.from({ length: 18 }, () => readLocalChapter),
+  ], { chapterId: localChapter.id })
+  assert.equal(cappedPatch.summary, "本轮已达到处理步数上限。")
+  assert.equal(cappedPatch.status, "ready")
+  assert.deepEqual(cappedPatch.changes.map(change => [change.state, change.after]), [["pending", localRun.changes[0].after]])
+  assert.equal((await api("GET", `/chapters/${localChapter.id}`)).data.content, localChapter.content)
   const recoveredPatch = await agentRun("Correct the place", [
     tool("read", {kind:"chapter", id:localChapter.id}),
     patchTool("Unmatched", "town"),

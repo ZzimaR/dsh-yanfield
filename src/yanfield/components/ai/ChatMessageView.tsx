@@ -169,7 +169,7 @@ export const ChatMessageView = React.memo(function ChatMessageView({
 
         {message.actions.filter(a=>a.type==="agent-run").map(action=>{
           const runId=(action.payload as {runId?:string})?.runId;
-          return runId?<AgentRunCard key={runId} runId={runId} novelId={novelId} initial={message.agentRun} thought={message.agentThought} disabled={disableActions} onContinue={onContinue}/>:null;
+          return runId?<AgentRunCard key={runId} runId={runId} novelId={novelId} initial={message.agentRun} thought={message.agentThought} liveReply={message.agentReply} streaming={isStreaming} disabled={disableActions} onContinue={onContinue}/>:null;
         })}
         {message.actions.some(a=>a.type!=="agent-run") ? (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">

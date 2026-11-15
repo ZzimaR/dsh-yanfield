@@ -62,8 +62,8 @@ Panel layout:
 
 - Top: conversation title (auto-named from the first prompt), history, new conversation.
 - When you ask for an opinion about the book, the assistant can read relevant material and give a direct answer. Expand the activity or references to see what it read.
-- Progress messages stay visible while the answer appears below them. Proposals for review appear after the answer.
-- When the model streams reasoning, the assistant shows the latest three lines. Once the model starts replying or moves on to a tool, expand **Reasoning** to read the full text for that round.
+- Progress messages stay visible as the assistant displays each piece of the answer it receives. Proposals for review appear after the answer is complete.
+- Each assistant message has a single **Reasoning** section when the model provides reasoning. While the model is thinking, the latest three lines are visible. Expand the section to read the full reasoning for the message.
 - Applying a change in the manuscript review updates its status in chat. Open **Activity log** to see individual tool results and the materials read.
 - The active conversation stays open when switching chapters within a book. New messages use the current chapter as context, and tasks in progress keep the chapter specified when they were sent.
 - The assistant uses your latest request to choose whether to search, read, prepare note or prose edits, or prepare a deletion. Manuscript passages can serve as sources for new cards. Ask for multiple types of changes together when you need them. Use **Keep editing** on the proposal you want to revise.
@@ -73,7 +73,7 @@ Panel layout:
 - When you click the AI input, the quoted passage stays softly highlighted in the manuscript. Place the cursor back in the manuscript to clear the selection, or select a new passage to update the reference.
 - Messages sent with selected prose show the chapter and line range. Expand the reference to see the original text sent with the message. Line numbers follow paragraphs and manual line breaks.
 - Short writing requests can use the current context. For example, `这里顺一点` polishes the selected passage, `接着写` continues the current chapter, and `根据正文改章纲` reads the full chapter before proposing an updated blueprint.
-- Middle: message stream. Task steps keep their order and the current step updates in place; autoscroll pauses while you read back.
+- Middle: message stream. Task steps keep their order and the current step updates in place. Scroll up to read earlier messages while the assistant is working. Return to the bottom or click **New updates · Back to bottom** to resume following.
 - Bottom: skills (quick prompts), persona / style / archive pickers, input box, model and reasoning level, `@` references, send.
 - Status line: today's usage, estimated cost, balance.
 
@@ -88,7 +88,7 @@ Capabilities:
 Review flow:
 
 1. Prose proposals show a word delta such as `319 → 338 words (+19)`. Note proposals start as clickable names. Open one to see field differences and source passages, or to apply or discard that item. Use the checkboxes next to the names to select notes to apply together. Open **Activity log** to see tools and materials read.
-2. The prose area also opens a review: original text (deletions in red, struck through) and the revised text (insertions in green) side by side.
+2. The prose area opens the review at the first change. Deletions appear crossed out in red, and insertions are highlighted in green. Use **Go to change** for a single change, or **Previous change** and **Next change** to move between changes.
 3. For each paragraph press **Keep** or **Revert**; **Revert all** / **Keep all** are also available.
 4. Press **Confirm review** — only kept paragraphs are written; undecided paragraphs keep the original text.
 5. After applying you can **Undo this round** or open the **change history**.
