@@ -40,6 +40,7 @@ export interface AgentRun {
   errorCode?:string; diagnostics?:AgentDiagnostic[];
   progress?: {id:string;text:string;stepIndex:number}[];
   thoughts?: AgentThought[];
+  linkTitles?: Record<string, string>;
   materialPolicy?: "auto" | "skip";
   summary: string; error: string; steps: AgentStep[]; changes: AgentChange[];
   recap?: boolean;

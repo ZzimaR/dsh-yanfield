@@ -1,5 +1,5 @@
 import { handle, ok } from "@/lib/api-utils";
-import { getRun, saveRun } from "@/lib/ai/agent/store";
+import { getRun, saveRun, withAgentLinkTitles } from "@/lib/ai/agent/store";
 import { readBody, requireQueryParam } from "@/app/api/_lib/http";
 import { ApiError } from "@/lib/api-utils";
 
@@ -9,7 +9,7 @@ export const GET=handle<{id:string}>(async(request,{params})=>{
   const novelId=requireQueryParam(request,"novelId","作品");
   const value=getRun(params.id);
   if(value.novelId!==novelId)throw new ApiError("任务不属于该作品",404);
-  return ok(value);
+  return ok(withAgentLinkTitles(value));
 });
 export const PATCH=handle<{id:string}>(async(request,{params})=>{
   const body=await readBody(request),value=getRun(params.id);

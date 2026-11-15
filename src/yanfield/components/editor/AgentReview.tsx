@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { ArrowDown, ArrowUp, Check, FilePenLine, RotateCcw, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, FilePenLine, LocateFixed, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/kit";
 import { cn } from "@/lib/ui/cn";
 import { splitBlocks } from "@/lib/diff/blocks";
@@ -18,6 +18,7 @@ export function AgentReview({initial,changeId,onClose}:{initial:AgentRun;changeI
   const [busy,setBusy]=React.useState(false),[error,setError]=React.useState(""),[active,setActive]=React.useState(0);
   const busyRef=React.useRef(false);
   const bridge=useEditorBridge(),root=React.useRef<HTMLDivElement>(null);
+  const toolbar = React.useRef<HTMLDivElement>(null);
   React.useEffect(()=>{
     let live=true;
     const receive=(value:AgentRun)=>{if(live && value.id===initial.id)setRun(current=>value.updatedAt>=current.updatedAt?value:current);};
@@ -30,10 +31,30 @@ export function AgentReview({initial,changeId,onClose}:{initial:AgentRun;changeI
   const before=String(change?.before?.content||""),after=String((change?.state==="applied"?change.saved?.content:undefined)??change?.after.content??"");
   const units=React.useMemo(()=>reviewUnits(before,after),[before,after]);
   const pending=change?.state==="pending";
+  const firstUnitId = units[0]?.id;
+  const scrollToChange = React.useCallback((index: number, animate: boolean) => {
+    const review = root.current;
+    const section = review?.querySelector<HTMLElement>(`[data-change-index="${index}"]`);
+    if (!section) return;
+    const behavior = animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto";
+    const viewport = review?.closest<HTMLElement>("[data-prose-scroll]");
+    if (!viewport) {
+      section.scrollIntoView({ behavior, block: "center" });
+      return;
+    }
+    const headerOffset = (toolbar.current?.offsetHeight ?? 0) + 24;
+    const top = viewport.scrollTop + section.getBoundingClientRect().top - viewport.getBoundingClientRect().top - headerOffset;
+    viewport.scrollTo({ top, behavior });
+  }, []);
+  React.useLayoutEffect(() => {
+    if (!pending || !firstUnitId) return;
+    const frame = window.requestAnimationFrame(() => scrollToChange(0, false));
+    return () => window.cancelAnimationFrame(frame);
+  }, [pending, firstUnitId, scrollToChange]);
   const jump=(index:number)=>{
     if(!units.length)return;
     const next=(index+units.length)%units.length;setActive(next);
-    root.current?.querySelector(`[data-change-index="${next}"]`)?.scrollIntoView({behavior:"smooth",block:"center"});
+    scrollToChange(next, true);
   };
   const finish=async(mode:"reviewed"|"all"|"none")=>{
     if(!change||busyRef.current||!pending)return;
@@ -83,7 +104,7 @@ export function AgentReview({initial,changeId,onClose}:{initial:AgentRun;changeI
   const blocks=splitBlocks(before),byId=new Map(units.filter(c=>c.type!=="added").map(c=>[c.id,c]));
   const additions=(anchor:string|null)=>units.filter(c=>c.type==="added"&&c.anchorId===anchor).map(renderChange);
   return <div ref={root} data-testid="agent-inline-review" className="ai-surface pb-8">
-    <div className="sticky top-2 z-20 mb-7 overflow-hidden rounded-xl border border-line/80 bg-surface/95 shadow-sm backdrop-blur">
+    <div ref={toolbar} className="sticky top-2 z-20 mb-7 overflow-hidden rounded-xl border border-line/80 bg-surface/95 shadow-sm backdrop-blur">
       <div className="flex items-start gap-3 px-4 pt-4">
         <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent"><FilePenLine className="size-4"/></span>
         <div className="min-w-0 flex-1 font-sans">
@@ -94,6 +115,7 @@ export function AgentReview({initial,changeId,onClose}:{initial:AgentRun;changeI
       </div>
       <div className="flex flex-wrap items-center gap-1 px-3 pb-3 pt-3">
         {units.length>1?<div className="mr-auto flex items-center gap-1"><Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" icon={<ArrowUp className="size-3"/>} onClick={()=>jump(active-1)}>{tr("上一处")}</Button><span className="px-1 font-mono text-[10px] tabular-nums text-ink-4">{active+1}/{units.length}</span><Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" icon={<ArrowDown className="size-3"/>} onClick={()=>jump(active+1)}>{tr("下一处")}</Button></div>:null}
+        {units.length===1?<Button size="sm" variant="ghost" className="mr-auto h-7 px-2 text-[11px]" icon={<LocateFixed className="size-3"/>} onClick={()=>jump(0)}>{tr("定位改动")}</Button>:null}
         {pending?<><Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" disabled={busy} onClick={()=>void finish("none")}>{tr("全部还原")}</Button><Button size="sm" variant="secondary" className="ml-auto h-7 border-accent/20 bg-accent/10 px-3 text-[11px] text-accent shadow-none hover:bg-accent/20" loading={busy} disabled={!units.length} icon={<Check className="size-3"/>} onClick={()=>void finish(Object.keys(choices).length?"reviewed":"all")}>{Object.keys(choices).length?tr("确认审阅结果"):tr("全部保留")}</Button></>:null}
       </div>
       <div className="border-t border-line/60 bg-paper/40 px-4 py-2">

@@ -43,6 +43,7 @@ export interface UIMessage {
   reasoning?: string;
   agentRun?: import("@/lib/ai/agent/types").AgentRun;
   agentThought?: import("@/lib/ai/agent/types").AgentThought;
+  agentReply?: string;
   actions: AiAction[];
   status: ChatMessage["status"];
   provider: string;

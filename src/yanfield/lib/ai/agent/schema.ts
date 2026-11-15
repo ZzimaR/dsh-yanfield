@@ -4,7 +4,11 @@ import type { EntityKind, Fields } from "./types";
 const text = z.string().max(100000);
 const name = z.string().trim().min(1).max(200);
 const list = z.array(z.string().max(5000)).max(100);
-const scene = z.object({ id: z.string(), title: text, summary: text, purpose: text, characters: list, location: text, emotion: text });
+const scene = z.object({
+  id: z.string(), title: text, summary: text, purpose: text, emotion: text,
+  characters: list.describe("Names as the author writes them. Use names in this text field."),
+  location: text.describe("Place name as the author writes it. Use the name in this text field."),
+});
 export const patchSchemas = {
   chapter: z.object({ title: name, content: text, summary: text, notes: text, volumeId: z.string().nullable(), orderIndex: z.number().int().nonnegative() }).partial().strict(),
   blueprint: z.object({ goal: text, pov: text, conflict: text, emotionalArc: text, scenes: z.array(scene).max(30), plotPoints: list, hooks: list, suspense: z.enum(["low", "medium", "high"]), twist: z.enum(["low", "medium", "high"]), targetWords: z.number().int().min(100).max(20000), notes: text }).partial().strict(),

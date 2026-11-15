@@ -215,7 +215,10 @@ export async function* runTools(input: {
     try {
       for await (const chunk of streamThoughts(run, complete([...messages, ...outstanding], { tools: true }))) {
         if (chunk.type === "agent-thinking") yield chunk
-        if (chunk.type === "delta") text += chunk.text
+        if (chunk.type === "delta") {
+          text += chunk.text
+          yield chunk
+        }
         if (chunk.type === "reasoning") reasoning += chunk.text
         if (chunk.type === "tool-calls") calls = chunk.calls
       }
