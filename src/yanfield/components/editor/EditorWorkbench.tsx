@@ -23,6 +23,7 @@ import { useNovelTree } from "@/lib/editor/useNovelTree";
 import { cn } from "@/lib/ui/cn";
 import { useT } from "@/lib/i18n";
 import { useHotkeys, useLocalStorageState, useResizePanel, useYanfieldPanelBounds } from "@/lib/ui/hooks";
+import { useOverlayMotion } from "@/lib/ui/overlay-motion";
 import { applySurfaceDataset, applyTheme, readSurfaceTheme } from "@/lib/ui/theme";
 import type { AppSettings, Chapter } from "@/lib/types";
 import { CommandPalette } from "./CommandPalette";
@@ -91,6 +92,8 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   const isWide = panelWidth >= 1024;
   const [drawerLeftOpen, setDrawerLeftOpen] = React.useState(false);
   const [drawerRightOpen, setDrawerRightOpen] = React.useState(false);
+  const rightDrawerRef = React.useRef<HTMLElement>(null);
+  const { present: rightDrawerPresent, ...rightDrawerMotion } = useOverlayMotion(!isWide && drawerRightOpen, rightDrawerRef);
   /** ⌘K 命令面板 */
   const [paletteOpen, setPaletteOpen] = React.useState(false);
 
@@ -112,14 +115,6 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   React.useEffect(() => {
     applySurfaceDataset("proseFont", proseFont === "sans" ? "sans" : null);
   }, [proseFont]);
-
-  /** 动效开关：关闭时给根节点打 data-motion="off"，由 globals.css 收敛动画/过渡 */
-  React.useEffect(() => {
-    applySurfaceDataset("motion", editorLayout.motionEnabled ? "on" : "off");
-    return () => {
-      applySurfaceDataset("motion", null);
-    };
-  }, [editorLayout.motionEnabled]);
 
   /* ---------------- 目录树 ---------------- */
 
@@ -716,7 +711,6 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
     <EditorBridgeProvider value={bridge}>
       <div
         className="flex h-full min-h-0 flex-col overflow-hidden bg-paper text-ink"
-        data-motion={editorLayout.motionEnabled ? "on" : "off"}
       >
         {immersive ? null : (
           <EditorHeader
@@ -893,11 +887,13 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
 
           {/* 右栏：AI 协作（仅 ≥1024 内联，窄屏走抽屉） */}
           {showRightInline ? <div role="separator" aria-orientation="vertical" aria-label={tr("拖拽调整右栏宽度")} onPointerDown={rightPanel.onPointerDown} className="w-1 shrink-0 cursor-col-resize border-l border-line bg-surface-2/40 hover:bg-accent-soft" /> : null}
-          {!isWide && drawerRightOpen ? <button type="button" aria-label={tr("关闭助手遮罩")} className="absolute inset-0 z-40 bg-black/30" onClick={()=>setDrawerRightOpen(false)} /> : null}
+          {!isWide && rightDrawerPresent ? <button type="button" {...rightDrawerMotion} aria-label={tr("关闭助手遮罩")} className="yf-backdrop-motion absolute inset-0 z-40 bg-black/30" onClick={()=>setDrawerRightOpen(false)} /> : null}
           {/* Keep one panel mounted across collapse, immersion and responsive layouts. */}
           <aside
+            ref={rightDrawerRef}
+            {...(!isWide ? rightDrawerMotion : {})}
             style={{ width: isWide ? Math.min(rightPanel.width, panelWidth * 0.38) : 440, maxWidth: "100%" }}
-            className={cn("min-h-0 min-w-0 shrink-0 overflow-hidden bg-surface", isWide ? (showRightInline ? "flex" : "hidden") : (drawerRightOpen ? "absolute inset-y-0 right-0 z-50 flex shadow-float" : "hidden"))}
+            className={cn("min-h-0 min-w-0 shrink-0 overflow-hidden bg-surface", isWide ? (showRightInline ? "flex" : "hidden") : (rightDrawerPresent ? "yf-drawer-motion absolute inset-y-0 right-0 z-50 flex shadow-float" : "hidden"))}
             aria-label={tr("AI 协作面板")}
             role={!isWide&&drawerRightOpen?"dialog":undefined}
             aria-modal={!isWide&&drawerRightOpen?true:undefined}

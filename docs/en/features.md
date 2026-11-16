@@ -37,6 +37,7 @@ Writing features:
 - Find and replace in the chapter. Press `Ctrl / ⌘ + F` to open the panel in the lower-right corner of the editor while the formatting toolbar stays in place. Typing highlights matches in place. Use Previous or Next to jump. Press `Ctrl / ⌘ + Z` to undo a replacement and return to the edited passage.
 - The formatting toolbar stays at the top while you scroll the manuscript. `Alt + 1` toggles the outline and `Alt + J` focuses the AI composer.
 - In windowed mode on macOS, drag the empty area at the top of the bookshelf or in the writing desk header to move the Harness window.
+- Menus, dialogs, and narrow-window drawers use brief opening and closing transitions. Turn off interface motion in the editor settings or reduce motion in your system settings.
 - Returning to a chapter in the workbench restores its caret and scroll position. Switching chapters starts a fresh undo history.
 
 ## 4. Notes

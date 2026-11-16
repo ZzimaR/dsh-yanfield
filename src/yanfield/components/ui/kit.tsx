@@ -11,6 +11,7 @@ import { Check, ChevronDown, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/ui/cn";
 import { yanfieldPanelBounds, yanfieldPortal } from "@/lib/ui/portal";
 import { useOnClickOutside, useYanfieldPanelBounds } from "@/lib/ui/hooks";
+import { useOverlayMotion } from "@/lib/ui/overlay-motion";
 import { isInsideComposedPath } from "@/lib/ui/composed";
 import { useT } from "@/lib/i18n";
 
@@ -208,7 +209,8 @@ export function Select({
   const [active, setActive] = React.useState(0);
   const anchorRef = React.useRef<HTMLButtonElement>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
-  const [box, setBox] = React.useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+  const { present, ...motion } = useOverlayMotion(open, menuRef);
+  const [box, setBox] = React.useState<{ top: number; left: number; width: number; maxHeight: number; openUp: boolean } | null>(null);
   const current = options.find((opt) => opt.value === String(value ?? ""));
   const muted = !current;
   const shown = current?.label ?? placeholder ?? tr("请选择");
@@ -237,10 +239,10 @@ export function Select({
     const maxHeight = rows * 32 + 8;
     const top = openUp ? Math.max(8, rect.top - Math.min(menuHeight, maxHeight) - 6) : rect.bottom + 6;
     const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - width - 8));
-    setBox({ top, left, width, maxHeight });
+    setBox({ top, left, width, maxHeight, openUp });
   }, []);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!open) return;
     const selected = options.findIndex((opt) => opt.value === String(value ?? ""));
     setActive(selected >= 0 ? selected : 0);
@@ -328,15 +330,17 @@ export function Select({
         <span className={cn("min-w-0 flex-1 truncate", muted && "text-ink-4")}>{shown}</span>
         <ChevronDown className={cn("size-4 shrink-0 text-ink-3 transition-transform duration-150", open && "rotate-180")} />
       </button>
-      {open
+      {present
         ? createPortal(
             <div
               ref={menuRef}
+              {...motion}
+              data-yf-menu-side={box?.openUp ? "above" : undefined}
               tabIndex={-1}
               role="listbox"
               aria-labelledby={selectId}
               onKeyDown={onMenuKeyDown}
-              className="scroll-thin fixed z-[80] overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-float outline-none rise-in"
+              className="yf-menu-motion scroll-thin fixed z-[80] overflow-y-auto rounded-lg border border-line bg-surface p-1 shadow-float outline-none"
               style={{ top: box?.top ?? -9999, left: box?.left ?? -9999, width: box?.width ?? 168, maxHeight: box?.maxHeight ?? 280 }}
             >
               {placeholder ? (
@@ -697,7 +701,7 @@ function frontOverlay(): Element | undefined {
   let top: Element | undefined;
   let level = -1;
   for (const node of yanfieldPortal().querySelectorAll("[data-yf-overlay]")) {
-    if (!node.getClientRects().length) continue;
+    if (node.closest("[inert]") || !node.getClientRects().length) continue;
     const z = Number(window.getComputedStyle(node).zIndex);
     if (z >= level) {
       top = node;
@@ -724,26 +728,30 @@ export function useOverlayEscape(ref: React.RefObject<HTMLElement | null>, open:
   }, [ref, open, onClose]);
 }
 
-function Overlay({ children, onClose, align = "center", layer = "modal" }: {
+function Overlay({ open, children, onClose, align = "center", layer = "modal" }: {
+  open: boolean;
   children: React.ReactNode;
   onClose: () => void;
   align?: "center" | "left" | "right";
   layer?: "drawer" | "modal";
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
-  useOverlayEscape(ref, true, onClose);
-  const bounds = useYanfieldPanelBounds();
+  const { present, ...motion } = useOverlayMotion(open, ref);
+  useOverlayEscape(ref, open, onClose);
+  const bounds = useYanfieldPanelBounds(open);
+  if (!present) return null;
   const boundsStyle: React.CSSProperties | undefined = bounds
     ? { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, right: "auto", bottom: "auto" }
     : undefined;
   return createPortal(
     <div
       ref={ref}
+      {...motion}
       data-yf-overlay
       className={cn(
-        "fixed inset-0 flex bg-black/35 backdrop-blur-[2px] fade-in",
+        "yf-overlay-motion fixed inset-0 flex bg-black/35 backdrop-blur-[2px]",
         layer === "drawer" ? "z-40" : "z-[70]",
-        align === "center" ? "items-center justify-center overflow-y-auto p-4" : align === "left" ? "justify-start" : "justify-end",
+        align === "center" ? "items-center justify-center overflow-y-auto p-4" : align === "left" ? "justify-start overflow-hidden" : "justify-end overflow-hidden",
       )}
       style={boundsStyle}
       onMouseDown={(event) => {
@@ -770,14 +778,14 @@ export function Dialog({ open, onClose, title, description, footer, width = 560,
   const tr = useT();
   const mounted = useMounted();
   const titleId = React.useId();
-  if (!open || !mounted) return null;
+  if (!mounted) return null;
   return (
-    <Overlay onClose={onClose}>
+    <Overlay open={open} onClose={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className="rise-in w-full rounded-lg border border-line bg-surface shadow-float"
+        className="yf-dialog-motion w-full rounded-lg border border-line bg-surface shadow-float"
         style={{ maxWidth: typeof width === "number" ? `${width}px` : width }}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
@@ -856,14 +864,15 @@ export function Sheet({
 }) {
   const tr = useT();
   const mounted = useMounted();
-  if (!open || !mounted) return null;
+  if (!mounted) return null;
   return (
-    <Overlay onClose={onClose} align={side} layer={layer}>
+    <Overlay open={open} onClose={onClose} align={side} layer={layer}>
       <div
         role="dialog"
         aria-modal="true"
+        data-yf-drawer-side={side}
         className={cn(
-          "flex h-full w-full flex-col bg-surface shadow-float rise-in",
+          "yf-drawer-motion flex h-full w-full flex-col bg-surface shadow-float",
           side === "left" ? "border-r border-line" : "border-l border-line",
         )}
         style={{ maxWidth: typeof width === "number" ? `${width}px` : width }}
@@ -899,10 +908,11 @@ export function Dropdown({
   const [open, setOpen] = React.useState(false);
   const anchorRef = React.useRef<HTMLSpanElement>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
-  const [pos, setPos] = React.useState<{ top: number; left: number } | null>(null);
+  const { present, ...motion } = useOverlayMotion(open, menuRef);
+  const [pos, setPos] = React.useState<{ top: number; left: number; openUp: boolean } | null>(null);
 
   // 菜单用 portal 渲染到 body：避免被 header/滚动容器的 overflow 裁切，也避免 z-index 被父级层级压住
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
       const anchor = anchorRef.current;
@@ -914,10 +924,11 @@ export function Dropdown({
       let left = align === "end" ? rect.right - width : rect.left;
       left = Math.min(Math.max(8, left), Math.max(8, vw - width - 8));
       let top = rect.bottom + 6;
-      if (menuHeight > 0 && top + menuHeight > vh - 8) {
+      const openUp = menuHeight > 0 && top + menuHeight > vh - 8;
+      if (openUp) {
         top = Math.max(8, rect.top - menuHeight - 6);
       }
-      setPos({ top, left });
+      setPos({ top, left, openUp });
     };
     place();
     const frame = window.requestAnimationFrame(place);
@@ -949,11 +960,13 @@ export function Dropdown({
       <span onClick={() => setOpen((v) => !v)} className="inline-flex">
         {trigger}
       </span>
-      {open
+      {present
         ? createPortal(
             <div
               ref={menuRef}
-              className="fixed z-[80] overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-float rise-in"
+              {...motion}
+              data-yf-menu-side={pos?.openUp ? "above" : undefined}
+              className="yf-menu-motion fixed z-[80] overflow-hidden rounded-lg border border-line bg-surface p-1 shadow-float"
               style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width }}
               role="menu"
             >
