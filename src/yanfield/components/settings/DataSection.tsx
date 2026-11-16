@@ -22,6 +22,7 @@ import type { ImportChapterDraft, Novel, SystemInfo } from "@/lib/types";
 import { countWords, formatWords } from "@/lib/ui/cn";
 import { downloadNovelExport } from "@/components/library/utils";
 import type { NovelListResponse } from "@/components/library/types";
+import { BackupSection } from "./BackupSection";
 import { navigateAfterSaving, useEditorSaveGuard } from "@/lib/editor/navigation";
 
 interface ImportTxtResponse {
@@ -37,7 +38,7 @@ type TargetMode = "existing" | "new";
 
 const IMPORT_PREVIEW_LIMIT = 8;
 
-export function DataSection() {
+export function DataSection({ saveSettings }: { saveSettings: () => Promise<void> }) {
   const tr = useT();
   const router = useRouter();
   const { toast } = useToast();
@@ -214,6 +215,8 @@ export function DataSection() {
           {tr("书稿是本地文件：可以整库备份、导出 Markdown，也可以把已有的 TXT 小说导入进来。")}
         </p>
       </div>
+
+      <BackupSection novels={novels} saveSettings={saveSettings} refresh={() => void novelsApi.refresh()} />
 
       <Card className="p-4">
         <h3 className="flex items-center gap-1.5 text-[13px] font-medium text-ink">

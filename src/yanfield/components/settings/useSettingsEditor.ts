@@ -18,6 +18,7 @@ export interface SettingsEditor {
   settings: AppSettings | undefined;
   update: (patch: Partial<AppSettings>) => void;
   saveNow: () => Promise<void>;
+  saveForBackup: () => Promise<void>;
   dirty: boolean;
   saving: boolean;
   saveError: string | null;
@@ -34,7 +35,7 @@ export function useSettingsEditor(server: AppSettings | undefined, setServer: (v
   const [lastSavedAt, setLastSavedAt] = React.useState<number | null>(null);
   const pending = React.useRef<Partial<AppSettings>>({});
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inFlight = React.useRef(false);
+  const inFlight = React.useRef<Promise<void> | null>(null);
   const mounted = React.useRef(true);
   const { toast } = useToast();
 
@@ -55,11 +56,11 @@ export function useSettingsEditor(server: AppSettings | undefined, setServer: (v
       clearTimeout(timer.current);
       timer.current = null;
     }
-    if (inFlight.current || Object.keys(pending.current).length === 0) return;
-    inFlight.current = true;
+    if (inFlight.current) return inFlight.current;
+    if (Object.keys(pending.current).length === 0) return;
     setSaving(true);
     setSaveError(null);
-    try {
+    const operation = (async () => {
       do {
         const patch = pending.current;
         pending.current = {};
@@ -82,8 +83,12 @@ export function useSettingsEditor(server: AppSettings | undefined, setServer: (v
           return;
         }
       } while (!timer.current && Object.keys(pending.current).length > 0);
+    })();
+    inFlight.current = operation;
+    try {
+      await operation;
     } finally {
-      inFlight.current = false;
+      inFlight.current = null;
       if (mounted.current) setSaving(false);
     }
   }, [setServer, toast]);
@@ -102,5 +107,10 @@ export function useSettingsEditor(server: AppSettings | undefined, setServer: (v
     [flush],
   );
 
-  return { settings: local, update, saveNow: flush, dirty, saving, saveError, lastSavedAt };
+  const saveForBackup = React.useCallback(async () => {
+    await flush();
+    if (Object.keys(pending.current).length > 0) throw new Error(t("请先保存设置，再继续备份操作"));
+  }, [flush]);
+
+  return { settings: local, update, saveNow: flush, saveForBackup, dirty, saving, saveError, lastSavedAt };
 }

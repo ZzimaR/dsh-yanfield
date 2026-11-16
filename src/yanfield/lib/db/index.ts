@@ -408,6 +408,18 @@ function readUserVersion(db: DB): number {
   return Number((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version);
 }
 
+/** Scratch database for validating backup rows against the actual schema. */
+export function openBackupDatabase(): DB {
+  const db = new DatabaseSync(":memory:");
+  db.exec(SCHEMA);
+  applySchemaMigrations(db, 0);
+  return db;
+}
+
+export function applySchemaMigrations(db: DB, from: number): void {
+  for (let step = from; step < SCHEMA_VERSION; step += 1) MIGRATIONS[step](db);
+}
+
 const KEEP_MIGRATION_BACKUPS = 3;
 const NEWER_DATABASE_ERROR = "数据库由更新版本的砚田创建，请升级砚田后再打开";
 
@@ -462,7 +474,7 @@ function migrate(db: DB, dbPath: string): void {
     }
     if (version < SCHEMA_VERSION) {
       db.exec(SCHEMA);
-      for (let step = version; step < SCHEMA_VERSION; step += 1) MIGRATIONS[step](db);
+      applySchemaMigrations(db, version);
       db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
     }
     db.exec("COMMIT");

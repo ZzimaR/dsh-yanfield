@@ -147,7 +147,7 @@ export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) 
                   </Button>
                 </div>
               ) : (
-                <SettingsSectionContent active={active} settings={editor.settings} update={editor.update} />
+                <SettingsSectionContent active={active} settings={editor.settings} update={editor.update} saveSettings={editor.saveForBackup} />
               )}
             </div>
           </div>

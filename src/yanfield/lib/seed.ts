@@ -40,12 +40,13 @@ export async function ensureReady(): Promise<void> {
 }
 
 async function initialize(): Promise<void> {
+  const firstRun = !get("SELECT 1 FROM app_settings WHERE key = 'app'");
   repo.ensureBuiltinPresets(BUILTIN_PRESETS);
   ensureDefaultSettings();
   ensureDemoProvider();
   ensureEnvProviders();
   await ensureHarnessProvider();
-  if (repo.listNovels().length === 0) seedDemo();
+  if (firstRun && repo.listNovels().length === 0) seedDemo();
   ready = true;
 }
 

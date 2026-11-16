@@ -54,7 +54,8 @@ Writing features:
 
 - **Import TXT**: detects headings such as "Chapter 12", "Chapter Twelve", "Chapter IV", "Volume Two: The Sea", "Prologue" and "Epilogue" (Chinese 第X章 / 卷 and `1、` numbering also work), previews the chapters, then writes them; about 2000 chapters per import.
 - **Export**: whole novel or a single chapter as Markdown / TXT.
-- **Backup**: open the database folder from Settings → Data, or copy the path.
+- **Export backup**: in Settings → Data, export one, several, or all books. Book backups include outlines, story notes and their order, archives, conversations, and pending changes. A full backup also includes global settings, presets, model service configuration, and writing statistics. Set a password to transfer API keys stored in Yanfield.
+- **Import backup**: preview the file and select books to import as copies. A full backup can also replace your current library and settings. Yanfield saves a database snapshot in the data folder before replacing them.
 
 ## 6. AI assistant
 

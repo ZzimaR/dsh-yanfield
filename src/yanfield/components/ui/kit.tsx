@@ -769,18 +769,20 @@ export interface DialogProps {
 export function Dialog({ open, onClose, title, description, footer, width = 560, children }: DialogProps) {
   const tr = useT();
   const mounted = useMounted();
+  const titleId = React.useId();
   if (!open || !mounted) return null;
   return (
     <Overlay onClose={onClose}>
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         className="rise-in w-full rounded-lg border border-line bg-surface shadow-float"
         style={{ maxWidth: typeof width === "number" ? `${width}px` : width }}
       >
         <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div className="min-w-0">
-            {title ? <h2 className="text-[15px] font-semibold text-ink">{title}</h2> : null}
+            {title ? <h2 id={titleId} className="text-[15px] font-semibold text-ink">{title}</h2> : null}
             {description ? <p className="mt-1 text-[13px] leading-relaxed text-ink-3">{description}</p> : null}
           </div>
           <IconButton label={tr("关闭")} onClick={onClose} size="sm">

@@ -1,5 +1,11 @@
 import type { AiStreamEvent } from "@/lib/types";
 
+let activeStreams = 0;
+
+export function hasActiveAiStreams(): boolean {
+  return activeStreams > 0;
+}
+
 /**
  * 把 AiStreamEvent 异步生成器包装成 SSE Response。
  * 客户端断开会 abort 生成器，从而取消上游模型请求。
@@ -10,6 +16,7 @@ export function sseResponse(run: (signal: AbortSignal) => AsyncGenerator<AiStrea
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      activeStreams++;
       const send = (event: AiStreamEvent) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       };
@@ -22,6 +29,7 @@ export function sseResponse(run: (signal: AbortSignal) => AsyncGenerator<AiStrea
           code: "server",
         });
       } finally {
+        activeStreams--;
         try {
           controller.close();
         } catch {

@@ -1,7 +1,11 @@
-import React, { useEffect } from "react"
+import React, { useEffect, useState } from "react"
 import { ToastProvider } from "@/components/ui/kit"
 import SettingsDialogHost from "@/components/settings/SettingsDialogHost"
 import { EditorSaveGuardProvider } from "@/lib/editor/navigation"
+import { BACKUP_RESTORED_EVENT } from "@/lib/client/api"
+import { clearSessions } from "@/lib/ui/session-cache"
+import { applyUiFont, getStoredUiFont, syncSurfaceTheme } from "@/lib/ui/theme"
+import { resetFloatWindowSize } from "@/components/editor/FloatWindow"
 import { EditorWorkbench } from "@/components/editor/EditorWorkbench"
 import LibraryPage from "@/app/library/page"
 import SettingsPage from "@/app/settings/page"
@@ -35,9 +39,34 @@ function DeskPages() {
 }
 
 export function YanfieldApp() {
+  const [restoreVersion, setRestoreVersion] = useState(0)
+  useEffect(() => {
+    const refreshAfterRestore = () => {
+      clearSessions()
+      resetFloatWindowSize()
+      try {
+        syncSurfaceTheme()
+        applyUiFont(getStoredUiFont(), false)
+      } catch {
+        /* Storage can be disabled by the browser. */
+      }
+      navigate("/library", "replace")
+      setRestoreVersion(version => version + 1)
+    }
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === BACKUP_RESTORED_EVENT) refreshAfterRestore()
+    }
+    window.addEventListener(BACKUP_RESTORED_EVENT, refreshAfterRestore)
+    window.addEventListener("storage", onStorage)
+    return () => {
+      window.removeEventListener(BACKUP_RESTORED_EVENT, refreshAfterRestore)
+      window.removeEventListener("storage", onStorage)
+    }
+  }, [])
+
   return (
     <ToastProvider>
-      <EditorSaveGuardProvider>
+      <EditorSaveGuardProvider key={restoreVersion}>
         <div className="yf-content">
           <DeskPages />
         </div>

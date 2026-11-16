@@ -36,3 +36,7 @@ export function writeSession(key: string, value: unknown): void {
     cache.delete(oldest.value);
   }
 }
+
+export function clearSessions(): void {
+  cache.clear();
+}
