@@ -425,7 +425,7 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
                       <button type="button" onClick={()=>setCollapsed(prev=>new Set([...prev,...parentIds]))} className="hover:text-accent">{tr("全部收起")}</button>
                     </span> : null}
                   </div>
-                  {groupClosed ? null : <div>
+                  {groupClosed ? null : <div className={tree ? "pl-3" : undefined}>
                     {(tree
                       ? worldRows(groupSettings, collapsed).map(({ setting, depth }) => ({
                           entry: entryById.get(setting.id)!,
@@ -470,7 +470,7 @@ export function CodexPanel({ novelId }: CodexPanelProps) {
                               setDrop(current => current?.id === id ? null : current);
                             }
                           }}
-                          style={{ marginLeft: Math.min(depth, 6) * 10, width: `calc(100% - ${Math.min(depth, 6) * 10}px)` }}>
+                          style={{ marginInlineStart: Math.min(depth, 6) * 10 }}>
                           {branch?<button type="button" aria-label={folded ? tr("展开{title}", { title }) : tr("收起{title}", { title })} aria-expanded={!folded}
                             className="mt-1 flex size-5 shrink-0 items-center justify-center rounded text-ink-3 hover:bg-surface-2 hover:text-ink focus-visible:outline-accent"
                             onClick={()=>setCollapsed(prev=>{const next=new Set(prev);if(next.has(entry.data.id))next.delete(entry.data.id);else next.add(entry.data.id);return next;})}>
