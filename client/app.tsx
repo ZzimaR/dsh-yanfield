@@ -2,9 +2,10 @@ import React, { useEffect, useState } from "react"
 import { ToastProvider } from "@/components/ui/kit"
 import SettingsDialogHost from "@/components/settings/SettingsDialogHost"
 import { EditorSaveGuardProvider } from "@/lib/editor/navigation"
-import { BACKUP_RESTORED_EVENT } from "@/lib/client/api"
+import { BACKUP_RESTORED_EVENT, useApi, useDataChanged } from "@/lib/client/api"
 import { clearSessions } from "@/lib/ui/session-cache"
-import { applyUiFont, getStoredUiFont, syncSurfaceTheme } from "@/lib/ui/theme"
+import { applySurfaceDataset, applyUiFont, getStoredUiFont, syncSurfaceTheme } from "@/lib/ui/theme"
+import type { AppSettings } from "@/lib/types"
 import { resetFloatWindowSize } from "@/components/editor/FloatWindow"
 import { EditorWorkbench } from "@/components/editor/EditorWorkbench"
 import LibraryPage from "@/app/library/page"
@@ -38,6 +39,17 @@ function DeskPages() {
   return <LibraryPage />
 }
 
+function InterfaceMotion() {
+  const { data, refresh } = useApi<AppSettings>("/api/settings")
+  const motionEnabled = data?.motionEnabled
+  useDataChanged(refresh, ["settings"])
+  useEffect(() => {
+    applySurfaceDataset("motion", motionEnabled === false ? "off" : null)
+    return () => applySurfaceDataset("motion", null)
+  }, [motionEnabled])
+  return null
+}
+
 export function YanfieldApp() {
   const [restoreVersion, setRestoreVersion] = useState(0)
   useEffect(() => {
@@ -67,6 +79,7 @@ export function YanfieldApp() {
   return (
     <ToastProvider>
       <EditorSaveGuardProvider key={restoreVersion}>
+        <InterfaceMotion />
         <div className="yf-content">
           <DeskPages />
         </div>

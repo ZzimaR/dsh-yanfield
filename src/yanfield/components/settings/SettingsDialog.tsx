@@ -17,6 +17,7 @@ import { applySurfaceDataset } from "@/lib/ui/theme";
 import { cn } from "@/lib/ui/cn";
 import { yanfieldPortal } from "@/lib/ui/portal";
 import { useYanfieldPanelBounds } from "@/lib/ui/hooks";
+import { useOverlayMotion } from "@/lib/ui/overlay-motion";
 import {
   SETTINGS_SECTIONS,
   SettingsSaveStatus,
@@ -40,6 +41,7 @@ export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) 
   const [active, setActive] = React.useState<SettingsSectionKey>("providers");
   const bounds = useYanfieldPanelBounds(open);
   const dialogRef = React.useRef<HTMLDivElement>(null);
+  const { present, ...motion } = useOverlayMotion(open && mounted, dialogRef);
 
   // 由外部事件指定分区打开
   React.useEffect(() => {
@@ -54,14 +56,15 @@ export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) 
 
   useOverlayEscape(dialogRef, open && mounted, onClose);
 
-  if (!open || !mounted) return null;
+  if (!present) return null;
 
   const status = <SettingsSaveStatus editor={editor} />;
   return createPortal(
     <div
       ref={dialogRef}
+      {...motion}
       data-yf-overlay
-      className="@container/settings fixed z-[70] bg-black/35 backdrop-blur-[2px] fade-in"
+      className="yf-overlay-motion @container/settings fixed z-[70] bg-black/35 backdrop-blur-[2px]"
       style={
         bounds
           ? { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height, right: "auto", bottom: "auto" }
@@ -71,12 +74,12 @@ export function SettingsDialog({ open, onClose, section }: SettingsDialogProps) 
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="pointer-events-none flex h-full justify-center @min-[720px]/settings:items-center @min-[720px]/settings:p-6">
+      <div className="yf-dialog-motion pointer-events-none flex h-full justify-center @min-[720px]/settings:items-center @min-[720px]/settings:p-6">
         <div
           role="dialog"
           aria-modal="true"
           aria-label={tr("设置")}
-          className="rise-in pointer-events-auto flex h-full w-full flex-col overflow-hidden border-line bg-surface shadow-float @min-[720px]/settings:h-[82%] @min-[720px]/settings:max-w-5xl @min-[720px]/settings:rounded-xl @min-[720px]/settings:border"
+          className="pointer-events-auto flex h-full w-full flex-col overflow-hidden border-line bg-surface shadow-float @min-[720px]/settings:h-[82%] @min-[720px]/settings:max-w-5xl @min-[720px]/settings:rounded-xl @min-[720px]/settings:border"
         >
           <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
             <div className="flex min-w-0 items-center gap-2">

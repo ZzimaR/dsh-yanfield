@@ -13,6 +13,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { yanfieldPortal } from "@/lib/ui/portal";
+import { useOverlayMotion } from "@/lib/ui/overlay-motion";
 import {
   Check,
   ChevronDown,
@@ -37,6 +38,7 @@ const OPEN_SETTINGS_EVENT = "yanfield:open-settings";
 const KIND_LABEL: Record<ProviderConfig["kind"], string> = {
   deepseek: "DeepSeek",
   demo: "离线演示",
+  harness: "DeepSeek Harness",
 };
 
 export interface ModelPickerProps {
@@ -65,7 +67,7 @@ export function ModelPicker({
   const { toast } = useToast();
   const tr = useT();
   const [open, setOpen] = React.useState(false);
-  const [pos, setPos] = React.useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = React.useState<{ top: number; left: number; below: boolean } | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   /** 弹层打开时实时拉取的 Provider 列表（避免父级缓存过期） */
@@ -73,9 +75,10 @@ export function ModelPicker({
   const [fetched, setFetched] = React.useState(false);
   const anchorRef = React.useRef<HTMLSpanElement | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
+  const { present, ...motion } = useOverlayMotion(open, menuRef);
 
   const groups = React.useMemo(
-    () => (liveProviders ?? providers ?? []).filter((provider) => provider.enabled),
+    () => (liveProviders ?? providers ?? []).filter((provider) => provider.enabled && provider.available !== false),
     [liveProviders, providers],
   );
   const realProviders = React.useMemo(
@@ -99,7 +102,9 @@ export function ModelPicker({
     ? tr("未配置模型")
     : target.providerKind === "demo"
       ? tr("离线演示 · {model}", { model: target.model })
-      : tr("DeepSeek · {model}", { model: shortModel(target.model) });
+      : target.model.startsWith("deepseek-")
+        ? tr("DeepSeek · {model}", { model: shortModel(target.model) })
+        : tr(target.modelLabel);
 
   /** 当前模型是否仍存在于已启用 Provider 列表中 */
   const currentInList = React.useMemo(() => {
@@ -143,7 +148,7 @@ export function ModelPicker({
   }, [open]);
 
   /* 弹层定位：下方空间足够优先向下，否则向上；跟随滚动 / 缩放重算 */
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (!open) return;
     const place = () => {
       const anchor = anchorRef.current;
@@ -158,7 +163,7 @@ export function ModelPicker({
       const below = spaceBelow >= menuHeight + 16 || spaceBelow >= spaceAbove;
       let top = below ? rect.bottom + 8 : rect.top - menuHeight - 8;
       top = Math.min(Math.max(8, top), Math.max(8, vh - menuHeight - 8));
-      setPos({ top, left });
+      setPos({ top, left, below });
     };
     place();
     const frame = window.requestAnimationFrame(place);
@@ -168,18 +173,20 @@ export function ModelPicker({
       setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      event.preventDefault();
+      setOpen(false);
     };
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keydown", onKeyDown, true);
     return () => {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
       document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keydown", onKeyDown, true);
     };
   }, [open]);
 
@@ -221,6 +228,7 @@ export function ModelPicker({
         });
         onChanged(updated);
         notifyDataChanged("settings");
+        notifyDataChanged("providers");
         toast({
           title: tr("默认模型已切换"),
           description: `${tr(provider.name)} / ${tr(model.label) || model.id}`,
@@ -288,13 +296,15 @@ export function ModelPicker({
         <ChevronDown className="size-2.5 shrink-0 opacity-70" />
       </button>
 
-      {open
+      {present
         ? createPortal(
             <div
               ref={menuRef}
+              {...motion}
+              data-yf-menu-side={pos?.below === false ? "above" : undefined}
               role="dialog"
               aria-label={tr("选择默认模型")}
-              className="fixed z-[90] max-h-[calc(100dvh-16px)] overflow-y-auto rounded-md border border-line bg-surface text-ink shadow-float rise-in"
+              className="yf-menu-motion fixed z-[90] max-h-[calc(100dvh-16px)] overflow-y-auto rounded-md border border-line bg-surface text-ink shadow-float"
               style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: MENU_WIDTH }}
             >
               <div className="flex items-baseline justify-between gap-2 border-b border-line px-3 py-2">

@@ -172,6 +172,7 @@ export function AppShell({
       </div>
 
       <div className={cn("flex min-w-0 flex-1 flex-col", flush ? "h-dvh overflow-hidden" : "pt-12 md:pt-0")}>
+        {active === "library" && <div className="yf-library-drag" aria-hidden="true" />}
         {novelId ? (
           <header className="sticky top-12 z-20 border-b border-line bg-paper/90 backdrop-blur md:top-0">
             <div className="flex h-12 items-center gap-2 px-3 md:px-5">

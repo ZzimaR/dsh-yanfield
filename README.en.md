@@ -73,9 +73,10 @@ Where the model comes from (`Settings → Model services`):
 | --- | --- | --- |
 | DSH account sign-in | Signed in to DeepSeek inside Harness | Recommended, zero setup, balance readable |
 | Official API key | `DEEPSEEK_API_KEY` | Pay per token; can also be stored on Harness' model page |
+| Custom DSH model | Configure the API under Settings → Models in DSH | Connects to LM Studio, vLLM, or llama.cpp |
 | Offline demo | Nothing | Template text only, for trying the UI; cannot really edit |
 
-Both real routes can be switched in Settings; an unavailable route explains why (not signed in / no key).
+Pick a model in Yanfield's Model services or in the writing assistant. Models are grouped by DSH route.
 
 ## Features
 
@@ -108,7 +109,7 @@ Both real routes can be switched in Settings; an unavailable route explains why 
 
 ## AI and cost
 
-- **Models** — by default the DeepSeek account already signed in to Harness; you can switch to an official API key. Both routes live in `Settings → Model services` with availability and reasons.
+- **Models** — models from all available DSH routes appear in both `Settings → Model services` and the writing assistant. See [AI and cost](docs/en/ai-and-cost.md) for LM Studio, vLLM, and llama.cpp setup.
 - **Catalog** — `deepseek-flash` (DeepSeek-V4.1-Flash, text and images) and `deepseek-v4-pro` (DeepSeek-V4-Pro, text only), roughly 1M tokens of context each; new models registered in Harness are synced automatically.
 - **Balance** — the **Balance** button under the composer queries the signed-in DSH account, no key needed.
 - **Cost** — the footer shows *today's* cumulative estimate, not a single task. Unit prices come from a built-in DeepSeek price table and switch between peak and off-peak by Beijing time (peak: weekdays 09:00–12:00 and 14:00–18:00; everything else, including weekends and public holidays, is off-peak at half price). **Estimates only — the DeepSeek bill is authoritative.**
@@ -143,7 +144,7 @@ Make sure you fully quit and restarted Harness (a page refresh is not enough), t
 <details>
 <summary>"no API key" / model unavailable</summary>
 
-The active route is the official API key route but no key is stored. Switch the route back to "DeepSeek account" in `Yanfield → Settings → Model services`, or store `DEEPSEEK_API_KEY` on Harness' model page.
+The selected model uses the official API key route, which needs a credential. Pick a model in the DeepSeek account group in Yanfield or enter the API key under Settings → Models in DSH.
 </details>
 
 <details>
@@ -203,7 +204,7 @@ See [development](docs/en/development.md) for the build chain and local testing,
 
 ## Credits
 
-The interface and domain logic come from [Yanfield](https://github.com/ZzimaR/Yanfield). This repository is its DeepSeek Harness plugin edition: models come from Harness, the theme follows the Harness light/dark setting, and multi-provider support is replaced by the two DeepSeek routes (DSH account / official API key).
+The interface and domain logic come from [Yanfield](https://github.com/ZzimaR/Yanfield). This DeepSeek Harness plugin edition uses the model services and light or dark theme configured in Harness.
 
 ## License
 

@@ -80,5 +80,22 @@ export type ToolName = keyof typeof definitions
 export const agentTools = (Object.keys(definitions) as ToolName[]).map(name => {
   const [schema, description] = definitions[name]
   const { $schema, ...parameters } = z.toJSONSchema(schema, { target: "draft-7", io: "input" })
-  return { name, description, parameters }
+  if (name !== "edit_prose") return { name, description, parameters }
+
+  // Some OpenAI-compatible servers require top-level object properties even for a discriminated union.
+  const modes = parameters.oneOf ?? []
+  const required = modes[0]?.required?.filter(field => modes.every(mode => mode.required?.includes(field)))
+  return {
+    name,
+    description,
+    parameters: {
+      ...parameters,
+      type: "object",
+      properties: {
+        ...Object.assign({}, ...modes.map(mode => mode.properties)),
+        mode: { type: "string", enum: proseSchema.options.map(option => option.shape.mode.value) },
+      },
+      required,
+    },
+  }
 })

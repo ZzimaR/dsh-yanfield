@@ -19,7 +19,7 @@ export const editor: Record<string, TranslateValue> = {
   "{status} · 点击查看档案": "{status} · click to view the archive",
   "{title} · {status} · 双击重命名": "{title} · {status} · double-click to rename",
   "{words} 字": "{words} words",
-  "「保留 / 还原」逐段生效：点完「确认审阅结果」后只写入保留的段落，其余保持原文。": "“Keep / Revert” applies paragraph by paragraph: after you confirm the review, only the kept paragraphs are written back and the rest stay as they were.",
+  "「全部保留」会直接写入修订。逐段选择后，点「确认审阅结果」写入保留的段落。": "Keep all saves the entire revision immediately. To review paragraph by paragraph, make your choices and click Confirm review to save the paragraphs you kept.",
   "上一个": "Previous",
   "上一个 (Shift+Enter)": "Previous (Shift+Enter)",
   "上一处": "Previous change",

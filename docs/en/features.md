@@ -36,7 +36,8 @@ Writing features:
 - Typography: serif or sans, size, weight, line height, letter spacing, paragraph spacing, margins, max line width, with a live preview.
 - Find and replace in the chapter. Press `Ctrl / ⌘ + F` to open the panel in the lower-right corner of the editor while the formatting toolbar stays in place. Typing highlights matches in place. Use Previous or Next to jump. Press `Ctrl / ⌘ + Z` to undo a replacement and return to the edited passage.
 - The formatting toolbar stays at the top while you scroll the manuscript. `Alt + 1` toggles the outline and `Alt + J` focuses the AI composer.
-- In windowed mode on macOS, drag an empty area of the writing desk header to move the Harness window.
+- In windowed mode on macOS, drag the empty area at the top of the bookshelf or in the writing desk header to move the Harness window.
+- Menus, dialogs, and narrow-window drawers use brief opening and closing transitions. Turn off interface motion in the editor settings or reduce motion in your system settings.
 - Returning to a chapter in the workbench restores its caret and scroll position. Switching chapters starts a fresh undo history.
 
 ## 4. Notes
@@ -90,15 +91,15 @@ Review flow:
 
 1. Prose proposals show a word delta such as `319 → 338 words (+19)`. Note proposals start as clickable names. Open one to see field differences and source passages, or to apply or discard that item. Linked fields such as **Parent place** show the linked item's name. Use the checkboxes next to the names to select notes to apply together. Open **Activity log** to see tools and materials read.
 2. The prose area opens the review at the first change. Deletions appear crossed out in red, and insertions are highlighted in green. Use **Go to change** for a single change, or **Previous change** and **Next change** to move between changes.
-3. For each paragraph press **Keep** or **Revert**; **Revert all** / **Keep all** are also available.
-4. Press **Confirm review** — only kept paragraphs are written; undecided paragraphs keep the original text.
+3. **Keep all** saves the entire revision immediately. **Revert all** discards it.
+4. To review paragraph by paragraph, select **Keep** or **Revert**, then click **Confirm review**. Undecided paragraphs keep their original text. After closing a pending review, you can reopen it from the proposal card in the conversation.
 5. After applying you can **Undo this round** or open the **change history**.
 
 When prose is selected, a revision replaces only the selected text in the current chapter. You can also quote a unique passage to request a local edit and keep the surrounding text and formatting. Automatically suggested note changes start unchecked, with a quotation for each suggested field. If the quotation is already in the saved chapter, you can apply the note on its own. If the quotation appears only in the draft, keep the cited passage first or apply the prose and note together. You can request separate edits to personality, speech style, and long-term goals.
 
 ## 7. Settings
 
-- **Model services**: add / edit / enable / delete services, switch model route (DSH account / official API key), query balance, default model, sync model list.
+- **Model services** syncs the DSH model catalog, groups default-model options by route, and lets you check your DeepSeek balance. LM Studio, vLLM, and llama.cpp connect through a [custom DSH model route](ai-and-cost.md).
 - **Prompt presets**: opens to custom presets. View or duplicate built-in templates and manage your own prompts for specific shortcuts and editor panels.
 - **Persona**: assistant identity and limits.
 - **AI & context**: context section toggles, context budget, max output, usage and cost (three unit prices, one-click official prices, daily and total stats), custom instructions.

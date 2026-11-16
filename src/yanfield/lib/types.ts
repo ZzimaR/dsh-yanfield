@@ -542,6 +542,9 @@ export interface ProviderConfig {
   apiKey: string;
   models: ModelOption[];
   enabled: boolean;
+  /** Live DSH route status, attached when listing providers. */
+  available?: boolean;
+  unavailableReason?: string;
   createdAt: string;
   updatedAt: string;
 }

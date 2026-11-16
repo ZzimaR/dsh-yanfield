@@ -158,7 +158,7 @@ export default function LibraryPage() {
 
   return (
     <AppShell active="library">
-      <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">
+      <div className="yf-library-body mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-ink-3">Library</p>

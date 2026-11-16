@@ -563,9 +563,16 @@ async function* streamHarness(request: CompletionRequest): AsyncGenerator<Provid
         const index = typeof chunk.index === "number" ? chunk.index : 0;
         const call = functionCalls.get(index) || { id: "", name: "", arguments: "" };
         if (typeof chunk.id === "string") call.id ||= chunk.id;
-        if (typeof chunk.name === "string") call.name += chunk.name;
+        // Harness sends the complete name as metadata, including on repeated deltas.
+        if (typeof chunk.name === "string" && chunk.name) call.name = chunk.name;
         if (typeof chunk.argumentsDelta === "string") call.arguments += chunk.argumentsDelta;
         functionCalls.set(index, call);
+      } else if (chunk.type === "block-end" && typeof chunk.index === "number") {
+        const block = asRecord(chunk.block);
+        if (block?.type === "tool-call" && typeof block.id === "string" &&
+            typeof block.name === "string" && typeof block.arguments === "string") {
+          functionCalls.set(chunk.index, { id: block.id, name: block.name, arguments: block.arguments });
+        }
       } else if (chunk.type === "usage" && chunk.usage && typeof chunk.usage === "object") {
         const usage = chunk.usage as Record<string, unknown>;
         const inputTokens = numberField(usage, "inputTokens") ?? numberField(usage, "uncachedInputTokens") ?? numberField(usage, "promptTokens") ?? 0;

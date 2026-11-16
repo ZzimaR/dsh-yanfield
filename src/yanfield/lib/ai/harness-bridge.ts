@@ -51,7 +51,7 @@ export interface HarnessBridge {
   defaultModel(): string
   listProviders(): { id: string; name: string }[]
   discoverModels(route: string): Promise<HarnessModel[]>
-  /** 列出所有可选路由及各自可用模型，供设置页做「账号登录 / 官方 Key」切换。 */
+  /** 列出宿主的模型路由、目录和就绪状态。 */
   listRoutes?(): Promise<HarnessRouteOption[]>
   stream(input: HarnessStreamInput): AsyncIterable<unknown>
   /**

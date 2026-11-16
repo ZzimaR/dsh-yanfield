@@ -7,6 +7,7 @@ import { IconButton, useOverlayEscape } from "@/components/ui/kit";
 import { cn } from "@/lib/ui/cn";
 import { yanfieldPanelBounds, yanfieldPortal } from "@/lib/ui/portal";
 import { useYanfieldPanelBounds } from "@/lib/ui/hooks";
+import { useOverlayMotion } from "@/lib/ui/overlay-motion";
 import { useT } from "@/lib/i18n";
 
 /** 浮窗与视口边缘的最小间距 */
@@ -124,6 +125,15 @@ export function FloatWindow({
   const [size, setSize] = React.useState<FloatWindowSize | null>(null);
   const [restore, setRestore] = React.useState<{ pos: typeof pos; size: FloatWindowSize | null } | null>(null);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const { present, ...motion } = useOverlayMotion(open, rootRef);
+  const lastContent = React.useRef({ title, minimized, children, footer });
+  const content = open ? { title, minimized, children, footer } : {
+    ...lastContent.current,
+    children: React.Children.toArray(children).length ? children : lastContent.current.children,
+  };
+  useIsomorphicLayoutEffect(() => {
+    if (open) lastContent.current = { title, minimized, children, footer };
+  }, [open, title, minimized, children, footer]);
   useOverlayEscape(rootRef, open, onClose);
   const dragRef = React.useRef<{ pointerX: number; pointerY: number; originX: number; originY: number } | null>(null);
   const resizeRef = React.useRef<{
@@ -202,7 +212,7 @@ export function FloatWindow({
     return () => observer.disconnect();
   }, [open, clampNow]);
 
-  if (!open || typeof document === "undefined") return null;
+  if (!present || typeof document === "undefined") return null;
 
   const toggleSize = () => {
     if (restore) {
@@ -294,20 +304,21 @@ export function FloatWindow({
   return createPortal(
     <div
       ref={rootRef}
+      {...motion}
       role="dialog"
       data-yf-overlay
-      aria-label={title}
+      aria-label={content.title}
       onPointerDownCapture={bringToFront}
       onFocusCapture={bringToFront}
       className={cn(
-        "fixed z-50 flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-float fade-in data-yf-front-float:z-[51]",
+        "yf-window-motion fixed z-50 flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-float data-yf-front-float:z-[51]",
         className,
       )}
       style={{
         left: pos.x,
         top: pos.y,
         width: size?.width ?? (bounds ? Math.max(MIN_WIDTH, Math.min(DEFAULT_WIDTH, bounds.width / 2)) : DEFAULT_WIDTH),
-        height: minimized ? undefined : size?.height,
+        height: content.minimized ? undefined : size?.height,
         maxWidth: bounds ? bounds.width - VIEWPORT_SIZE_GUTTER : "calc(100vw - 24px)",
         maxHeight: bounds ? Math.min(size ? bounds.height : 760, bounds.height - VIEWPORT_SIZE_GUTTER) : "calc(100vh - 24px)",
       }}
@@ -320,12 +331,12 @@ export function FloatWindow({
         onPointerCancel={onPointerUp}
         onLostPointerCapture={onPointerUp}
       >
-        <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{title}</p>
-        <span className="shrink-0 text-[11px] text-ink-4">{minimized ? tr("已最小化") : tr("拖动")}</span>
-        {!minimized ? <IconButton label={restore ? tr("还原窗口大小") : tr("放大窗口")} size="sm" onClick={toggleSize}>
+        <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{content.title}</p>
+        <span className="shrink-0 text-[11px] text-ink-4">{content.minimized ? tr("已最小化") : tr("拖动")}</span>
+        {!content.minimized ? <IconButton label={restore ? tr("还原窗口大小") : tr("放大窗口")} size="sm" onClick={toggleSize}>
           {restore ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
         </IconButton> : null}
-        <IconButton label={minimized ? tr("展开") : tr("最小化")} size="sm" onClick={() => onMinimizedChange(!minimized)}>
+        <IconButton label={content.minimized ? tr("展开") : tr("最小化")} size="sm" onClick={() => onMinimizedChange(!minimized)}>
           <Minus className="size-3.5" />
         </IconButton>
         <IconButton label={tr("关闭")} size="sm" onClick={onClose}>
@@ -333,12 +344,12 @@ export function FloatWindow({
         </IconButton>
       </div>
       {/* 最小化时只隐藏内容，保持子组件挂载，展开后未保存的草稿仍在 */}
-      <div className={cn("flex min-h-0 flex-1 flex-col", minimized && "hidden")}>
-        <div className="yf-reference-document scroll-thin min-h-0 flex-1 overflow-y-auto">{children}</div>
-        {footer ? <div className="border-t border-line py-3 pl-5 pr-7">{footer}</div> : null}
+      <div className={cn("flex min-h-0 flex-1 flex-col", content.minimized && "hidden")}>
+        <div className="yf-reference-document scroll-thin min-h-0 flex-1 overflow-y-auto">{content.children}</div>
+        {content.footer ? <div className="border-t border-line py-3 pl-5 pr-7">{content.footer}</div> : null}
       </div>
       {/* 右下角缩放把手：同时调整宽高；最小化时隐藏（内容已收起，无高度可调） */}
-      {minimized ? null : (
+      {content.minimized ? null : (
         <button
           type="button"
           aria-label={tr("调整窗口大小")}

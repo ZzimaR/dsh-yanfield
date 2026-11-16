@@ -454,10 +454,69 @@ html[data-prose-font="sans"] .prose-paper,
   display: none;
 }
 
+/* ---------- 菜单、弹窗与抽屉 ---------- */
+.yf-menu-motion,
+.yf-window-motion,
+.yf-overlay-motion > .yf-dialog-motion,
+.yf-drawer-motion,
+.yf-overlay-motion > .yf-drawer-motion {
+  translate: 0 0;
+  transition-property: var(--yf-overlay-transition, opacity, translate);
+  transition-duration: var(--yf-open-duration, 180ms);
+  transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.yf-menu-motion {
+  --yf-open-duration: 140ms;
+  --yf-close-duration: 100ms;
+  --yf-offset: 0 -4px;
+}
+.yf-menu-motion[data-yf-menu-side="above"] { --yf-offset: 0 4px; }
+.yf-window-motion,
+.yf-dialog-motion {
+  --yf-offset: 0 5px;
+}
+.yf-drawer-motion {
+  --yf-open-duration: 200ms;
+  --yf-close-duration: 160ms;
+  --yf-offset: 100% 0;
+}
+.yf-drawer-motion[data-yf-drawer-side="left"] { --yf-offset: -100% 0; }
+.yf-overlay-motion,
+.yf-backdrop-motion {
+  transition: var(--yf-overlay-transition, opacity) 180ms ease-out;
+}
+.yf-menu-motion[data-yf-motion-state="closed"],
+.yf-window-motion[data-yf-motion-state="closed"],
+.yf-drawer-motion[data-yf-motion-state="closed"],
+.yf-overlay-motion[data-yf-motion-state="closed"],
+.yf-backdrop-motion[data-yf-motion-state="closed"] {
+  opacity: 0;
+}
+.yf-menu-motion[data-yf-motion-state="closed"],
+.yf-window-motion[data-yf-motion-state="closed"],
+.yf-drawer-motion[data-yf-motion-state="closed"],
+.yf-overlay-motion[data-yf-motion-state="closed"] > :is(.yf-dialog-motion, .yf-drawer-motion) {
+  translate: var(--yf-offset);
+  transition-duration: var(--yf-close-duration, 140ms);
+}
+.yf-overlay-motion[data-yf-motion-state="closed"] { transition-duration: 160ms; }
+.yf-backdrop-motion[data-yf-motion-state="closed"] { transition-duration: 140ms; }
+
+@starting-style {
+  :is(.yf-menu-motion, .yf-window-motion, .yf-drawer-motion, .yf-overlay-motion, .yf-backdrop-motion)[data-yf-motion-state="open"] {
+    opacity: 0;
+  }
+  :is(.yf-menu-motion, .yf-window-motion, .yf-drawer-motion)[data-yf-motion-state="open"],
+  .yf-overlay-motion[data-yf-motion-state="open"] > :is(.yf-dialog-motion, .yf-drawer-motion) {
+    translate: var(--yf-offset);
+  }
+}
+
 /* ---------- 减少动效（设置里关闭「界面动效」时） ---------- */
 [data-motion="off"] *,
 [data-motion="off"] *::before,
 [data-motion="off"] *::after {
+  --yf-overlay-transition: none;
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
@@ -467,6 +526,7 @@ html[data-prose-font="sans"] .prose-paper,
   *,
   *::before,
   *::after {
+    --yf-overlay-transition: none;
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;

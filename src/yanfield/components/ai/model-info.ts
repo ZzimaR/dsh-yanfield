@@ -114,7 +114,7 @@ export function describeModelTarget(
     maxOutputTokens: typeof chosen.maxOutputTokens === "number" && chosen.maxOutputTokens > 0
       ? Math.round(chosen.maxOutputTokens)
       : null,
-    ready: true,
+    ready: provider.available !== false,
   };
 }
 

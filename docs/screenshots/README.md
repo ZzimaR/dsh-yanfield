@@ -8,14 +8,14 @@ Screenshots in this directory are used by the READMEs and docs. The `en-*` files
 | `en-chapter-outline.png` | Chapter outline coverage and pacing indicators in the English light theme |
 | `en-library.png` | Bookshelf in English: book cards, covers, genres, word counts |
 | `en-editor.png` | Three-column writing desk in English: contents, prose, AI panel |
-| `en-settings.png` | Settings → Model services in English |
+| `en-settings.png` | Settings → Model services in English, with an example custom DSH route |
 | `yanfield-in-dsh.gif` | 24-second DSH walkthrough (recorded in Chinese): shelf, desk, outline, codex, archives, context preview, reviewing and reverting an example edit, model routes |
 | `dsh-workspace.jpg` | Marketplace hero image with the DSH sidebar |
 | `market-icon.png` | 192×192 marketplace icon rasterized from `icon.svg` |
 | `workspace.png` | Writing desk (rice-paper theme) |
 | `library.png` | Bookshelf (Chinese UI) |
 | `review-light.png` | Prose review: green insertions, red deletions, keep or revert per paragraph |
-| `settings-models.png` | Settings → Model services (Chinese UI) |
+| `settings-models.png` | Settings → Model services in Chinese, with an example custom DSH route |
 | `workspace-dark.png` | Writing desk (night-sail theme) |
 | `task-card.png` | AI task card with candidate prose and field-by-field note changes |
 

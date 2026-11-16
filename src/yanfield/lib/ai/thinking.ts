@@ -1,4 +1,5 @@
 import type { AppSettings, ModelOption, ProviderConfig, ThinkingEffort } from "@/lib/types";
+import { harnessRouteOf } from "./harness-bridge";
 
 export const THINKING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max", "ultra"] as const;
 export type ThinkingLevel = "default" | "off" | ThinkingEffort;
@@ -12,9 +13,10 @@ type ThinkingProvider = Pick<ProviderConfig, "kind"> & {baseUrl?: string; models
 function host(provider: ThinkingProvider) {
   try { return new URL(provider.baseUrl || "").hostname; } catch { return ""; }
 }
-/** 砚田只做 DeepSeek：官方地址或 DeepSeek 类型的 Provider 一律按 DeepSeek 思考协议处理。 */
 function isDeepSeek(provider: ThinkingProvider) {
-  return provider.kind === "deepseek" || provider.kind === "harness" || host(provider) === "api.deepseek.com";
+  const route = provider.kind === "harness" ? harnessRouteOf(provider.baseUrl) : null;
+  return provider.kind === "deepseek" || host(provider) === "api.deepseek.com" ||
+    route === "deepseek" || route === "deepseek-account" || route === "deepseek-official";
 }
 /** Missing metadata stays unknown; DeepSeek providers fall back to its documented levels. */
 export function thinkingProfile(provider: ThinkingProvider, model: string) {

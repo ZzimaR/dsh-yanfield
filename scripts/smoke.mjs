@@ -21,9 +21,11 @@ if (plugin.name !== "dsh-yanfield" || typeof plugin.apply !== "function") {
 }
 
 let modelWindow = 32000
+let localRoute = false
 let toolSequence = 0
 const scriptedReplies = []
 const outputLimits = []
+const requestedRoutes = []
 const ctx = {
   get(name) {
     if (name === "connection") return { requestRejection: () => null }
@@ -32,9 +34,12 @@ const ctx = {
   },
   deepseekAccount: { getState: async () => ({ status: "signed-out" }) },
   llm: {
-    listProviders: () => [{ id: "deepseek-account" }, { id: "deepseek-official" }],
-    listModels: async () => [{ id: "deepseek-flash", label: "烟测模型", contextWindow: modelWindow }],
-    async *stream({ maxTokens, messages, tools }) {
+    listProviders: () => [{ id: "deepseek-account" }, { id: "deepseek-official" }, ...(localRoute ? [{ id: "lmstudio" }] : [])],
+    listModels: async (route) => route === "lmstudio"
+      ? [{ id: "local-qwen", label: "Local Qwen", contextWindow: 32512 }]
+      : [{ id: "deepseek-flash", label: "烟测模型", contextWindow: modelWindow }],
+    async *stream({ provider, model, maxTokens, messages, tools }) {
+      requestedRoutes.push({ provider, model })
       const scripted = scriptedReplies.shift()
       if (scripted !== undefined) {
         const value = typeof scripted === "function" ? await scripted(messages, tools) : scripted
@@ -45,8 +50,19 @@ const ctx = {
           for (const [index, call] of (value.calls ?? (value.name ? [value] : [])).entries()) {
             const argumentsText = call.input ?? JSON.stringify(call.args)
             const id = `native-${++toolSequence}`
-            yield { type: "tool-call-delta", index, id, name: call.name, argumentsDelta: argumentsText.slice(0, 15) }
-            yield { type: "tool-call-delta", index, argumentsDelta: argumentsText.slice(15) }
+            yield {
+              type: "tool-call-delta", index, id,
+              ...(!call.finalBlock ? { name: call.name } : {}),
+              argumentsDelta: argumentsText.slice(0, 15),
+            }
+            yield {
+              type: "tool-call-delta", index,
+              ...(call.repeatMetadata ? { id, name: call.name } : {}),
+              argumentsDelta: argumentsText.slice(15),
+            }
+            if (call.finalBlock) {
+              yield { type: "block-end", index, block: { type: "tool-call", id, name: call.name, arguments: argumentsText } }
+            }
           }
         } else if (value) yield { type: "text-delta", text: value }
         yield { type: "finish", reason: { kind: value?.finish ?? "stop" } }
@@ -125,6 +141,16 @@ try {
   modelWindow = 64000
   const synced = (await api("GET", "/providers")).data.items.find((item) => item.id === harness.id)
   assert.equal(synced.models[0].contextWindow, 64000)
+  const account = providers.data.items.find(item => item.baseUrl === "harness:deepseek-account")
+  assert.equal(account.available, false)
+  localRoute = true
+  const catalogs = await Promise.all([api("GET", "/providers"), api("GET", "/providers")])
+  const local = catalogs[0].data.items.find(item => item.baseUrl === "harness:lmstudio")
+  assert.equal(local.models[0].contextWindow, 32512)
+  assert(local.available)
+  for (const catalog of catalogs) {
+    assert.deepEqual(catalog.data.items.filter(item => item.baseUrl === "harness:lmstudio").map(item => item.id), [local.id])
+  }
 
   assert.equal((await api("PATCH", "/settings", { defaultContext: { contextBudget: 12000 } })).status, 200)
   assert.equal((await api("PATCH", "/settings", { defaultContext: { contextBudget: 2000001 } })).status, 400)
@@ -134,19 +160,44 @@ try {
   assert.equal((await api("GET", "/settings")).data.defaultContext.contextBudget, 12000)
   assert.equal((await api("GET", "/providers/harness")).data.current, "harness:deepseek-official")
 
-  async function runAgent(maxTokens) {
+  async function runAgent(maxTokens, expectedError) {
     const result = await call("POST", "/yanfield/api/ai/agent", JSON.stringify({
       novelId: novel.id, message: "烟测任务", context: { maxTokens },
     }))
     assert.equal(result.status, 200)
-    return result.body.split(/\r?\n/).filter(line => line.startsWith("data: "))
-      .map(line => JSON.parse(line.slice(6))).findLast(event => event.type === "done")?.usage
+    const events = result.body.split(/\r?\n/).filter(line => line.startsWith("data: "))
+      .map(line => JSON.parse(line.slice(6)))
+    if (expectedError) {
+      const run = events.findLast(event => event.type === "agent")?.run
+      assert.equal(run?.status, "error")
+      assert.equal(run?.error, expectedError)
+    }
+    return events.findLast(event => event.type === "done")?.usage
   }
   const usage = await runAgent(3000)
   assert.deepEqual(outputLimits, [3000, 3000])
   assert.equal(usage.totalTokens, 5600, "截断的调用也应计入用量")
   await runAgent(1000)
   assert.deepEqual(outputLimits, [3000, 3000, 1000])
+  const localSelection = { providerId: local.id, model: "local-qwen" }
+  assert.equal((await api("PATCH", "/settings", { models: { chat: localSelection, prose: localSelection } })).status, 200)
+  scriptedReplies.push("Local route")
+  await runAgent(1000)
+  assert.deepEqual(requestedRoutes.at(-1), { provider: "lmstudio", model: "local-qwen" })
+  localRoute = false
+  const requestsBeforeRemoval = requestedRoutes.length
+  await runAgent(1000, "宿主没有注册当前路由")
+  assert.equal(requestedRoutes.length, requestsBeforeRemoval, "路由移除后不能向失效路由或其他模型发请求")
+  const unavailableLocal = (await api("GET", "/providers")).data.items.find(item => item.id === local.id)
+  assert.equal(unavailableLocal.available, false)
+  localRoute = true
+  assert.equal((await api("GET", "/providers")).data.items.find(item => item.id === local.id).available, true)
+  scriptedReplies.push("Local route restored")
+  await runAgent(1000)
+  assert.deepEqual(requestedRoutes.at(-1), { provider: "lmstudio", model: "local-qwen" })
+  const officialSelection = { providerId: harness.id, model: "deepseek-flash" }
+  assert.equal((await api("PATCH", "/settings", { models: { chat: officialSelection, prose: officialSelection } })).status, 200)
+  assert.equal((await api("GET", "/providers/harness")).data.current, "harness:deepseek-official")
 
   const novelId = novel.id
   const tool = (name, args) => ({ name, args })
@@ -236,20 +287,21 @@ try {
   assert.deepEqual(retriedThought.thoughts.map(thought => thought.text), ["First attempt", "Second attempt"])
   assert.equal(retriedThought.summary, reply)
   const batch = await agentRun("Create a character and a location card.", [
-    tool("write", { items: [
+    { ...tool("write", { items: [
       { kind: "character", fields: { name: "Batch character", role: "ferrymaster" } },
       { kind: "location", fields: { name: "Batch pier", kind: "building" } },
-    ] }),
+    ] }), repeatMetadata: true },
     (messages) => {
       const result = messages.findLast(message => message.role === "tool")
       const original = messages.findLast(message => message.role === "assistant").content.find(part => part.type === "tool-call")
+      assert.equal(original.name, "write", "重复的工具名元数据不能拼进工具名")
       assert.equal(result.toolCallId, original.id)
       const receipt = JSON.parse(result.content[0].text)
       assert.deepEqual(receipt.items.map(item => [item.title, item.ok]), [["Batch character", false], ["Batch pier", true]])
       assert.equal(receipt.items[0].error.fields[0].path, "fields.role")
-      return tool("write", { items: [
+      return { ...tool("write", { items: [
         { kind: "character", fields: { name: "Batch character", role: "supporting", identity: "ferrymaster" } },
-      ] })
+      ] }), finalBlock: true }
     }, reply,
   ], {})
   assert.equal(batch.incomplete, undefined)
@@ -412,6 +464,14 @@ try {
       assert.equal(current.history[0].content, "不要动设定，只改第一章正文。")
       assert.equal(current.previousCandidates.length, 1)
       assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "write", "edit_prose", "delete"])
+      for (const tool of tools) {
+        assert.equal(tool.parameters.type, "object", `${tool.name} must declare object parameters for OpenAI-compatible servers`)
+        assert(tool.parameters.properties, `${tool.name} must declare top-level properties`)
+      }
+      const proseParameters = tools.find(tool => tool.name === "edit_prose").parameters
+      assert.deepEqual(proseParameters.properties.mode.enum, ["patch", "selection", "append", "rewrite"])
+      assert.deepEqual([...proseParameters.required].sort(), ["instruction", "mode", "reason"])
+      assert.equal(proseParameters.oneOf.length, 4)
       assert.equal(tools.find(tool => tool.name === "search").parameters.properties.limit.maximum, 60)
       return tool("edit_prose", { id: repeated.id, mode: "rewrite", reason: current.history[0].content, instruction: "Continue the old task" })
     },
