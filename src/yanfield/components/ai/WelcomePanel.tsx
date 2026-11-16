@@ -99,7 +99,7 @@ export function WelcomePanel({
       </div>
 
       {/* 示例问题 */}
-      <div role="group" aria-label={tr("示例提问")} className="flex flex-wrap items-center gap-1.5">
+      <div role="group" aria-label={tr("示例提问")} className="flex flex-wrap items-center justify-center gap-1.5">
         {EXAMPLES.map(({ label, prompt }) => (
           <button
             key={label}

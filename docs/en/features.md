@@ -36,12 +36,13 @@ Writing features:
 - Typography: serif or sans, size, weight, line height, letter spacing, paragraph spacing, margins, max line width, with a live preview.
 - Find and replace in the chapter. Press `Ctrl / ⌘ + F` to open the panel in the lower-right corner of the editor while the formatting toolbar stays in place. Typing highlights matches in place. Use Previous or Next to jump. Press `Ctrl / ⌘ + Z` to undo a replacement and return to the edited passage.
 - The formatting toolbar stays at the top while you scroll the manuscript. `Alt + 1` toggles the outline and `Alt + J` focuses the AI composer.
-- In windowed mode on macOS, drag an empty area of the writing desk header to move the Harness window.
+- In windowed mode on macOS, drag the empty area at the top of the bookshelf or in the writing desk header to move the Harness window.
 - Returning to a chapter in the workbench restores its caret and scroll position. Switching chapters starts a fresh undo history.
 
 ## 4. Notes
 
 - **Outline**: book outline, volume outlines, chapter blueprints (goal, conflict, emotional arc, scene beats, plot points, hooks, target words, suspense level, and twist level).
+- The blueprint list shows the saved suspense level, twist level, and summary. AI proposals are marked **Pending review**. Applying or undoing a proposal updates the list and the count of filled blueprints.
 - **Characters**: name, aliases, role, age, personality, goals, relationships, appearance, secrets, appearance chapter, AI visibility.
 - **Place cards**: name, aliases, type, parent place, sensory details, and layout. Browse by hierarchy and set AI visibility and reveal chapters.
 - **World settings**: name, category, importance, description, related characters, reveal chapter, AI visibility.
@@ -61,17 +62,18 @@ Panel layout:
 
 - Top: conversation title (auto-named from the first prompt), history, new conversation.
 - When you ask for an opinion about the book, the assistant can read relevant material and give a direct answer. Expand the activity or references to see what it read.
-- Progress messages stay visible while the answer appears below them. Proposals for review appear after the answer.
+- Progress messages stay visible as the assistant displays each piece of the answer it receives. Proposals for review appear after the answer is complete.
+- Each assistant message has a single **Reasoning** section when the model provides reasoning. While the model is thinking, the latest three lines are visible. Expand the section to read the full reasoning for the message.
 - Applying a change in the manuscript review updates its status in chat. Open **Activity log** to see individual tool results and the materials read.
 - The active conversation stays open when switching chapters within a book. New messages use the current chapter as context, and tasks in progress keep the chapter specified when they were sent.
-- Each request is scoped before the assistant gets its editing tools. It can use prose to build cards while leaving the manuscript intact. Ask for multiple types of changes together when you need them. Use **Keep editing** on the proposal you want to revise.
+- The assistant uses your latest request to choose whether to search, read, prepare note or prose edits, or prepare a deletion. Manuscript passages can serve as sources for new cards. Ask for multiple types of changes together when you need them. Use **Keep editing** on the proposal you want to revise.
 - The continuation, expansion, polishing, and AI-tone cleanup shortcuts in the manuscript toolbar use their corresponding enabled presets during prose generation. Presets guide the writing, and the current request determines what can change.
 - The assistant submits batches of note additions or edits together. Each item is validated independently. The activity log shows any failed items, and successful proposals stay available for review below the reply.
 - Retrying a task from conversation history uses its original chapter. Tasks created with this version also retain the selection, references, and context settings.
 - When you click the AI input, the quoted passage stays softly highlighted in the manuscript. Place the cursor back in the manuscript to clear the selection, or select a new passage to update the reference.
 - Messages sent with selected prose show the chapter and line range. Expand the reference to see the original text sent with the message. Line numbers follow paragraphs and manual line breaks.
 - Short writing requests can use the current context. For example, `这里顺一点` polishes the selected passage, `接着写` continues the current chapter, and `根据正文改章纲` reads the full chapter before proposing an updated blueprint.
-- Middle: message stream. Task steps keep their order and the current step updates in place; autoscroll pauses while you read back.
+- Middle: message stream. Task steps keep their order and the current step updates in place. Scroll up to read earlier messages while the assistant is working. Return to the bottom or click **New updates · Back to bottom** to resume following.
 - Bottom: skills (quick prompts), persona / style / archive pickers, input box, model and reasoning level, `@` references, send.
 - Status line: today's usage, estimated cost, balance.
 
@@ -85,17 +87,17 @@ Capabilities:
 
 Review flow:
 
-1. Prose proposals show a word delta such as `319 → 338 words (+19)`. Note proposals start as clickable names. Open one to see field differences and source passages, or to apply or discard that item. Use the checkboxes next to the names to select notes to apply together. Open **Activity log** to see tools and materials read.
-2. The prose area also opens a review: original text (deletions in red, struck through) and the revised text (insertions in green) side by side.
-3. For each paragraph press **Keep** or **Revert**; **Revert all** / **Keep all** are also available.
-4. Press **Confirm review** — only kept paragraphs are written; undecided paragraphs keep the original text.
+1. Prose proposals show a word delta such as `319 → 338 words (+19)`. Note proposals start as clickable names. Open one to see field differences and source passages, or to apply or discard that item. Linked fields such as **Parent place** show the linked item's name. Use the checkboxes next to the names to select notes to apply together. Open **Activity log** to see tools and materials read.
+2. The prose area opens the review at the first change. Deletions appear crossed out in red, and insertions are highlighted in green. Use **Go to change** for a single change, or **Previous change** and **Next change** to move between changes.
+3. **Keep all** saves the entire revision immediately. **Revert all** discards it.
+4. To review paragraph by paragraph, select **Keep** or **Revert**, then click **Confirm review**. Undecided paragraphs keep their original text. After closing a pending review, you can reopen it from the proposal card in the conversation.
 5. After applying you can **Undo this round** or open the **change history**.
 
 When prose is selected, a revision replaces only the selected text in the current chapter. You can also quote a unique passage to request a local edit and keep the surrounding text and formatting. Automatically suggested note changes start unchecked, with a quotation for each suggested field. If the quotation is already in the saved chapter, you can apply the note on its own. If the quotation appears only in the draft, keep the cited passage first or apply the prose and note together. You can request separate edits to personality, speech style, and long-term goals.
 
 ## 7. Settings
 
-- **Model services**: add / edit / enable / delete services, switch model route (DSH account / official API key), query balance, default model, sync model list.
+- **Model services** syncs the DSH model catalog, groups default-model options by route, and lets you check your DeepSeek balance. LM Studio, vLLM, and llama.cpp connect through a [custom DSH model route](ai-and-cost.md).
 - **Prompt presets**: opens to custom presets. View or duplicate built-in templates and manage your own prompts for specific shortcuts and editor panels.
 - **Persona**: assistant identity and limits.
 - **AI & context**: context section toggles, context budget, max output, usage and cost (three unit prices, one-click official prices, daily and total stats), custom instructions.

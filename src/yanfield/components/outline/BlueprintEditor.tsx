@@ -26,7 +26,7 @@ import {
   Textarea,
   useToast,
 } from "@/components/ui/kit";
-import { apiPatch, notifyDataChanged, useApi } from "@/lib/client/api";
+import { apiPatch, notifyDataChanged, useApi, useDataChanged } from "@/lib/client/api";
 import {
   BLUEPRINT_TENSIONS,
   BLUEPRINT_TENSION_LABEL,
@@ -121,6 +121,7 @@ export function BlueprintEditor({
   const locale = useLocale();
   const { toast } = useToast();
   const { data, loading, error, refresh, setData } = useApi<ChapterBlueprint>(`/api/chapters/${chapter.id}/blueprint`);
+  useDataChanged(refresh, ["agent"]);
   const [draft, setDraft] = React.useState<BlueprintDraft | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [aiOpen, setAiOpen] = React.useState(false);

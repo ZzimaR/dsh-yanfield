@@ -264,6 +264,7 @@ export const ai: Record<string, TranslateValue> = {
   "思考·{level}": "Thinking · {level}",
   "思考程度": "Thinking effort",
   "思考过程 · {count} 字": "Reasoning · {count} chars",
+  "思考过程": "Reasoning",
   "思考能力未知；可在模型设置中重新拉取。未确认能力时使用服务商默认。": "Thinking capability unknown; re-fetch it in model settings. The provider default is used until confirmed.",
   "思考中…": "Thinking…",
   "添加 / 启用 DeepSeek 服务，配置默认模型": "Add or enable a DeepSeek provider and set a default model",
@@ -354,6 +355,7 @@ export const ai: Record<string, TranslateValue> = {
   "用量加载中": "Loading usage",
   "由模型决定": "Model default",
   "有新进展 · 回到底部 ↓": "New updates · Back to bottom ↓",
+  "对话消息": "Chat messages",
   "余额": "Balance",
   "余额 {amount}": "Balance {amount}",
   "余额查询失败，请稍后重试": "Failed to check balance; try again later",
@@ -593,4 +595,8 @@ export const ai: Record<string, TranslateValue> = {
     "A custom persona, role, and voice for a fixed writing workflow.",
   "请先在设置里定义我的人设与职责，然后我们就可以开始了。":
     "Define my persona and role in Settings first, and we can get started.",
+  "有 {count} 项操作未完成，详情见执行记录。": "Unfinished operations: {count}. See the execution log.",
+  "候选已准备，等待确认": "Change prepared for review",
+  "{accepted} 项候选已准备，{failed} 项未完成": "{accepted} ready for review · {failed} unfinished",
+  "本轮已达到处理步数上限。": "This turn reached its operation limit.",
 }

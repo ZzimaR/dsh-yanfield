@@ -369,6 +369,12 @@ html[data-prose-font="sans"] .prose-paper,
   animation: pulse-soft 1.6s ease-in-out infinite;
 }
 /* 写作台加载：羽毛笔沿横线书写 */
+@keyframes thinking-pen {
+  0%, 54%, 100% { transform: translateY(-1px) rotate(-10deg); }
+  12%, 37% { transform: translateY(1px) rotate(3deg); }
+  24% { transform: translateY(-0.5px) rotate(-6deg); }
+}
+
 @keyframes ink-write-line {
   0% { transform: scaleX(0); opacity: 1; }
   70% { transform: scaleX(1); opacity: 1; }

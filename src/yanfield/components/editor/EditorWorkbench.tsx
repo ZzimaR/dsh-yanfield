@@ -33,7 +33,7 @@ import {
   updateAgentReview,
   type AgentReviewState,
 } from "@/lib/editor/agent-review";
-import { AGENT_UPDATED } from "@/lib/ai/agent/client";
+import { AGENT_REVIEW_READY, AGENT_UPDATED, isAgentCommitting } from "@/lib/ai/agent/client";
 import type { AgentRun } from "@/lib/ai/agent/types";
 import { EditorCanvas, type ChapterEditorPosition } from "./EditorCanvas";
 import { EditorHeader, type EditorTheme } from "./EditorHeader";
@@ -43,6 +43,8 @@ import { EditorError, EditorLoading, EditorNotFound } from "./EditorStates";
 import { LeftPanel, type EditorLeftTab } from "./LeftPanel";
 
 const EMPTY_SELECTION: SelectionInfo = { text: "", from: 0, to: 0, empty: true };
+// The host can remount the editor when switching DSH sessions.
+const seenReviewKeys = new Set<string>();
 
 interface EditorWorkbenchProps {
   novelId: string;
@@ -378,8 +380,6 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   } : null,[rawBridge,flush,adoptSaved,actions,editor,chapterId]);
   /* ---------------- 正文改动审阅：手动入口 + 自动打开 ---------------- */
 
-  /** 已自动打开或已被作者关闭的审阅，key = `${run.id}:${change.id}`；关闭过的改动不会再弹。 */
-  const seenReviewKeysRef = React.useRef(new Set<string>());
   /** 审阅状态与 ref 同步：事件监听读 ref，避免 state 变化导致监听器反复重挂。 */
   const reviewRef = React.useRef<AgentReviewState | null>(null);
   const [review, setReviewState] = React.useState<AgentReviewState | null>(null);
@@ -395,28 +395,30 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   /** 手动「在正文中审阅改动」与自动打开共用同一条打开序列。 */
   const openReview = React.useCallback(async (run: AgentRun, changeId: string, onlyIfPending: boolean) => {
     await flush();
+    await actions.refresh();
     const latest = await apiGet<AgentRun>(`/api/ai/agent/${run.id}?novelId=${encodeURIComponent(novelId)}`);
     const change = latest.changes.find(c => c.id === changeId);
     if (!change) return;
-    // 自动打开只在候选仍待确认时进行：已经应用/丢弃的改动交给手动入口查看历史。
-    if (onlyIfPending && change.state !== "pending") return;
-    await actions.refresh();
+    if (onlyIfPending) {
+      if (change.state !== "pending") return;
+      if (change.targetId) {
+        const chapter = await apiGet<Chapter>(`/api/chapters/${encodeURIComponent(change.targetId)}`);
+        if (chapter.content !== change.before?.content || chapter.updatedAt !== change.before?.updatedAt) return;
+      }
+      if (reviewRef.current || isAgentCommitting(run.id)) return;
+    }
     const targetChapter = change.appliedId || change.targetId;
     if (targetChapter) {
       setChapterId(targetChapter);
       syncChapterRoute(targetChapter);
     }
+    seenReviewKeys.add(reviewKey(latest.id, changeId));
     setReview({ run: latest, changeId });
   }, [actions, flush, novelId, setChapterId, setReview, syncChapterRoute]);
   const openReviewRef = React.useRef(openReview);
   React.useEffect(() => { openReviewRef.current = openReview; });
 
-  /** 关闭审阅即视为「看过」：之后即使该改动仍待确认也不会自动弹出。 */
-  const closeReview = React.useCallback(() => {
-    const current = reviewRef.current;
-    if (current) seenReviewKeysRef.current.add(reviewKey(current.run.id, current.changeId));
-    setReview(null);
-  }, [setReview]);
+  const closeReview = React.useCallback(() => setReview(null), [setReview]);
 
   React.useEffect(() => {
     const open = (event: Event) => {
@@ -466,19 +468,25 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
       // Applying from either the card or inline review must leave the author in the editable chapter.
       const next = updateAgentReview(reviewRef.current, nextRun);
       if (next !== reviewRef.current) setReview(next);
+    };
+    const ready = (event: Event) => {
+      const nextRun = (event as CustomEvent<AgentRun>).detail;
       if (nextRun.status !== "ready" || nextRun.novelId !== novelIdRef.current) return;
       // 不抢占已经打开的内联审阅，也不在别的作品里弹窗。
       if (reviewRef.current || openingReviewRef.current) return;
-      const change = autoReviewChange(nextRun, seenReviewKeysRef.current, currentChapterRef.current);
+      const change = autoReviewChange(nextRun, seenReviewKeys, currentChapterRef.current);
       if (!change) return;
-      seenReviewKeysRef.current.add(reviewKey(nextRun.id, change.id));
       openingReviewRef.current = true;
       void openReviewRef.current(nextRun, change.id, true)
         .catch(() => {})
         .finally(() => { openingReviewRef.current = false; });
     };
     window.addEventListener(AGENT_UPDATED, updated);
-    return () => window.removeEventListener(AGENT_UPDATED, updated);
+    window.addEventListener(AGENT_REVIEW_READY, ready);
+    return () => {
+      window.removeEventListener(AGENT_UPDATED, updated);
+      window.removeEventListener(AGENT_REVIEW_READY, ready);
+    };
   }, [setReview]);
 
   // 审阅绑定章节：切到别的章节就收起，避免旧稿 diff 盖住当前正文。

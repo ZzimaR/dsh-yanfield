@@ -4,17 +4,20 @@ import { BookOpen, User, MapPin, MapPinned, Bookmark, FolderOpen, Check, Chevron
 import { copyText } from "@/lib/ui/clipboard";
 import { entityTone } from "@/lib/ui/entity-tone";
 import { AgentProgress } from "./AgentProgress";
-import { AgentReply, useAgentReplyReveal } from "./AgentReply";
+import { AgentReply } from "./AgentReply";
+import { ThinkingPreview } from "./ThinkingPreview";
 import { MaterialPreview } from "@/components/cards/MaterialPreview";
 import { Button, ConfirmDialog, Markdown, Sheet, useToast } from "@/components/ui/kit";
-import { apiGet, apiPatch, useDataChanged } from "@/lib/client/api";
+import { apiGet, apiPatch, notifyDataChanged, useDataChanged } from "@/lib/client/api";
 import { useEditorBridge } from "@/lib/editor/bridge";
 import { countWords, stripHtml } from "@/lib/ui/cn";
 import { diffInline } from "@/lib/diff/blocks";
 import { AGENT_COMMIT_CHANGED, AGENT_UPDATED,broadcastRun,commitAgent,isAgentCommitting,openAgentReview } from "@/lib/ai/agent/client";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
-import { ENTITY_LABEL, FIELD_LABEL, type AgentChange, type AgentRun, type AgentReference } from "@/lib/ai/agent/types";
+import { agentLinkField, agentLinkKey } from "@/lib/ai/agent/links";
+import { ENTITY_LABEL, FIELD_LABEL, type AgentChange, type AgentRun, type AgentReference, type AgentThought } from "@/lib/ai/agent/types";
 import { t, useT } from "@/lib/i18n";
+import { BLUEPRINT_TENSION_LABEL } from "@/lib/types";
 
 const entityIcons = { character: User, location: MapPinned, world: MapPin, foreshadow: Bookmark };
 
@@ -22,6 +25,9 @@ function display(value:unknown):string {
   if(value===null||value===undefined||value==="") return t("未填写");
   if(Array.isArray(value)) return value.map(v=>typeof v==="string"?v:JSON.stringify(v)).join("\n");
   return typeof value==="object"?JSON.stringify(value,null,2):String(value);
+}
+function displayTension(value: unknown): string {
+  return value === "low" || value === "medium" || value === "high" ? t(BLUEPRINT_TENSION_LABEL[value]) : display(value);
 }
 function displayScenes(value:unknown):string {
   if(!Array.isArray(value)||!value.length)return t("未填写");
@@ -46,15 +52,19 @@ function evidenceLabel(run:AgentRun,e:NonNullable<AgentChange["evidence"]>[numbe
   if(source?.state==="rejected")return t("已丢弃正文");
   return t("待确认正文");
 }
-export function FieldChange({before,after,format=display}:{before:unknown;after:unknown;format?:(value:unknown)=>string}) {
+export function FieldChange({before,after,format=display,wholeValue=false}:{before:unknown;after:unknown;format?:(value:unknown)=>string;wholeValue?:boolean}) {
   const tr=useT();
-  const segments=diffInline(format(before),format(after));
+  const original = format(before);
+  const updated = format(after);
+  const segments = wholeValue
+    ? [{ type: "del", text: original }, { type: "add", text: updated }]
+    : diffInline(original, updated);
   return <div className="space-y-1.5 text-[12px] leading-[1.85]">
     <div className="whitespace-pre-wrap break-words rounded-md border-l-2 border-danger/25 bg-danger/[0.035] px-2.5 py-2 text-ink-3"><span className="mr-2 text-[10px] text-danger">{tr("原")}</span>{segments.filter(x=>x.type!=="add").map((s,i)=><span key={i} className={s.type==="del"?"bg-danger/10 text-danger line-through":""}>{s.text}</span>)}</div>
     <div className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/35 bg-jade/[0.035] px-2.5 py-2 text-ink-2"><span className="mr-2 text-[10px] text-jade">{tr("改")}</span>{segments.filter(x=>x.type!=="del").map((s,i)=><span key={i} className={s.type==="add"?"bg-jade/15 text-jade":""}>{s.text}</span>)}</div>
   </div>;
 }
-export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{runId:string;novelId:string;initial?:AgentRun;disabled?:boolean;onContinue?:(text:string, runId:string)=>void}) {
+export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,disabled=false,onContinue}:{runId:string;novelId:string;initial?:AgentRun;thought?:AgentThought;liveReply?:string;streaming?:boolean;disabled?:boolean;onContinue?:(text:string, runId:string)=>void}) {
   const [run,setRun]=React.useState<AgentRun|undefined>(initial);
   const [error,setError]=React.useState("");
   const [expanded,setExpanded]=React.useState<string|null>(null);
@@ -71,18 +81,18 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
   const busy=localBusy||saving;
   const bridge=useEditorBridge(),{toast}=useToast();
   const tr=useT();
-  const liveRunRef=React.useRef<string | null>(null);
-  if(run?.status==="running") liveRunRef.current=run.id;
   const running=run?.status==="running";
   const validationStopped=run?.stoppedOnValidation || run?.summary.startsWith("同一条改动连续两次没有通过校验");
   const summary=displayAgentReply(validationStopped ? "" : run?.summary??"").split("\n").map(line=>tr(line)).join("\n");
-  const showReply=Boolean(summary.trim() && (!running || run?.answering));
-  const replyLength=useAgentReplyReveal(runId,showReply?summary:"",liveRunRef.current===runId);
-  const revealing=showReply && replyLength<summary.length;
-  const settled=!running && !revealing;
+  const streamedText = streaming ? liveReply?.trimStart() ?? "" : "";
+  const reply = streamedText || (!running || run?.answering ? summary : "");
+  const completedThoughts = React.useMemo(() => run?.thoughts?.map(entry => entry.text.trim()).filter(Boolean).join("\n\n") ?? "", [run?.thoughts]);
+  const thinking = Boolean(streaming && running && (thought || (!run.steps.length && !completedThoughts && !reply)));
+  const settled=!running;
   const receive=React.useCallback((value:AgentRun)=>setRun(current=>!current||current.id!==value.id||value.updatedAt>=current.updatedAt?{...value}:current),[]);
   const refresh=React.useCallback(()=>{void apiGet<AgentRun>(`/api/ai/agent/${runId}?novelId=${encodeURIComponent(novelId)}`).then(receive).catch(e=>setError(e.message));},[runId,novelId,receive]);
-  React.useEffect(()=>{if(initial)receive(initial);else refresh();},[initial,refresh,receive]);
+  React.useLayoutEffect(()=>{if(initial)receive(initial);},[initial,receive]);
+  React.useEffect(()=>{if(!initial)refresh();},[initial,refresh]);
   React.useEffect(()=>{
     const listen=(event:Event)=>{const value=(event as CustomEvent<AgentRun>).detail;if(value.id===runId)receive(value);};
     window.addEventListener(AGENT_UPDATED,listen);return()=>window.removeEventListener(AGENT_UPDATED,listen);
@@ -93,23 +103,6 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
     window.addEventListener(AGENT_COMMIT_CHANGED,listen);
     return()=>window.removeEventListener(AGENT_COMMIT_CHANGED,listen);
   },[runId]);
-  // 任务一进入 ready 且带待确认正文候选就广播一次；写作区收到后自动打开内联 diff 审阅。
-  // 只广播「刚就绪」的转换，避免刷新页面或回看旧会话时把历史候选自动弹出来。
-  const readyBroadcastRef=React.useRef(new Set<string>());
-  const lastStatusRef=React.useRef<AgentRun["status"]|null>(initial?.status??null);
-  const hadInitialRef=React.useRef(Boolean(initial));
-  React.useEffect(()=>{
-    const previous=lastStatusRef.current;
-    lastStatusRef.current=run?.status??null;
-    if(!run||run.status!=="ready")return;
-    if(previous!=="running"&&!(previous===null&&!hadInitialRef.current))return;
-    if(!run.changes.some(c=>c.kind==="chapter"&&c.state==="pending"))return;
-    // 用 ${run.id}:${updatedAt} 去重：同一版本经轮询/事件多次到达时不会重复广播。
-    const key=`${run.id}:${run.updatedAt}`;
-    if(readyBroadcastRef.current.has(key))return;
-    readyBroadcastRef.current.add(key);
-    broadcastRun(run);
-  },[run]);
   useDataChanged(refresh,["agent"]);
   React.useEffect(()=>{if(run?.status!=="running"||disabled)return;const timer=window.setInterval(refresh,1500);return()=>window.clearInterval(timer);},[run?.status,disabled,refresh]);
   const mutate=async(action:()=>Promise<AgentRun>)=>{
@@ -208,14 +201,24 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
         <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] ${entityTone(c.kind)}`}>{tr(ENTITY_LABEL[c.kind])}</span>
         <span className="ml-auto shrink-0 text-[10px] text-ink-4">{c.state==="applied"?(deleting?tr("已删除"):tr("已应用")):c.state==="reverted"?tr("已撤回"):c.state==="rejected"?tr("已丢弃"):deleting?<span className="text-danger">{tr("删除整条")}</span>:c.before?tr("修改"):tr("新建")}</span>
       </div>
-      {c.reason?<p className="mt-1.5 text-[11px] leading-relaxed text-ink-3">{c.reason}</p>:null}
+      {c.reason && !run.request.includes(c.reason)?<p className="mt-1.5 text-[11px] leading-relaxed text-ink-3">{c.reason}</p>:null}
       {deleting
         ? <div className="mt-2 rounded-lg border border-danger/20 bg-danger/[0.03] p-2.5 opacity-80"><MaterialPreview kind={c.kind as "character"|"world"|"location"|"foreshadow"} fields={c.before??{}} showTitle={false}/></div>
         : <div className="scroll-thin mt-2.5 max-h-80 space-y-2.5 overflow-y-auto pr-1">
-            {keys.map(key=><div key={key}>
-              <label className="mb-1 flex items-center gap-1.5 text-[10.5px] text-ink-3">{isPending?<input type="checkbox" checked={chosen.includes(key)} disabled={busy||running||disabled} onChange={e=>setFields(p=>({...p,[c.id]:e.target.checked?[...chosen,key]:chosen.filter(k=>k!==key)}))}/>:null}{FIELD_LABEL[key]?tr(FIELD_LABEL[key]):key}</label>
-              {c.before?<FieldChange before={c.before[key]} after={c.after[key]} format={key==="scenes"?displayScenes:display}/>:<p className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/25 bg-jade/[0.035] px-2.5 py-2 text-[12px] leading-[1.85] text-ink-2">{(key==="scenes"?displayScenes:display)(c.after[key])}</p>}
-            </div>)}
+            {keys.map(key=>{
+              const relation = agentLinkField(c.kind, key);
+              const label = relation?.label ?? FIELD_LABEL[key];
+              const format = relation ? (value: unknown) => {
+                if (typeof value !== "string" || !value) return tr("未填写");
+                return run.linkTitles?.[agentLinkKey(relation.kind, value)] ?? tr("未找到此资料");
+              }
+                : key === "scenes" ? displayScenes
+                : key === "suspense" || key === "twist" ? displayTension : display;
+              return <div key={key}>
+              <label className="mb-1 flex items-center gap-1.5 text-[10.5px] text-ink-3">{isPending?<input type="checkbox" checked={chosen.includes(key)} disabled={busy||running||disabled} onChange={e=>setFields(p=>({...p,[c.id]:e.target.checked?[...chosen,key]:chosen.filter(k=>k!==key)}))}/>:null}{label?tr(label):key}</label>
+              {c.before?<FieldChange before={c.before[key]} after={c.after[key]} format={format} wholeValue={Boolean(relation)}/>:<p className="whitespace-pre-wrap break-words rounded-md border-l-2 border-jade/25 bg-jade/[0.035] px-2.5 py-2 text-[12px] leading-[1.85] text-ink-2">{format(c.after[key])}</p>}
+            </div>;
+            })}
           </div>}
       {c.evidence?.length?<details className="mt-2 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("原文依据 · {count}",{count:c.evidence.length})}</summary><div className="mt-2 space-y-2">{c.evidence.map((e,i)=><blockquote key={i} className="border-l-2 border-jade/25 pl-2.5 leading-relaxed"><span className="mb-1 block text-[10px] text-jade">{e.field&&FIELD_LABEL[e.field]?`${tr(FIELD_LABEL[e.field])} · `:""}{e.title}{` · ${evidenceLabel(run,e)}`}</span>{e.quote}</blockquote>)}</div></details>:null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -233,9 +236,13 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
   </button>;
   };
   return <div className="min-w-0" data-testid="agent-run-card">
+    {(thinking || completedThoughts) ? <div className="px-1 py-1">
+      <ThinkingPreview text={thinking ? thought?.text ?? "" : completedThoughts} active={thinking} />
+    </div> : null}
     <AgentProgress run={run} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
-    {(running || revealing) && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}
-    {showReply?<AgentReply text={summary} length={replyLength}/>:null}
+    {running && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}
+    {reply.trim()?<AgentReply text={reply} streaming={Boolean(streamedText)}/>:null}
+    {settled && Boolean(run.incomplete)?<p className="px-1 py-1 text-[12px] text-danger" role="status">{tr("有 {count} 项操作未完成，详情见执行记录。",{count:run.incomplete!})}</p>:null}
     {settled && validationStopped?<p className="px-1 py-1 text-[13px] leading-relaxed text-ink-2" role="status">{
       applied.length ? tr("已应用 {count} 项改动。", { count:applied.length })
         : pending.length ? tr("已准备 {count} 项候选，等待你确认。", { count:pending.length })
@@ -245,7 +252,7 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
       <p>{tr("已准备 {count} 项候选，等待你确认。", { count: pending.length })}</p>
       <ul className="list-disc space-y-1 pl-4">
         {pending.slice(0, 4).map(change => {
-          const fields = Object.keys(change.after).map(key => FIELD_LABEL[key]).filter(Boolean).map(key => tr(key));
+          const fields = Object.keys(change.after).map(key => agentLinkField(change.kind, key)?.label ?? FIELD_LABEL[key]).filter(Boolean).map(key => tr(key));
           return <li key={change.id}>
             {tr(change.op === "delete" ? "删除" : change.before ? "修改" : "新建")} · {tr(ENTITY_LABEL[change.kind])}
             {change.title ? ` · ${change.title}` : ""}
@@ -276,10 +283,14 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
         </div>
         {recordTab==="steps" ?
         <ol className="my-2 space-y-3 border-l border-line pl-3">{run.steps.map((step,index)=><li key={step.id}>
-          <div className={`flex items-center gap-1.5 text-[12px] ${step.status==="error"?"text-danger":"text-ink-3"}`}>
-            {step.status==="running"?<Loader2 className="size-3 animate-spin"/>:step.status==="error"?<CircleAlert className="size-3"/>:<Check className="size-3"/>}
+          <div className={`flex items-center gap-1.5 text-[12px] ${(step.status==="error"||step.status==="partial")?"text-danger":"text-ink-3"}`}>
+            {step.status==="running"?<Loader2 className="size-3 animate-spin"/>:(step.status==="error"||step.status==="partial")?<CircleAlert className="size-3"/>:<Check className="size-3"/>}
             <span>{tr(step.label)}</span>
           </div>
+          {step.issues?.length?<ul className="mt-1 space-y-1 text-danger">{step.issues.map((issue,index)=><li key={index} className="break-words">
+            {issue.title ? `${issue.title} · ` : ""}{tr(issue.message)}
+            {issue.fields?.map((field,fieldIndex)=><span key={fieldIndex} className="block text-ink-3">{field.path} · {field.message}</span>)}
+          </li>)}</ul>:null}
           {step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}
           {step.detail && (step.detailValues || step.status==="error" || step.detail!==run.steps[index-1]?.detail)?<p className="mt-1 whitespace-pre-line leading-relaxed text-ink-4">{tr(step.detail, step.detailValues && {
             ...step.detailValues,
@@ -288,13 +299,13 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
         </li>)}</ol> : <div className="flex flex-wrap gap-1.5">{run.references.map(chip)}</div>}
       </div>
     </Sheet>:null}
-    {error||run.error?<p role="alert" className="mx-3 mb-3 rounded bg-danger/5 p-2 text-[11px] leading-relaxed text-danger"><CircleAlert className="mr-1 inline size-3"/>{error||run.error}</p>:null}
+    {error||run.error?<p role="alert" className="mx-3 mb-3 rounded bg-danger/5 p-2 text-[11px] leading-relaxed text-danger"><CircleAlert className="mr-1 inline size-3"/>{tr(error||run.error)}</p>:null}
     {run.errorCode?<details className="mx-3 mb-3 rounded-md border border-line p-2 text-[11px] text-ink-3">
       <summary className="cursor-pointer">{tr("调试详情 · {detail}",{detail:run.errorCode||(run.diagnostics?.length?tr("已自动修复的协议错误"):tr("旧任务未记录错误码"))})}</summary>
       <p className="mt-2 break-all">{tr("任务 ID：{id}",{id:run.id})}</p>
       <p className="mt-1">{tr("模型：{provider} / {model}",{provider:run.provider,model:run.model})}</p>
       {run.error && !run.errorCode && !run.diagnostics?.length?<p className="mt-2">{tr("此任务由旧版执行器生成，没有保存原始返回或具体校验错误，无法补回历史调试详情。更新后的新任务会记录这些信息。")}</p>:null}
-      <p className="mt-1">{tr("以下仅包含模型返回的脱敏片段和校验结果，不包含请求密钥。预览可能含作品内容。")}</p>
+      {run.diagnostics?.length ? <p className="mt-1">{tr("以下仅包含模型返回的脱敏片段和校验结果，不包含请求密钥。预览可能含作品内容。")}</p> : null}
       {run.diagnostics?.map((diagnostic,index)=><details key={index} className="mt-2 border-t border-line pt-2">
         <summary className="cursor-pointer">{tr("第 {round} 轮 · 第 {attempt} 次 · {code} · {chars} 字符",{round:diagnostic.round,attempt:diagnostic.attempt,code:diagnostic.code,chars:diagnostic.responseChars})}</summary>
         <ul className="my-2 space-y-1">{diagnostic.issues.map((issue,i)=><li key={i} className="break-words">{issue.path} · {issue.code}：{issue.message}</li>)}</ul>
@@ -318,7 +329,12 @@ export function AgentRunCard({runId,novelId,initial,disabled=false,onContinue}:{
         if(confirmation.op==="delete")void apply(confirmation.changes);
         else {
           setExpandedMaterial(null);
-          void mutate(()=>apiPatch<AgentRun>(`/api/ai/agent/${run.id}`,{op:"reject",changeId:confirmation.changes[0].id,novelId:run.novelId}));
+          const change = confirmation.changes[0];
+          void mutate(async () => {
+            const result = await apiPatch<AgentRun>(`/api/ai/agent/${run.id}`, { op: "reject", changeId: change.id, novelId: run.novelId });
+            if (change.kind === "blueprint") notifyDataChanged("blueprint-review");
+            return result;
+          });
         }
       }}/>:null}
   </div>;

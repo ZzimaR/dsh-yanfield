@@ -15,7 +15,7 @@ const VOLUME_OUTLINE_FIELDS: FieldSpec = {
 
 export const GET = handle<{ volumeId: string }>(async (_request, { params }) => {
   if (!repo.getVolume(params.volumeId)) return notFound("卷不存在");
-  return ok(repo.getVolumeOutline(params.volumeId));
+  return ok(repo.getVolumeOutline(params.volumeId, false));
 });
 
 export const PATCH = handle<{ volumeId: string }>(async (request, { params }) => {

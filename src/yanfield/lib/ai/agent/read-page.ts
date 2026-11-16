@@ -17,8 +17,8 @@ export function chapterReadPage(row: Fields, offset: number, limit: number): Fie
   const fullPage = { ...row, ...pagination(maxLength) };
   if (JSON.stringify(fullPage).length <= TOOL_RECEIPT_LIMIT) return fullPage;
 
-  const { id, title, wordCount } = row;
-  const page = (length: number) => ({ id, title, wordCount, ...pagination(length) });
+  const { id, title, wordCount, field, fields } = row;
+  const page = (length: number) => ({ id, title, wordCount, field, fields, ...pagination(length) });
   let low = 0;
   let high = maxLength;
   while (low < high) {

@@ -430,6 +430,7 @@ export interface AiUsage {
 export type AiStreamEvent =
   | { type: "agent"; run: import("@/lib/ai/agent/types").AgentRun }
   | { type: "agent-preview"; runId: string; text: string }
+  | { type: "agent-thinking"; thought: import("@/lib/ai/agent/types").AgentThought; phase: "start" | "delta" | "end" }
   | { type: "meta"; runId: string; feature: AiFeature; provider: string; model: string }
   | { type: "delta"; text: string }
   | { type: "reasoning"; text: string }
@@ -541,6 +542,9 @@ export interface ProviderConfig {
   apiKey: string;
   models: ModelOption[];
   enabled: boolean;
+  /** Live DSH route status, attached when listing providers. */
+  available?: boolean;
+  unavailableReason?: string;
   createdAt: string;
   updatedAt: string;
 }

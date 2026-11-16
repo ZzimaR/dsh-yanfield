@@ -22,7 +22,7 @@ const BLUEPRINT_FIELDS: FieldSpec = {
 
 export const GET = handle<{ id: string }>(async (_request, { params }) => {
   if (!repo.getChapter(params.id)) return notFound("章节不存在");
-  return ok(repo.getBlueprint(params.id));
+  return ok(repo.getBlueprint(params.id, false));
 });
 
 export const PATCH = handle<{ id: string }>(async (request, { params }) => {

@@ -5,8 +5,40 @@ import { countWords, stripHtml, uid } from "@/lib/ui/cn";
 import { sameFields, validatePatch } from "./schema";
 import { applyBlockDiff, diffBlocks } from "@/lib/diff/blocks";
 import type { AgentChange, AgentRun, EntityKind, Fields } from "./types";
+import { agentLinkField, agentLinkKey, type AgentLinkKind } from "./links";
+
+const linkReaders = {
+  chapter: repo.getChapter,
+  volume: repo.getVolume,
+  world: repo.getWorld,
+  location: repo.getLocation,
+} satisfies Record<AgentLinkKind, (id: string) => { novelId: string } | undefined>;
+
+/** Preserve names alongside finished proposals. Resolve missing names when reading older runs. */
+export function withAgentLinkTitles(value: AgentRun): AgentRun {
+  const titles = { ...value.linkTitles };
+  const seen = new Set<string>();
+  for (const change of value.changes) {
+    for (const field of Object.keys(change.after)) {
+      const relation = agentLinkField(change.kind, field);
+      if (!relation) continue;
+      for (const id of [change.before?.[field], change.after[field]]) {
+        if (typeof id !== "string" || !id) continue;
+        const key = agentLinkKey(relation.kind, id);
+        if (titles[key] || seen.has(key)) continue;
+        seen.add(key);
+        const row = linkReaders[relation.kind](id);
+        const reference = value.references.find(item => item.kind === relation.kind && item.id === id);
+        const title = row?.novelId === value.novelId ? ("name" in row ? row.name : row.title) : reference?.title;
+        if (title) titles[key] = title;
+      }
+    }
+  }
+  return Object.keys(titles).length ? { ...value, linkTitles: titles } : value;
+}
 
 export function saveRun(value: AgentRun): void {
+  if (value.status !== "running") value.linkTitles = withAgentLinkTitles(value).linkTitles;
   value.updatedAt = new Date().toISOString();
   sql("INSERT INTO agent_runs (id,novel_id,data,created_at) VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data", [value.id,value.novelId,JSON.stringify(value),value.createdAt]);
 }
@@ -37,6 +69,18 @@ export function supersedeRun(run: AgentRun, previous: AgentRun, retiredIds: stri
 }
 export function listRuns(novelId: string): AgentRun[] {
   return all<{data:string}>("SELECT data FROM agent_runs WHERE novel_id=? ORDER BY created_at DESC LIMIT 30",[novelId]).map(r=>JSON.parse(r.data));
+}
+
+export function pendingBlueprintChapterIds(novelId: string): string[] {
+  return all<{ chapterId: string }>(`
+    SELECT DISTINCT json_extract(change.value, '$.targetId') AS chapterId
+    FROM agent_runs, json_each(agent_runs.data, '$.changes') AS change
+    WHERE agent_runs.novel_id = ?
+      AND json_extract(agent_runs.data, '$.status') <> 'running'
+      AND json_extract(change.value, '$.kind') = 'blueprint'
+      AND json_extract(change.value, '$.state') = 'pending'
+      AND json_type(change.value, '$.targetId') = 'text'
+  `, [novelId]).map(row => row.chapterId)
 }
 
 /** Outline getters in repo create empty rows. Probe first so agent reads are truly read-only. */
@@ -127,7 +171,7 @@ function assertDeletable(kind: EntityKind, id: string, novelId: string, alsoDele
   }
   if (kind !== "world") return;
   const children = repo.listWorld(novelId).filter(w=>w.parentId===id && !alsoDeleting.has(w.id));
-  if (children.length) throw new ApiError(`「${repo.getWorld(id)?.title||"该设定"}」下还有子设定（${children.slice(0,3).map(w=>w.title).join("、")}${children.length>3?"等":""}），请先删除或移走子设定`,409);
+  if (children.length) throw new ApiError("该设定还有子设定，请先移走或删除子设定", 409);
 }
 
 /** Deletion is staged like any edit: the full saved row is kept as `before` for version checks and undo. */
@@ -186,7 +230,7 @@ function deleteEntity(kind: EntityKind, id: string): void {
   else if (kind==="foreshadow") repo.deleteForeshadow(id);
 }
 
-function validateLinks(kind: EntityKind, patch: Fields, novelId: string, targetId: string | null): void {
+export function validateLinks(kind: EntityKind, patch: Fields, novelId: string, targetId: string | null): void {
   if (kind === "chapter" && patch.volumeId && repo.getVolume(String(patch.volumeId))?.novelId!==novelId) throw new ApiError("所属卷无效",400);
   if (kind === "world" && patch.parentId) {
     let parent = String(patch.parentId);

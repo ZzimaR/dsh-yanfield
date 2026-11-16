@@ -1,6 +1,6 @@
 import type { ProviderConfig } from "@/lib/types";
 import { ProviderError } from "./provider";
-import { getHarnessBridge, type HarnessWallet } from "./harness-bridge";
+import { getHarnessBridge, harnessRouteOf, type HarnessWallet } from "./harness-bridge";
 
 export interface ProviderBalance {
   isAvailable: boolean;
@@ -18,12 +18,10 @@ export function supportsBalance(provider: Pick<ProviderConfig, "baseUrl">): bool
 }
 
 /**
- * Harness 通道没有 API Key，余额由宿主去问 DSH 已登录账号。
- * 注意：这段代码同时跑在浏览器里，浏览器侧没有 bridge，所以这里只按 kind 判断；
- * 宿主真没有账号服务时由 getHarnessAccountBalance() 给出可读错误。
+ * DeepSeek 账号路由的余额由宿主的账号服务读取。
  */
-export function supportsAccountBalance(provider: Pick<ProviderConfig, "kind">): boolean {
-  return provider.kind === "harness";
+export function supportsAccountBalance(provider: Pick<ProviderConfig, "kind" | "baseUrl">): boolean {
+  return provider.kind === "harness" && harnessRouteOf(provider.baseUrl) === "deepseek-account";
 }
 
 /** 面板底栏与设置页共用的「是否显示余额入口」判断。 */
@@ -86,7 +84,7 @@ async function getHarnessAccountBalance(): Promise<ProviderBalance> {
 }
 
 export async function getProviderBalance(provider: ProviderConfig): Promise<ProviderBalance> {
-  if (provider.kind === "harness") return getHarnessAccountBalance();
+  if (supportsAccountBalance(provider)) return getHarnessAccountBalance();
   if (!supportsBalance(provider)) throw new ProviderError("此服务暂未接入官方余额查询", 400);
   if (!provider.apiKey?.trim()) throw new ProviderError("请先填写 API Key", 400);
   const response = await fetch("https://api.deepseek.com/user/balance", {

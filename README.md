@@ -74,9 +74,10 @@ dsh plugin --profile desktop add dsh-yanfield
 | --- | --- | --- |
 | DSH 账号登录 | 在 Harness 里登录 DeepSeek | 推荐，零配置；余额可直接查 |
 | 官方 API Key | `DEEPSEEK_API_KEY` | 按量计费；也可在 DSH 的模型服务页填写 |
+| DSH 自定义模型 | 在 DSH 的「设置 → 模型」中配置 API | 可接入 LM Studio、vLLM 或 llama.cpp |
 | 离线演示 | 不需要 | 只有模板文本，用于试用界面，不能真正改稿 |
 
-两种真实路由可以在设置页一键切换，未就绪的那条会写明原因（没登录 / 没填 Key）。
+在砚田的「模型服务」或写作助手中直接选择模型。模型按 DSH 路由分组。
 
 ## 功能
 
@@ -103,14 +104,14 @@ dsh plugin --profile desktop add dsh-yanfield
 - `@` 引用章节、角色、设定、伏笔、档案；上下文预算与分节预览可调
 - 关键进展按顺序保留，当前步骤原地更新；上翻阅读时暂停自动滚动
 - 正文改动在正文区逐段审阅（绿色新增 / 红色删除），资料改动按字段对比
-- 本轮任务决定可以生成哪些候选。要求新建资料时只生成资料卡。明确要求写完后同步资料时，才会从新稿提取有原文依据的候选
+- 助手根据本轮指令查找和读取资料，再生成待审阅的改动。批量改动的成功项可以先审阅，失败项可在「执行记录」查看。需要从新稿整理资料时，可在同一条指令里提出，候选会附上可核对的正文引文
 - 支持把常用指令存成提示词预设。工具栏「AI 助手」的续写、扩写、润色和去 AI 味快捷任务会使用对应的预设
 
 ![正文审阅：绿色新增、红色删除，逐段决定保留或还原](docs/screenshots/review-light.png)
 
 ## AI 与费用
 
-- **模型**：默认用 Harness 里已登录的 DeepSeek 账号；也可以切到官方 API Key。两条路由都在 `设置 → 模型服务` 里，显示可用状态与未就绪原因。
+- **模型**：`设置 → 模型服务` 和写作助手的模型列表同时显示 DSH 各路由中的可用模型。LM Studio、vLLM 和 llama.cpp 的配置方式见 [AI 与费用](docs/ai-and-cost.md)。
 - **模型目录**：`deepseek-flash`（DeepSeek-V4.1-Flash，支持文本与图像）与 `deepseek-v4-pro`（DeepSeek-V4-Pro，纯文本），上下文各约 100 万 token；Harness 新增模型时会自动同步进选择器。
 - **余额**：输入框底部的「余额」直接查 DSH 已登录账号的余额，不需要填 Key。
 - **费用**：底部「今日 N tok · 预估 ¥X」是**今日累计**的估算，不是单次任务；单价由插件内置的 DeepSeek 官方价目表提供，按北京时间自动区分高峰与空闲（高峰为工作日 9:00–12:00、14:00–18:00，其余时段与法定节假日按空闲计，空闲价是高峰价的一半）。**估算仅供参考，账单以 DeepSeek 官方为准。**
@@ -143,7 +144,7 @@ dsh plugin --profile desktop add dsh-yanfield
 <details>
 <summary>发消息报 no API key / 模型不可用</summary>
 
-当前路由选到了「官方 API Key」但还没有填 Key。到 `砚田 → 设置 → 模型服务` 把模型路由切回「DeepSeek 账号登录」，或在 Harness 的模型服务页填入 `DEEPSEEK_API_KEY`。
+当前选的是「DeepSeek 官方 API Key」路由下的模型，但还没有填 Key。在砚田选择「DeepSeek 账号登录」分组下的模型，或在 DSH 的「设置 → 模型」填写 API Key。
 </details>
 
 <details>
@@ -203,7 +204,7 @@ English docs: [README.en.md](README.en.md) · [docs/en/](docs/en/features.md)
 
 ## 致谢
 
-界面与领域逻辑来自 [砚田 Yanfield](https://github.com/ZzimaR/Yanfield)。本仓库是它的 DeepSeek Harness 插件化版本：模型改走 Harness 已配置的服务，主题跟随 Harness 明暗切换，多服务商适配改为「DSH 账号 / 官方 API Key」两条路由。
+界面与领域逻辑来自 [砚田 Yanfield](https://github.com/ZzimaR/Yanfield)。本仓库是它的 DeepSeek Harness 插件化版本，复用 Harness 的模型服务和明暗主题。
 
 ## 许可
 

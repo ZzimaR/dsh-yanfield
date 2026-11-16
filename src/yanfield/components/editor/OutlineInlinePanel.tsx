@@ -137,6 +137,7 @@ function ChapterCard({
   chapter,
   active,
   blueprint,
+  status,
   onSelect,
   onEdit,
   rowRef,
@@ -144,6 +145,7 @@ function ChapterCard({
   chapter: Chapter;
   active: boolean;
   blueprint: ChapterBlueprint | undefined;
+  status?: "未保存" | "待审阅";
   onSelect: () => void;
   onEdit: () => void;
   rowRef?: React.Ref<HTMLDivElement>;
@@ -187,13 +189,14 @@ function ChapterCard({
           >
             {stripChapterNumber(chapter.title)}
           </span>
+          {status ? <span className="shrink-0 text-[10.5px] text-ink-3">{tr(status)}</span> : null}
         </span>
         {blueprint ? (
-          <span className="mt-1 flex min-w-0 items-center gap-1 pl-[22px]">
+          <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1 pl-[22px]">
             <TensionTag label="悬念" value={blueprint.suspense} />
             <TensionTag label="转折" value={blueprint.twist} />
             {summary ? (
-              <span className="min-w-0 flex-1 truncate text-[10.5px] text-ink-4">{summary}</span>
+              <span title={summary} className="min-w-[6em] flex-1 truncate text-[10.5px] text-ink-4">{summary}</span>
             ) : null}
           </span>
         ) : null}
@@ -237,15 +240,15 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
     [foreshadowsApi.data],
   );
 
-  const [blueprintVersion, setBlueprintVersion] = React.useState(0);
   /** 章纲列表倒序：最新一卷/一章排在最前；只影响显示，不改库里的顺序 */
   const [descending, setDescending] = useLocalStorageState<boolean>(`yanfield:editor:outline-desc:${novelId}`, false);
-  const blueprintIndex = useBlueprintIndex(novelId, chapters, blueprintVersion);
+  const blueprintIndex = useBlueprintIndex(novelId, chapters);
 
   const [editor, setEditor] = React.useState<EditorKind | null>(null);
   const [minimized, setMinimized] = React.useState(false);
   const [editingVolumeId, setEditingVolumeId] = React.useState<string | null>(null);
   const [editingChapterId, setEditingChapterId] = React.useState<string | null>(null);
+  const [dirtyBlueprintId, setDirtyBlueprintId] = React.useState<string | null>(null);
   const [collapsedVolumes, setCollapsedVolumes] = React.useState<Set<string>>(() => new Set<string>());
 
   const dirtyRef = React.useRef(false);
@@ -361,6 +364,19 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
     dirtyRef.current = dirty;
   }, []);
 
+  const handleBlueprintDirtyChange = React.useCallback((dirty: boolean) => {
+    handleDirtyChange(dirty);
+    setDirtyBlueprintId(dirty ? editingChapterId : null);
+  }, [editingChapterId, handleDirtyChange]);
+
+  function blueprintStatus(id: string) {
+    if (editor === "blueprint" && editingChapterId === id && dirtyBlueprintId === id) return "未保存";
+    if (blueprintIndex.pending.has(id)) return "待审阅";
+  }
+  const currentBlueprintStatus = currentChapter
+    ? blueprintStatus(currentChapter.id) ?? (currentBlueprint ? undefined : "待写")
+    : undefined;
+
   const closeEditor = React.useCallback(() => {
     guardUnsaved(() => {
       dirtyRef.current = false;
@@ -417,11 +433,6 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
     },
     [guardUnsaved],
   );
-
-  const handleBlueprintSaved = React.useCallback(() => {
-    setBlueprintVersion((version) => version + 1);
-    void chaptersApi.refresh();
-  }, [chaptersApi.refresh]);
 
   const confirmDiscard = () => {
     const action = pendingActionRef.current;
@@ -499,8 +510,8 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
                 >
                   {stripChapterNumber(currentChapter.title)}
                 </span>
-                {!currentBlueprint ? (
-                  <span className="shrink-0 text-[10.5px] text-ink-4">{tr("待写")}</span>
+                {currentBlueprintStatus ? (
+                  <span className="shrink-0 text-[10.5px] text-ink-3">{tr(currentBlueprintStatus)}</span>
                 ) : null}
               </div>
               {currentBlueprint ? (
@@ -622,6 +633,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
                               chapter={chapter}
                               active={chapter.id === chapterId}
                               blueprint={blueprintIndex.byChapter.get(chapter.id)}
+                              status={blueprintStatus(chapter.id)}
                               onSelect={() => onSelectChapter(chapter.id)}
                               onEdit={() => openBlueprintEditor(chapter.id)}
                               rowRef={chapter.id === chapterId ? activeRowRef : undefined}
@@ -661,6 +673,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
                         chapter={chapter}
                         active={chapter.id === chapterId}
                         blueprint={blueprintIndex.byChapter.get(chapter.id)}
+                        status={blueprintStatus(chapter.id)}
                         onSelect={() => onSelectChapter(chapter.id)}
                         onEdit={() => openBlueprintEditor(chapter.id)}
                         rowRef={chapter.id === chapterId ? activeRowRef : undefined}
@@ -729,8 +742,7 @@ export function OutlineInlinePanel({ novelId, chapterId, onSelectChapter }: Outl
               chapters={chapters}
               foreshadows={foreshadows}
               onWrite={() => { void onSelectChapter(editingChapter.id); }}
-              onSaved={handleBlueprintSaved}
-              onDirtyChange={handleDirtyChange}
+              onDirtyChange={handleBlueprintDirtyChange}
             />
           </div>
         ) : null}

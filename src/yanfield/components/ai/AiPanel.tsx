@@ -21,7 +21,7 @@ import { Check, CircleAlert, Cpu, MessagesSquare, Plus, Settings2, X } from "luc
 import { DiffReview } from "@/components/diff/DiffReview";
 import { Button, IconButton, Sheet, Tooltip, useToast } from "@/components/ui/kit";
 import { openSettingsDialog } from "@/components/settings/open";
-import { apiGet, apiPatch, notifyDataChanged, streamAiAgent, useApi } from "@/lib/client/api";
+import { apiGet, apiPatch, notifyDataChanged, streamAiAgent, useApi, useDataChanged } from "@/lib/client/api";
 import { ApiError } from "@/lib/client/api";
 import { textToInsertHtml, useEditorBridge, type EditorBridge } from "@/lib/editor/bridge";
 import { HAND_OFF_EVENT, takeHandOff, type HandOffDetail } from "@/lib/editor/hand-off";
@@ -51,6 +51,7 @@ import { ContextDrawer } from "./ContextDrawer";
 import { useContextPreview } from "./ContextMeter";
 import type { AgentRequest, AgentRun } from "@/lib/ai/agent/types";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
+import { requestAutoReview } from "@/lib/ai/agent/client";
 import { ModelPicker } from "./ModelPicker";
 import { WelcomePanel } from "./WelcomePanel";
 import { MAX_SESSION_TABS, useAiChat } from "./use-ai-chat";
@@ -172,10 +173,12 @@ export function AiPanel({
   const chat = useAiChat({ novelId, chapterId: chapterId ?? null, defaultAgentId });
   const chatRef = React.useRef(chat);
   chatRef.current = chat;
-  const { data: settings, setData: setSettingsData } = useApi<AppSettings>("/api/settings");
+  const { data: settings, refresh: refreshSettings, setData: setSettingsData } = useApi<AppSettings>("/api/settings");
   const statsApi = useApi<DashboardStats>("/api/stats");
   const wasStreaming = React.useRef(false);
-  const { data: providers } = useApi<{ items: ProviderConfig[] }>("/api/providers");
+  const { data: providers, refresh: refreshProviders } = useApi<{ items: ProviderConfig[] }>("/api/providers");
+  useDataChanged(refreshSettings, ["settings"]);
+  useDataChanged(refreshProviders, ["providers"]);
   const agents = React.useMemo(() => listAgents(settings), [settings]);
   /** 只有一个智能体时隐藏选择器（内置已精简到 3 个，通常仍会显示） */
   const hasAgentChoice = agents.length > 1;
@@ -384,18 +387,26 @@ export function AiPanel({
 
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
   const followingRef = React.useRef(true);
+  const lastScrollTop = React.useRef(0);
   const [hasNewProgress,setHasNewProgress] = React.useState(false);
-  const followLatest = React.useCallback(()=>{
-    followingRef.current=true;setHasNewProgress(false);
-    const element=scrollRef.current;
-    if(element)element.scrollTop=element.scrollHeight;
+  const scrollToLatest = React.useCallback(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    element.scrollTop = element.scrollHeight;
+    lastScrollTop.current = element.scrollTop;
   },[]);
+  const followLatest = React.useCallback(() => {
+    followingRef.current = true;
+    setHasNewProgress(false);
+    scrollToLatest();
+  }, [scrollToLatest]);
   React.useEffect(()=>{
     // 空对话（欢迎态）不该自动滚到底：内容比可视区高一点时会把主编卡和开场白切掉。
     const element=scrollRef.current;
     if(chat.activeTab.messages.length===0){
       followingRef.current=true;setHasNewProgress(false);
       if(element)element.scrollTop=0;
+      lastScrollTop.current = 0;
       return;
     }
     followLatest();
@@ -404,23 +415,23 @@ export function AiPanel({
     if(chat.activeTab.messages.length===0){
       followingRef.current=true;setHasNewProgress(false);
       const element=scrollRef.current;if(element)element.scrollTop=0;
+      lastScrollTop.current = 0;
       return;
     }
     const frame=requestAnimationFrame(()=>{
-      if(followingRef.current)followLatest();
+      if(followingRef.current)scrollToLatest();
       else setHasNewProgress(true);
     });
     return()=>cancelAnimationFrame(frame);
-  },[chat.activeTab.messages,followLatest]);
+  },[chat.activeTab.messages,scrollToLatest]);
   React.useEffect(()=>{
     const content=scrollRef.current?.firstElementChild;
     if(!content || chat.activeTab.messages.length===0 || typeof ResizeObserver==="undefined")return;
     const observer=new ResizeObserver(()=>{
-      if(followingRef.current)followLatest();
-      else setHasNewProgress(true);
+      if(followingRef.current)scrollToLatest();
     });
     observer.observe(content);return()=>observer.disconnect();
-  },[activeKey,chat.activeTab.messages.length,followLatest]);
+  },[activeKey,chat.activeTab.messages.length,scrollToLatest]);
 
   /** 当前实际会用的 Provider / 模型（后端 resolveTarget 规则推导，用于顶栏展示与无模型引导） */
   const target = React.useMemo(
@@ -503,7 +514,18 @@ export function AiPanel({
     if (continuation.current?.tab === originalKey && !retryMessage) continuation.current = null;
     setDraft("");setMentions([]);setTask(null);setReferenceSnapshots(prev=>({...prev,[originalKey]:undefined}));
     let currentRun:AgentRun|undefined;
+    let agentThought: UIMessage["agentThought"];
+    let agentReply = "";
     let action:AiAction|undefined;
+    const receiveRun = (run: AgentRun) => {
+      const newlyReady = run.status === "ready" && currentRun?.status !== "ready";
+      currentRun = run;
+      if (newlyReady && activeTabKeyRef.current === originalKey &&
+        run.changes.some(change => change.kind === "chapter" && change.state === "pending")) {
+        // React can batch the running and ready snapshots into the same render.
+        requestAutoReview(run);
+      }
+    };
     try {
       await streamAiAgent({novelId,chapterId:requestContext.chapterId,sessionId:sessionId||undefined,agentId:requestContext.agentId,message:text,snapshot,history,previousRunId,retryRunId:retryMessage ? previousRunId : undefined,selection,selectionReference,mentions:references,context:requestContext.context,writingPreset}, {
         signal:controller.signal,
@@ -516,29 +538,52 @@ export function AiPanel({
             chat.patchExchange(assistantId,{actions:[action]});
           }
           if(event.type==="agent") {
-            currentRun=event.run;
-            chat.patchExchange(assistantId,{agentRun:event.run,content:event.run.summary||tr("正在处理任务"),status:event.run.status==="running"?"streaming":event.run.status==="error"?"error":event.run.status==="aborted"?"aborted":"complete",error:event.run.error,usage:event.run.usage});
+            receiveRun(event.run);
+            agentThought=undefined;
+            agentReply = "";
+            chat.patchExchange(assistantId,{agentRun:event.run,agentThought,agentReply,content:event.run.summary||tr("正在处理任务"),status:event.run.status==="running"?"streaming":event.run.status==="error"?"error":event.run.status==="aborted"?"aborted":"complete",error:event.run.error,usage:event.run.usage});
+          }
+          if (event.type === "agent-thinking" && currentRun) {
+            const { phase, thought } = event;
+            if (phase === "end") {
+              agentThought = undefined;
+              if (thought.text.trim()) currentRun = { ...currentRun, thoughts: [...(currentRun.thoughts ?? []), thought] };
+              chat.patchExchange(assistantId, { agentRun: currentRun, agentThought });
+            } else {
+              const text = agentThought?.id === thought.id ? agentThought.text + thought.text : thought.text;
+              agentThought = { ...thought, text };
+              if (phase === "start") agentReply = "";
+              chat.patchExchange(assistantId, { agentThought, agentReply });
+            }
+          }
+          if (event.type === "delta") {
+            agentReply += event.text;
+            chat.patchExchange(assistantId, { agentReply });
           }
           if(event.type==="agent-preview" && currentRun) {
             currentRun={...currentRun,preview:currentRun.preview+event.text};
             chat.patchExchange(assistantId,{agentRun:currentRun});
           }
-          if(event.type==="error") chat.patchExchange(assistantId,{status:"error",error:event.message,content:currentRun?.summary||tr("任务未完成")});
+          if(event.type==="error") chat.patchExchange(assistantId,{agentThought:undefined,agentReply:"",status:"error",error:event.message,content:currentRun?.summary||tr("任务未完成")});
           if(event.type==="done") chat.patchExchange(assistantId,{usage:event.usage});
         },
       });
     } catch(e) {
       if (runId === agentRunIdRef.current) {
-        chat.patchExchange(assistantId,{status:controller.signal.aborted?"aborted":"error",content:currentRun?.summary||tr("任务未完成"),error:controller.signal.aborted?tr("已停止，完成的候选已保留"):e instanceof Error?e.message:tr("任务失败")});
+        chat.patchExchange(assistantId,{agentThought:undefined,agentReply:"",status:controller.signal.aborted?"aborted":"error",content:currentRun?.summary||tr("任务未完成"),error:controller.signal.aborted?tr("已停止，完成的候选已保留"):e instanceof Error?e.message:tr("任务失败")});
       }
       if(action && runId === agentRunIdRef.current) {
         const savedRunId=(action.payload as {runId:string}).runId;
         try {
           const saved=await apiGet<AgentRun>(`/api/ai/agent/${savedRunId}?novelId=${encodeURIComponent(novelId)}`);
-          if (runId === agentRunIdRef.current) chat.patchExchange(assistantId,{agentRun:saved});
+          if (runId === agentRunIdRef.current) {
+            receiveRun(saved);
+            chat.patchExchange(assistantId,{agentRun:saved});
+          }
         } catch {}
       }
     } finally {
+      if (currentRun?.changes.some(change => change.kind === "blueprint")) notifyDataChanged("blueprint-review");
       if (runId === agentRunIdRef.current) {
         sendingRef.current=false;
         editAbortRef.current=null;
@@ -863,11 +908,39 @@ export function AiPanel({
       ) : null}
 
       {/* 对话区 */}
-      <div ref={scrollRef} onScroll={event=>{
-        const element=event.currentTarget;
-        followingRef.current=element.scrollHeight-element.scrollTop-element.clientHeight<48;
-        if(followingRef.current)setHasNewProgress(false);
-      }} className="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-5">
+      <div
+        ref={scrollRef}
+        tabIndex={0}
+        role="region"
+        aria-label={tr("对话消息")}
+        onWheelCapture={(event) => {
+          // The wheel event arrives before the browser moves the viewport or a pending frame follows the stream.
+          if (event.deltaY < 0 && event.currentTarget.scrollTop > 0) followingRef.current = false;
+        }}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === "End") {
+            event.preventDefault();
+            followLatest();
+          } else if (event.key === "PageUp" || event.key === "ArrowUp" || event.key === "Home") {
+            followingRef.current = false;
+          }
+        }}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          const bottom = Math.max(0, element.scrollHeight - element.clientHeight);
+          const top = Math.max(0, Math.min(bottom, element.scrollTop));
+          const previous = Math.min(bottom, lastScrollTop.current);
+          lastScrollTop.current = top;
+          // Compare with the latest valid position so collapsing a block does not look like scrolling up.
+          if (top < previous) followingRef.current = false;
+          else if (top > previous && bottom - top <= 2) {
+            followingRef.current = true;
+            setHasNewProgress(false);
+          }
+        }}
+        className="scroll-thin min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 focus-visible:outline-accent"
+      >
         {chat.activeTab.messages.length === 0 ? (
           <WelcomePanel
             agent={activeAgent}

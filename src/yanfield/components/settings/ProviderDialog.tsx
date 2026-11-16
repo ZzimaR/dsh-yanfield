@@ -68,6 +68,7 @@ function formFromPreset(preset: ProviderPreset): ProviderForm {
 /** 新增 / 编辑模型服务。apiKey 留空表示不修改已保存的密钥。 */
 export function ProviderDialog({ open, provider, preset, onClose, onSaved }: ProviderDialogProps) {
   const tr = useT();
+  const baseUrlId = React.useId();
   const [form, setForm] = React.useState<ProviderForm>(EMPTY_FORM);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -132,7 +133,7 @@ export function ProviderDialog({ open, provider, preset, onClose, onSaved }: Pro
       title={provider ? tr("编辑模型服务") : tr("添加模型服务")}
       description={form.kind === "harness"
         ? tr("这一项走 DeepSeek Harness 里已经配置好的模型，不需要再填 API Key。")
-        : tr("本构建专精 DeepSeek：填写官方 API Key，即可对话、写作，并查询账户余额。")}
+        : tr("填写 DeepSeek 官方 API Key，即可对话、写作，并查询账户余额。")}
       width={620}
       footer={
         <>
@@ -154,7 +155,7 @@ export function ProviderDialog({ open, provider, preset, onClose, onSaved }: Pro
       >
         {preset && !provider ? (
           <div className="rounded-md border border-line bg-surface-2/70 px-3 py-2.5">
-            <p className="text-[11.5px] leading-5 text-ink-3">{preset.description}</p>
+            <p className="text-[11.5px] leading-5 text-ink-3">{tr(preset.description)}</p>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] leading-4">
               {preset.keyUrl ? (
                 <a
@@ -167,7 +168,7 @@ export function ProviderDialog({ open, provider, preset, onClose, onSaved }: Pro
                   <ArrowUpRight className="size-3" aria-hidden />
                 </a>
               ) : null}
-              {preset.note ? <span className="text-ink-3">{preset.note}</span> : null}
+              {preset.note ? <span className="text-ink-3">{tr(preset.note)}</span> : null}
             </div>
           </div>
         ) : form.kind === "harness" ? (
@@ -191,14 +192,21 @@ export function ProviderDialog({ open, provider, preset, onClose, onSaved }: Pro
             placeholder={tr("例如：DeepSeek")}
             error={error}
           />
-          {form.kind === "harness" ? null : (
-          <Input
-            label={tr("Base URL")}
-            value={form.baseUrl}
-            onChange={(event) => update("baseUrl", event.target.value)}
-            placeholder={DEEPSEEK_BASE_URL}
-            hint={tr("使用官方地址 https://api.deepseek.com 才能查询账户余额。")}
-          />
+          {form.kind !== "harness" && (
+            <div className="min-w-0 space-y-1.5">
+              <Input
+                id={baseUrlId}
+                label={tr("接口地址")}
+                value={form.baseUrl}
+                onChange={(event) => update("baseUrl", event.target.value)}
+                placeholder={DEEPSEEK_BASE_URL}
+                spellCheck={false}
+                aria-describedby={`${baseUrlId}-hint`}
+              />
+              <p id={`${baseUrlId}-hint`} className="break-words text-[11px] leading-relaxed text-ink-3">
+                {tr("查询余额需使用 DeepSeek 官方接口。")}
+              </p>
+            </div>
           )}
         </div>
         {form.kind === "harness" ? null : (

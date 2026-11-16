@@ -25,7 +25,7 @@ function invalidCharacterArcs(value: unknown): boolean {
 
 export const GET = handle<{ novelId: string }>(async (_request, { params }) => {
   if (!repo.getNovel(params.novelId)) return notFound("作品不存在");
-  return ok(repo.getNovelOutline(params.novelId));
+  return ok(repo.getNovelOutline(params.novelId, false));
 });
 
 export const PATCH = handle<{ novelId: string }>(async (request, { params }) => {

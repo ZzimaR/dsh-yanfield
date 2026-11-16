@@ -22,6 +22,7 @@ export const outline: Record<string, TranslateValue> = {
   "已追加到列表，记得点击保存。": "Added to the list — remember to save.",
   "用逗号或顿号分隔": "Separate with commas",
   "未保存": "Unsaved",
+  "待审阅": "Pending review",
 
   // AI 辅助面板
   "完善": "Complete",
