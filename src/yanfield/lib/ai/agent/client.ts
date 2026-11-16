@@ -6,10 +6,14 @@ import type { AgentRun } from "./types";
 import { t } from "@/lib/i18n/core";
 
 export const AGENT_UPDATED="yanfield:agent-updated";
+export const AGENT_REVIEW_READY = "yanfield:agent-review-ready";
 export const AGENT_COMMIT_CHANGED="yanfield:agent-commit-changed";
 const committing = new Set<string>();
 export function isAgentCommitting(id: string): boolean { return committing.has(id); }
 export function broadcastRun(run:AgentRun):void {window.dispatchEvent(new CustomEvent(AGENT_UPDATED,{detail:run}));}
+export function requestAutoReview(run: AgentRun): void {
+  window.dispatchEvent(new CustomEvent(AGENT_REVIEW_READY, { detail: run }));
+}
 export function openAgentReview(run:AgentRun,changeId:string):void {
   window.dispatchEvent(new CustomEvent("yanfield:agent-review",{detail:{run,changeId}}));
 }

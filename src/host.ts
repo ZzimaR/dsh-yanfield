@@ -290,6 +290,9 @@ function createBridge(ctx: { llm?: LlmLike; get?: (name: string) => unknown; dee
     async *stream(input: HarnessStreamInput) {
       const llm = llmOf()
       if (!llm) throw Object.assign(new Error("DeepSeek Harness 的模型服务还没有就绪"), { status: 503 })
+      if (typeof llm.listProviders === "function" && !llm.listProviders().some(route => route.id === input.provider)) {
+        throw Object.assign(new Error("宿主没有注册当前路由"), { status: 400 })
+      }
       const options: Record<string, unknown> = {
         provider: input.provider,
         model: input.model,

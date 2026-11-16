@@ -37,6 +37,7 @@ const OPEN_SETTINGS_EVENT = "yanfield:open-settings";
 const KIND_LABEL: Record<ProviderConfig["kind"], string> = {
   deepseek: "DeepSeek",
   demo: "离线演示",
+  harness: "DeepSeek Harness",
 };
 
 export interface ModelPickerProps {
@@ -75,7 +76,7 @@ export function ModelPicker({
   const menuRef = React.useRef<HTMLDivElement | null>(null);
 
   const groups = React.useMemo(
-    () => (liveProviders ?? providers ?? []).filter((provider) => provider.enabled),
+    () => (liveProviders ?? providers ?? []).filter((provider) => provider.enabled && provider.available !== false),
     [liveProviders, providers],
   );
   const realProviders = React.useMemo(
@@ -99,7 +100,9 @@ export function ModelPicker({
     ? tr("未配置模型")
     : target.providerKind === "demo"
       ? tr("离线演示 · {model}", { model: target.model })
-      : tr("DeepSeek · {model}", { model: shortModel(target.model) });
+      : target.model.startsWith("deepseek-")
+        ? tr("DeepSeek · {model}", { model: shortModel(target.model) })
+        : tr(target.modelLabel);
 
   /** 当前模型是否仍存在于已启用 Provider 列表中 */
   const currentInList = React.useMemo(() => {
@@ -221,6 +224,7 @@ export function ModelPicker({
         });
         onChanged(updated);
         notifyDataChanged("settings");
+        notifyDataChanged("providers");
         toast({
           title: tr("默认模型已切换"),
           description: `${tr(provider.name)} / ${tr(model.label) || model.id}`,

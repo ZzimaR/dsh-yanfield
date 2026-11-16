@@ -48,6 +48,24 @@
   -webkit-app-region: no-drag;
 }
 
+.yf-library-drag {
+  display: none;
+}
+
+@media (min-width: 48rem) {
+  :host-context(html[data-platform="darwin"]:not([data-fullscreen])) .yf-library-drag {
+    display: block;
+    flex: 0 0 1.5rem;
+    -webkit-app-region: drag;
+    user-select: none;
+  }
+
+  /* Move the first 24px of the library's top padding into the title bar. */
+  :host-context(html[data-platform="darwin"]:not([data-fullscreen])) .yf-library-body {
+    padding-top: 0.5rem;
+  }
+}
+
 .yf-app .h-dvh {
   height: 100% !important;
   max-height: 100%;

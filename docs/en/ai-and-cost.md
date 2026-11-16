@@ -2,19 +2,21 @@
 
 ## 1. Where the model comes from
 
-Yanfield ships no API key and stores no credentials. It borrows one of two routes already registered in DeepSeek Harness:
+When you connect through DeepSeek Harness, DSH manages models and credentials. Yanfield can use custom routes registered in DSH as well as the following DeepSeek routes:
 
 | Route | Display name | Credential | When to use |
 | --- | --- | --- | --- |
 | `deepseek-account` | DeepSeek account | The DeepSeek account signed in to Harness | Recommended; zero setup, balance readable |
 | `deepseek-official` | DeepSeek official API key | `DEEPSEEK_API_KEY` (env or Harness model page) | Pay per token; no account sign-in on the client |
 
-Switch them in `Settings → Model services`; an unavailable route explains itself:
+Settings → Model services syncs the routes registered in DSH. Pick a model under Default model or directly in the writing assistant. Unavailable routes show their status:
 
 - account route not ready: "Not signed in to DeepSeek yet: sign in to DSH and this route works immediately"
 - key route not ready: "No DeepSeek API key yet: add one under Model services in DSH, or set the DEEPSEEK_API_KEY environment variable"
 
 On first setup, Yanfield prefers a signed-in account route, then an official key route with credentials. Restarting preserves the selected route. If the official route reports a missing credential, the request can fall back to a signed-in account route.
+
+For a local inference server, go to Settings → Models in DSH and add a Custom model API using OpenAI Chat Completions. Enter the server URL, model ID, and context window allocated by the server. In Yanfield, select the model from the model list. If the list is already open, click Refresh models. The full writing assistant workflow requires the server to stream tool calls and accept tool results for the next response.
 
 ## 2. Model catalog
 

@@ -52,7 +52,7 @@ export const SETTINGS_SECTIONS: SettingsSectionMeta[] = [
   {
     key: "providers",
     label: "模型服务",
-    description: "DeepSeek 官方接口",
+    description: "DSH 模型路由与 DeepSeek API",
     icon: <Cpu className="size-3.5" aria-hidden />,
   },
   {

@@ -121,7 +121,7 @@ export function AgentReview({initial,changeId,onClose}:{initial:AgentRun;changeI
       <div className="border-t border-line/60 bg-paper/40 px-4 py-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] leading-relaxed text-ink-4">
           {pending?<><span className="inline-flex items-center gap-1"><span aria-hidden className="size-2 rounded-[2px] bg-jade-soft ring-1 ring-jade/40"/><span className="text-jade">{tr("新增")}</span></span><span className="inline-flex items-center gap-1"><span aria-hidden className="size-2 rounded-[2px] bg-danger/15 ring-1 ring-danger/40"/><span className="text-danger/80">{tr("删除（划线）")}</span></span></>:null}
-          <span>{pending?tr("「保留 / 还原」逐段生效：点完「确认审阅结果」后只写入保留的段落，其余保持原文。"):tr("本轮修改的历史快照，关闭即可返回当前正文。")}</span>
+          <span>{pending?tr("「全部保留」会直接写入修订。逐段选择后，点「确认审阅结果」写入保留的段落。"):tr("本轮修改的历史快照，关闭即可返回当前正文。")}</span>
         </div>
         {error?<p role="alert" className="mt-2 text-[11px] text-danger">{error}</p>:null}
       </div>

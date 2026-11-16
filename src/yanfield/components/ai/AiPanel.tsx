@@ -21,7 +21,7 @@ import { Check, CircleAlert, Cpu, MessagesSquare, Plus, Settings2, X } from "luc
 import { DiffReview } from "@/components/diff/DiffReview";
 import { Button, IconButton, Sheet, Tooltip, useToast } from "@/components/ui/kit";
 import { openSettingsDialog } from "@/components/settings/open";
-import { apiGet, apiPatch, notifyDataChanged, streamAiAgent, useApi } from "@/lib/client/api";
+import { apiGet, apiPatch, notifyDataChanged, streamAiAgent, useApi, useDataChanged } from "@/lib/client/api";
 import { ApiError } from "@/lib/client/api";
 import { textToInsertHtml, useEditorBridge, type EditorBridge } from "@/lib/editor/bridge";
 import { HAND_OFF_EVENT, takeHandOff, type HandOffDetail } from "@/lib/editor/hand-off";
@@ -51,7 +51,7 @@ import { ContextDrawer } from "./ContextDrawer";
 import { useContextPreview } from "./ContextMeter";
 import type { AgentRequest, AgentRun } from "@/lib/ai/agent/types";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
-import { broadcastRun } from "@/lib/ai/agent/client";
+import { requestAutoReview } from "@/lib/ai/agent/client";
 import { ModelPicker } from "./ModelPicker";
 import { WelcomePanel } from "./WelcomePanel";
 import { MAX_SESSION_TABS, useAiChat } from "./use-ai-chat";
@@ -173,10 +173,12 @@ export function AiPanel({
   const chat = useAiChat({ novelId, chapterId: chapterId ?? null, defaultAgentId });
   const chatRef = React.useRef(chat);
   chatRef.current = chat;
-  const { data: settings, setData: setSettingsData } = useApi<AppSettings>("/api/settings");
+  const { data: settings, refresh: refreshSettings, setData: setSettingsData } = useApi<AppSettings>("/api/settings");
   const statsApi = useApi<DashboardStats>("/api/stats");
   const wasStreaming = React.useRef(false);
-  const { data: providers } = useApi<{ items: ProviderConfig[] }>("/api/providers");
+  const { data: providers, refresh: refreshProviders } = useApi<{ items: ProviderConfig[] }>("/api/providers");
+  useDataChanged(refreshSettings, ["settings"]);
+  useDataChanged(refreshProviders, ["providers"]);
   const agents = React.useMemo(() => listAgents(settings), [settings]);
   /** 只有一个智能体时隐藏选择器（内置已精简到 3 个，通常仍会显示） */
   const hasAgentChoice = agents.length > 1;
@@ -521,7 +523,7 @@ export function AiPanel({
       if (newlyReady && activeTabKeyRef.current === originalKey &&
         run.changes.some(change => change.kind === "chapter" && change.state === "pending")) {
         // React can batch the running and ready snapshots into the same render.
-        broadcastRun(run);
+        requestAutoReview(run);
       }
     };
     try {

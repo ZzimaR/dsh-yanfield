@@ -9,7 +9,6 @@ import {
   ConfirmDialog,
   EmptyState,
   IconButton,
-  Segmented,
   Skeleton,
   Spinner,
   Switch,
@@ -19,7 +18,6 @@ import { apiDelete, apiPatch, apiPost, notifyDataChanged, useApi } from "@/lib/c
 import { getProviderPreset } from "@/lib/defaults";
 import type { AppSettings, ProviderConfig } from "@/lib/types";
 import { providerShowsBalance, type ProviderBalance } from "@/lib/ai/balance";
-import { harnessRouteOf, type HarnessRouteOption } from "@/lib/ai/harness-bridge";
 import { cn } from "@/lib/ui/cn";
 import { useT } from "@/lib/i18n";
 import { ProviderDialog } from "./ProviderDialog";
@@ -32,12 +30,6 @@ export interface ProvidersSectionProps {
 
 interface ProviderListResponse {
   items: ProviderConfig[];
-}
-
-interface HarnessRoutesResponse {
-  routes: HarnessRouteOption[];
-  current: string | null;
-  defaultModel: string | null;
 }
 
 interface TestResult {
@@ -73,35 +65,6 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
     finally{setBalanceLoading(prev=>({...prev,[key]:false}));}
   };
   const items = providersApi.data?.items ?? [];
-  const routesApi = useApi<HarnessRoutesResponse>("/api/providers/harness");
-  const [switchingRouteId, setSwitchingRouteId] = React.useState<string | null>(null);
-
-  /** 切换 harness 服务的底层路由（账号登录 / 官方 API Key），并把默认模型对齐到新路由的目录。 */
-  const switchRoute = async (provider: ProviderConfig, routeId: string) => {
-    if (!routeId || routeId === harnessRouteOf(provider.baseUrl)) return;
-    setSwitchingRouteId(provider.id);
-    try {
-      await apiPatch<ProviderConfig>(`/api/providers/${provider.id}`, { baseUrl: `harness:${routeId}` });
-      const route = routesApi.data?.routes.find((item) => item.id === routeId);
-      const first = route?.models[0];
-      const selection = settings?.models.chat;
-      const missing = selection?.providerId === provider.id && first
-        && !(route?.models ?? []).some((model) => model.id === selection.model);
-      if (missing && first && selection) {
-        const next = { providerId: provider.id, model: first.id };
-        update({ models: { chat: next, prose: next } });
-      }
-      await providersApi.refresh();
-      await routesApi.refresh();
-      notifyDataChanged("providers");
-      toast({ title: tr("已切换模型路由"), description: route?.name ? tr(route.name) : routeId, tone: "success" });
-    } catch (cause) {
-      toast({ title: tr("切换失败"), description: cause instanceof Error ? cause.message : tr("请稍后再试"), tone: "error" });
-    } finally {
-      setSwitchingRouteId(null);
-    }
-  };
-
   const openCreate = () => {
     setEditing(null);
     setDialogOpen(true);
@@ -183,14 +146,14 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
     }
   };
 
-  const activeProviders = items.filter((provider) => provider.enabled && provider.models.length > 0);
+  const activeProviders = items.filter((provider) => provider.enabled && provider.available !== false && provider.models.length > 0);
   const defaultSelection = settings?.models.chat;
   const currentDefault =
     defaultSelection?.providerId && defaultSelection.model
       ? `${defaultSelection.providerId}${MODEL_SEP}${defaultSelection.model}`
       : "";
   const modelProviders = items.filter(
-    (provider) => provider.models.length > 0 && (provider.enabled || provider.id === defaultSelection?.providerId),
+    (provider) => provider.models.length > 0 && ((provider.enabled && provider.available !== false) || provider.id === defaultSelection?.providerId),
   );
   const currentProvider = items.find((provider) => provider.id === defaultSelection?.providerId);
   const currentModel = currentProvider?.models.find((model) => model.id === defaultSelection?.model);
@@ -215,13 +178,25 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
         <div className="min-w-0">
           <h2 className="font-serif text-lg text-ink">{tr("模型服务")}</h2>
           <p className="mt-1 max-w-[62ch] text-[12px] leading-6 text-ink-3">
-            {tr("使用 DSH 中的 DeepSeek 账号，或添加官方 API Key。")}
+            {tr("自动读取 DSH 中配置的模型。你也可以添加 DeepSeek 官方 API Key。")}
           </p>
         </div>
         <Button variant="primary" size="sm" className="shrink-0" icon={<Plus className="size-3.5" />} onClick={() => openCreate()}>
           {tr("添加 DeepSeek")}
         </Button>
       </div>
+
+      {items.some(provider => provider.kind === "harness") && (
+        <div className="flex items-start justify-between gap-3">
+          <p className="max-w-[72ch] text-[11px] leading-relaxed text-ink-3">
+            {tr("使用 LM Studio、vLLM、llama.cpp 或其他 OpenAI 兼容接口？在 DSH 的「设置 → 模型」添加自定义模型 API，协议选择「OpenAI Chat Completions」，再回到砚田刷新模型列表。")}
+          </p>
+          <Button size="sm" variant="secondary" className="shrink-0" icon={<RefreshCw className="size-3.5" />}
+            loading={providersApi.loading} onClick={() => void providersApi.refresh().then(() => notifyDataChanged("providers"))}>
+            {tr("刷新模型列表")}
+          </Button>
+        </div>
+      )}
 
       <Card className="p-4">
         <h3 className="text-[13px] font-medium text-ink">{tr("默认模型")}</h3>
@@ -241,7 +216,7 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
               >
                 <option value="">{tr("未选择")}</option>
                 {modelProviders.map((provider) => (
-                  <optgroup key={provider.id} label={tr(provider.name)}>
+                  <optgroup key={provider.id} label={tr(provider.name)} disabled={!provider.enabled || provider.available === false}>
                     {provider.models.map((model) => (
                       <option key={model.id} value={`${provider.id}${MODEL_SEP}${model.id}`}>
                         {tr(model.label)}
@@ -257,7 +232,7 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
             </div>
             <p className="mt-1.5 text-[10.5px] leading-5 text-ink-3">
               {currentProvider && currentModel
-                ? `${tr("当前：{provider} · {model}", { provider: currentProvider.name, model: currentModel.label })}${
+                ? `${tr("当前：{provider} · {model}", { provider: tr(currentProvider.name), model: currentModel.label })}${
                     typeof currentContextWindow === "number" && currentContextWindow > 0
                       ? tr(" · 上下文约 {tokens}K tokens", { tokens: Math.round(currentContextWindow / 1000) })
                       : ""
@@ -316,42 +291,13 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
                         </Badge>
                       ) : null}
                     </div>
-                    {provider.kind === "harness" ? (() => {
-                      const currentRoute = harnessRouteOf(provider.baseUrl) ?? "";
-                      const routes = routesApi.data?.routes ?? [];
-                      const active = routes.find((route) => route.id === currentRoute);
-                      const options = routes.map((route) => ({
-                        value: route.id,
-                        label: (
-                          <span className="flex items-center gap-1.5">
-                            {tr(route.name)}
-                            {route.available ? null : <span className="text-ink-4">{tr("· 未就绪")}</span>}
-                          </span>
-                        ),
-                      }));
-                      return (
-                        <div className="mt-2 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[11px] text-ink-3">{tr("模型路由")}</span>
-                            {options.length > 0 ? (
-                              <Segmented
-                                size="sm"
-                                value={currentRoute}
-                                options={options}
-                                onChange={(value) => { if (!switchingRouteId) void switchRoute(provider, value); }}
-                              />
-                            ) : (
-                              <span className="font-mono text-[10.5px] text-ink-4">{provider.baseUrl}</span>
-                            )}
-                          </div>
-                          <p className={cn("text-[11px]", active && !active.available ? "text-warning" : "text-ink-3")}>
-                            {active
-                              ? active.available ? null : active.unavailableReason ?? tr("这条路由暂时不可用")
-                              : routesApi.loading ? tr("正在读取宿主路由…") : routesApi.error ?? tr("宿主没有注册当前路由")}
-                          </p>
-                        </div>
-                      );
-                    })() : (
+                    {provider.kind === "harness" ? (
+                      provider.available === false && (
+                        <p className="mt-1 text-[11px] text-warning">
+                          {tr(provider.unavailableReason ?? "这条路由暂时不可用")}
+                        </p>
+                      )
+                    ) : (
                       <p className="mt-1 truncate font-mono text-[10.5px] text-ink-3">
                         {provider.baseUrl || tr("本地演示 · 无需网络")}
                       </p>
@@ -403,19 +349,23 @@ export function ProvidersSection({ settings, update }: ProvidersSectionProps) {
                         <IconButton
                           label={tr("测试连通性")}
                           size="sm"
-                          disabled={testingId === provider.id}
+                          disabled={testingId === provider.id || provider.available === false}
                           onClick={() => void test(provider)}
                         >
                           {testingId === provider.id ? <Spinner size="sm" /> : <Zap className="size-3.5" />}
                         </IconButton>
-                        <IconButton label={tr("编辑")} size="sm" onClick={() => openEdit(provider)}>
-                          <Pencil className="size-3.5" />
-                        </IconButton>
+                        {provider.kind !== "harness" && (
+                          <IconButton label={tr("编辑")} size="sm" onClick={() => openEdit(provider)}>
+                            <Pencil className="size-3.5" />
+                          </IconButton>
+                        )}
                       </>
                     ) : null}
-                    <IconButton label={tr("删除")} size="sm" onClick={() => setRemoving(provider)}>
-                      <Trash className="size-3.5" />
-                    </IconButton>
+                    {provider.kind !== "harness" && (
+                      <IconButton label={tr("删除")} size="sm" onClick={() => setRemoving(provider)}>
+                        <Trash className="size-3.5" />
+                      </IconButton>
+                    )}
                   </div>
                 </div>
               </Card>
