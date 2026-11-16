@@ -28,6 +28,10 @@ type FloatWindowSize = { width: number; height: number };
 /** 会话内共享的“最后一次调整过的尺寸”，避免每个浮窗实例各读各的 localStorage */
 let lastFloatSize: FloatWindowSize | null = null;
 
+export function resetFloatWindowSize(): void {
+  lastFloatSize = null;
+}
+
 function readStoredFloatSize(): FloatWindowSize | null {
   if (lastFloatSize) return lastFloatSize;
   if (typeof window === "undefined") return null;

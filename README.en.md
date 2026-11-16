@@ -126,7 +126,9 @@ More: [model services](docs/screenshots/en-settings.png) · [Chinese screenshots
 
 - Manuscripts live in `$DSH_HOME/yanfield/yanfield.db` (plus `-wal` / `-shm`). `Settings → Data` shows the real path and can open the folder.
 - Set `YANFIELD_DB_PATH` to select a database file. If the profile's `cordis.patch.yml` sets the plugin's `dataDir`, its `yanfield.db` takes precedence.
-- Backup: quit Harness first, then copy the whole directory (copying SQLite while it runs can give an inconsistent snapshot).
+- In **Settings → Data → Export backup**, download a `.yanfield` file. Select books to back up their manuscripts, story notes, and AI history. A full backup also includes global settings, presets, model service configuration, and statistics.
+- Use **Import backup** to preview the file and import copies. With a full backup, you can also **Restore full library**. Yanfield creates a `yanfield-before-restore-*.db` snapshot in the data folder first. To roll back, quit Harness, replace the current database with that snapshot, and move the current database’s matching `-wal` and `-shm` files out of the folder.
+- Full exports omit model service API keys by default. Select **Encrypt the backup and include model service API keys** to transfer keys stored in Yanfield. Set up Harness-managed accounts and credentials separately on the destination.
 - Before upgrading the database schema, Yanfield creates a full snapshot in the same folder. If the backup fails, the upgrade stops. After a successful upgrade, Yanfield keeps the three most recent automatic upgrade backups.
 - Removing the plugin does not delete your manuscript; the database stays where it is.
 
@@ -159,7 +161,7 @@ That request returned no usage (for example it was interrupted), or the model is
 <details>
 <summary>Where is my manuscript / how do I move it</summary>
 
-See "Data and backup" above. Copy the whole database directory to the new machine; if the path stays the same, nothing else is needed.
+See “Data and backup” above. Export a full backup and restore it on the new machine.
 </details>
 
 <details>

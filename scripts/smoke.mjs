@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { Readable } from "node:stream"
 import assert from "node:assert/strict"
 import { DatabaseSync } from "node:sqlite"
+import { checkBackups } from "./backup-smoke.mjs"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const dir = await mkdtemp(path.join(tmpdir(), "yanfield-dsh-"))
@@ -66,11 +67,11 @@ const ctx = {
 plugin.apply(ctx)
 let handler = host.createHttpHandler(ctx)
 
-function call(method, url, body) {
+function call(method, url, body, requestHeaders = body ? { "content-type": "application/json" } : {}) {
   const req = Readable.from(body ? [Buffer.from(body)] : [])
   req.method = method
   req.url = url
-  req.headers = body ? { "content-type": "application/json" } : {}
+  req.headers = requestHeaders
   const chunks = []
   let status = 0
   const headers = {}
@@ -87,10 +88,11 @@ function call(method, url, body) {
     get destroyed() { return false },
     get headersSent() { return false },
   }
-  return handler(req, res).then(() => ({
-    status: status || res.statusCode,
-    body: Buffer.concat(chunks).toString("utf8"),
-  }))
+  return handler(req, res).then(() => {
+    const buffer = Buffer.concat(chunks)
+    const text = buffer.toString("utf8")
+    return { status: status || res.statusCode, body: text, buffer, headers }
+  })
 }
 
 try {
@@ -749,6 +751,15 @@ try {
   const diff = diffBlocks(original, revised)
   assert.equal(diff.items.length, 2)
   assert.equal(applyBlockDiff(original, diff, [diff.items[0].id]), richText + "<p>She paused.</p><p>End.</p>")
+
+  await checkBackups({
+    call, api, dbPath, novelId, chapter, qaVolume, archive, session, attemptedAgain, scriptedReplies,
+    async restart() {
+      const freshHost = await import(`${pathToFileURL(path.join(root, "dist", "host.js")).href}?restart-after-restore`)
+      freshHost.apply(ctx)
+      handler = freshHost.createHttpHandler(ctx)
+    },
+  })
 
   console.log(`[dsh-yanfield] smoke ok (${payload.items.length} novels, volumes, archives, settings restart, model sync, session retry, local edits, blueprint pagination, candidate revisions, stale review, source evidence, partial apply and undo)`)
 } finally {

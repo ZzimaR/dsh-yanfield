@@ -25,7 +25,7 @@ export function apiUrl(url: string): string {
   return url;
 }
 
-async function parseResponse<T>(res: Response): Promise<T> {
+export async function parseResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   let data: unknown = null;
   try {
@@ -205,6 +205,16 @@ export function streamAiTask(req: AiTaskRequest, handlers: StreamHandlers): Prom
 /* ============================== 全局刷新事件 ============================== */
 
 export const DATA_CHANGED_EVENT = "yanfield:data-changed";
+export const BACKUP_RESTORED_EVENT = "yanfield:backup-restored";
+
+export function notifyBackupRestored(): void {
+  window.dispatchEvent(new Event(BACKUP_RESTORED_EVENT));
+  try {
+    window.localStorage.setItem(BACKUP_RESTORED_EVENT, String(Date.now()));
+  } catch {
+    /* The current Yanfield panel still reloads if storage is disabled. */
+  }
+}
 
 /** 数据变更后广播，页面可监听刷新 */
 export function notifyDataChanged(topic?: string): void {

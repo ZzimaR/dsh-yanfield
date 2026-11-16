@@ -108,10 +108,12 @@ export function SettingsSectionContent({
   active,
   settings,
   update,
+  saveSettings,
 }: {
   active: SettingsSectionKey;
   settings: AppSettings | undefined;
   update: (patch: Partial<AppSettings>) => void;
+  saveSettings: () => Promise<void>;
 }) {
   switch (active) {
     case "providers":
@@ -127,7 +129,7 @@ export function SettingsSectionContent({
     case "appearance":
       return <AppearanceSection settings={settings} update={update} />;
     case "data":
-      return <DataSection />;
+      return <DataSection saveSettings={saveSettings} />;
     case "about":
       return <AboutSection />;
     default:

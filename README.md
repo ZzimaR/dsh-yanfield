@@ -128,7 +128,9 @@ dsh plugin --profile desktop add dsh-yanfield
 
 - 书稿默认在 `$DSH_HOME/yanfield/yanfield.db`（含 `-wal` / `-shm` 附属文件）。`设置 → 数据` 会显示实际路径并能一键打开所在文件夹。
 - 用环境变量 `YANFIELD_DB_PATH` 可指定数据库文件。若 profile 的 `cordis.patch.yml` 配置了插件的 `dataDir`，优先使用该目录里的 `yanfield.db`。
-- 备份：先退出 Harness，再复制整个目录（运行中直接复制 SQLite 可能拿到不一致的快照）。
+- 在 **设置 → 数据 → 导出备份** 下载 `.yanfield` 文件。可以选择作品，备份正文、设定、资料和 AI 历史，也可以整库备份，额外带走全局设置、预设、模型服务配置和统计。
+- 在 **导入备份** 预览文件并导入作品副本。只有整库备份可用来 **恢复整库**，恢复前砚田会在数据目录保存一份 `yanfield-before-restore-*.db`。需要回退时，退出 Harness，再用该快照替换当前数据库文件，并移走当前库的同名 `-wal` 和 `-shm` 文件。
+- 整库导出默认省略模型服务 API Key。请勾选 **加密备份并包含模型服务 API Key** 来迁移砚田保存的密钥。Harness 管理的账号与凭据需要在目标环境分别配置。
 - 数据库结构升级前，砚田会在同一目录创建整库快照。备份失败时会停止升级。升级成功后保留最近三份自动升级备份。
 - 卸载插件不会删除书稿；数据库仍在上面那个路径里。
 
@@ -161,7 +163,7 @@ dsh plugin --profile desktop add dsh-yanfield
 <details>
 <summary>书稿在哪 / 换电脑怎么迁</summary>
 
-见上面「数据与备份」。换机器时把整个数据库目录一起拷过去即可，路径不变就不需要额外配置。
+见上面「数据与备份」。换机器时导出整库备份，在目标环境导入并恢复。
 </details>
 
 <details>
