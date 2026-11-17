@@ -237,7 +237,8 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
   };
   return <div className="min-w-0" data-testid="agent-run-card">
     {(thinking || completedThoughts) ? <div className="px-1 py-1">
-      <ThinkingPreview text={thinking ? thought?.text ?? "" : completedThoughts} active={thinking} />
+      {/* Once prose is visible, keep new reasoning inside the disclosure so it doesn't move the draft. */}
+      <ThinkingPreview text={thinking ? thought?.text ?? "" : ""} completed={completedThoughts} active={thinking} showInline={!run.preview} />
     </div> : null}
     <AgentProgress run={run} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
     {running && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}

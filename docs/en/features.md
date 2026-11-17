@@ -65,7 +65,7 @@ Panel layout:
 - Top: conversation title (auto-named from the first prompt), history, new conversation.
 - When you ask for an opinion about the book, the assistant can read relevant material and give a direct answer. Expand the activity or references to see what it read.
 - Progress messages stay visible as the assistant displays each piece of the answer it receives. Proposals for review appear after the answer is complete.
-- Each assistant message has a single **Reasoning** section when the model provides reasoning. While the model is thinking, the latest three lines are visible. Expand the section to read the full reasoning for the message.
+- Each assistant message has a single **Reasoning** section when the model provides reasoning. The latest three lines appear while the model is thinking. Once the live text preview appears, further reasoning updates inside **Reasoning**. Expand it to read the full reasoning for the message.
 - Applying a change in the manuscript review updates its status in chat. Open **Activity log** to see individual tool results and the materials read.
 - The active conversation stays open when switching chapters within a book. New messages use the current chapter as context, and tasks in progress keep the chapter specified when they were sent.
 - The assistant uses your latest request to choose whether to search, read, prepare note or prose edits, or prepare a deletion. Manuscript passages can serve as sources for new cards. Ask for multiple types of changes together when you need them. Use **Keep editing** on the proposal you want to revise.
