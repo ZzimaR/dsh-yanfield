@@ -35,7 +35,7 @@ import {
   type AgentReviewState,
 } from "@/lib/editor/agent-review";
 import { AGENT_REVIEW_READY, AGENT_UPDATED, isAgentCommitting } from "@/lib/ai/agent/client";
-import type { AgentRun } from "@/lib/ai/agent/types";
+import { isChapterOperation, type AgentRun } from "@/lib/ai/agent/types";
 import { EditorCanvas, type ChapterEditorPosition } from "./EditorCanvas";
 import { EditorHeader, type EditorTheme } from "./EditorHeader";
 import { EditorRightRail } from "./EditorRightRail";
@@ -393,7 +393,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
     await actions.refresh();
     const latest = await apiGet<AgentRun>(`/api/ai/agent/${run.id}?novelId=${encodeURIComponent(novelId)}`);
     const change = latest.changes.find(c => c.id === changeId);
-    if (!change) return;
+    if (!change || isChapterOperation(change)) return;
     if (onlyIfPending) {
       if (change.state !== "pending") return;
       if (change.targetId) {

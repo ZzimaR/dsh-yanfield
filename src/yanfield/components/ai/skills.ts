@@ -53,10 +53,15 @@ export interface SkillOption {
   label: string;
   hint?: string;
   prompt: string;
+  chapterOperation?: boolean;
 }
 
-export const SKILL_OPTIONS: SkillOption[] = SKILL_CARDS.map((skill) => ({
-  label: skill.label,
-  hint: skill.description,
-  prompt: skill.prompt,
-}));
+export const SKILL_OPTIONS: SkillOption[] = [
+  { label: "拆章", prompt: "拆章： ", chapterOperation: true, hint: "指定要拆的章节，以及新章从哪段开始" },
+  { label: "移动章节", prompt: "移动章节： ", chapterOperation: true, hint: "指定要移动的章节，以及放在哪一章的前面或后面" },
+  { label: "重命名章节", prompt: "重命名章节： ", chapterOperation: true, hint: "指定原章节名和新标题" },
+  { label: "删除章节", prompt: "删除章节： ", chapterOperation: true, hint: "指定要删除的整章，审阅后再确认" },
+  { label: "合并章节", prompt: "合并章节： ", chapterOperation: true, hint: "指定同一卷中相邻的两章" },
+  { label: "跨章移动段落", prompt: "跨章移动段落： ", chapterOperation: true, hint: "指定源章节、要移走的段落和插入位置" },
+  ...SKILL_CARDS.map((skill) => ({ label: skill.label, hint: skill.description, prompt: skill.prompt })),
+];

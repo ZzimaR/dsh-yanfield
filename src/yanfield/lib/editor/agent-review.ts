@@ -1,5 +1,5 @@
 import { diffBlocks, splitBlocks } from "@/lib/diff/blocks";
-import type { AgentChange, AgentRun } from "@/lib/ai/agent/types";
+import { isChapterOperation, type AgentChange, type AgentRun } from "@/lib/ai/agent/types";
 
 export interface AgentReviewState { run: AgentRun; changeId: string }
 
@@ -22,7 +22,7 @@ export function autoReviewChange(
 ): AgentChange | null {
   if (run.status !== "ready") return null;
   const pending = run.changes.filter(
-    change => change.kind === "chapter" && change.state === "pending" && !seen.has(reviewKey(run.id, change.id)),
+    change => change.kind === "chapter" && !isChapterOperation(change) && change.state === "pending" && !seen.has(reviewKey(run.id, change.id)),
   );
   if (!pending.length) return null;
   if (currentChapterId) {

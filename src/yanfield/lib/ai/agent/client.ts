@@ -28,7 +28,7 @@ export async function commitAgent(run:Pick<AgentRun,"id"|"novelId">,body:Record<
     const saved=await apiPost<AgentRun>(`/api/ai/agent/${run.id}/apply`,{...body,novelId:run.novelId});
     broadcastRun(saved);notifyDataChanged("agent");
     const current=bridge?.getChapterId?.();
-    const changed=saved.changes.find(c=>c.kind==="chapter"&&c.appliedId===current);
+    const changed=saved.changes.find(c=>c.kind==="chapter" && (c.appliedId === current || c.chapterPair?.second.id === current));
     if(changed && !(changed.state==="reverted"&&!changed.before)) {
       // Undo returns the old snapshot; fetch it because IDs/wordCount remain server-owned.
       const {apiGet}=await import("@/lib/client/api");

@@ -4,7 +4,7 @@ import { candidateContext } from "./context"
 import { chapterReadPage, TOOL_RECEIPT_LIMIT } from "./read-page"
 import { patchSchemas } from "./schema"
 import { visibleEntity } from "./store"
-import { ENTITY_LABEL, type AgentRequest, type AgentRun, type EntityKind, type Fields } from "./types"
+import { ENTITY_LABEL, isChapterOperation, type AgentRequest, type AgentRun, type EntityKind, type Fields } from "./types"
 import type { ContextConfig, Novel } from "@/lib/types"
 import type { z } from "zod"
 import type { readSchema, searchSchema } from "./tools"
@@ -27,8 +27,8 @@ export function openWorkspace(novel: Novel, request: AgentRequest, config: Conte
     }
   }
   function candidate(kind: EntityKind, id: string) {
-    return run.changes.find(change => change.id === id && change.kind === kind && change.state === "pending")
-      ?? prior?.changes.find(change => change.id === id && change.kind === kind && change.state === "pending")
+    return run.changes.find(change => change.id === id && change.kind === kind && change.state === "pending" && !isChapterOperation(change))
+      ?? prior?.changes.find(change => change.id === id && change.kind === kind && change.state === "pending" && !isChapterOperation(change))
   }
   function read(kind: EntityKind, id: string): Fields | null {
     permitted(kind, id)

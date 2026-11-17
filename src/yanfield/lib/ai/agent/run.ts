@@ -3,10 +3,12 @@ import { ApiError } from "@/lib/api-utils"
 import { resolveTarget, mergeContextConfig } from "@/lib/ai/engine"
 import { historyLimitsFor, trimChatHistory } from "@/lib/ai/history"
 import { agentPreamble } from "@/lib/ai/prompts"
-import { uid } from "@/lib/ui/cn"
+import { estimateTokens, uid } from "@/lib/ui/cn"
 import type { AiStreamEvent } from "@/lib/types"
 import type { AiMessage } from "@/lib/ai/provider"
-import { createCompletion, messageTokens, toolTokens } from "./complete"
+import { createCompletion, messageTokens } from "./complete"
+import { requestedChapterTool } from "./chapter-tool"
+import { agentTools } from "./tools"
 import { organizeNotes } from "./changes"
 import { AGENT_INSTRUCTIONS } from "./instructions"
 import { runTools, toolError } from "./loop"
@@ -78,8 +80,14 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
       run.status = "complete"
     } else {
       const workspace = openWorkspace(novel, request, config, run, priorRun)
-      const complete = createCompletion(target, config, request, run, checkpoint, signal)
-      const system: AiMessage = { role: "system", content: AGENT_INSTRUCTIONS + "\n" + agentPreamble(request.agentId, repo.getSettings()) }
+      const chapterTool = requestedChapterTool(request.message)
+      const tools = chapterTool ? agentTools.filter(tool => ["search", "read", chapterTool].includes(tool.name)) : agentTools
+      const toolTokens = estimateTokens(JSON.stringify(tools))
+      const complete = createCompletion(target, config, request, run, checkpoint, tools, toolTokens, signal)
+      const selectedToolInstruction = chapterTool
+        ? `\n本轮作者在输入开头指定了章节操作。唯一可用的改动工具是 ${chapterTool}。可先查找和读取。缺少必要信息时请询问作者。`
+        : ""
+      const system: AiMessage = { role: "system", content: AGENT_INSTRUCTIONS + selectedToolInstruction + "\n" + agentPreamble(request.agentId, repo.getSettings()) }
       const context = {
         previousCandidates: priorRun?.changes.filter(change => change.state === "pending")
           .map(({ id, kind, targetId, title }) => ({ id, kind, targetId, title })),
@@ -127,7 +135,8 @@ export async function* runAgent(request: AgentRequest, signal?: AbortSignal): As
         yield { type: "agent", run }
         return receipt
       }
-      yield* runTools({ run, request, prior: priorRun, workspace, complete, messages, budget, checkpoint, edit, organize, signal })
+      yield* runTools({ run, request, prior: priorRun, workspace, complete, messages, budget, checkpoint, edit, organize, signal, toolTokens,
+        allowedTools: chapterTool ? new Set(tools.map(tool => tool.name)) : undefined })
       if (proposalsNeedRecap(run.changes, run.summary)) run.recap = true
       run.status = run.changes.some(change => change.state === "pending") ? "ready" : "complete"
     }

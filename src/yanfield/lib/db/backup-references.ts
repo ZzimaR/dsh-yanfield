@@ -9,11 +9,12 @@ export function remapId(value: string, ids: IdMap): string {
 
 const referenceFields = new Set([
   "id", "novelId", "volumeId", "chapterId", "parentId", "targetId", "plantedChapterId", "payoffChapterId",
-  "sessionId", "messageId", "runId", "previousRunId", "retryRunId", "sourceId", "appliedId", "changeId",
+  "sessionId", "messageId", "runId", "previousRunId", "retryRunId", "sourceId", "appliedId", "changeId", "anchorId",
 ])
 const referenceObjects = new Set([
   "requestContext", "snapshot", "fields", "mentions", "before", "after", "saved", "relations", "changes",
   "evidence", "references", "steps", "targets", "payload", "archive",
+  "chapterSplit", "chapterDirectory", "chapterPair", "second", "existing", "orderBefore", "orderAfter",
 ])
 
 // Follow the structured links used by proposals and chat actions. Manuscript, chat and note text

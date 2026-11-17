@@ -11,10 +11,8 @@ export function messageTokens(message: AiMessage): number {
   return estimateTokens(message.content + (message.reasoning_content ?? "")) + 4 +
     (message.toolCalls?.reduce((total, call) => total + estimateTokens(call.name + call.input) + 8, 0) ?? 0)
 }
-export const toolTokens = estimateTokens(JSON.stringify(agentTools))
-
 export function createCompletion(target: ReturnType<typeof resolveTarget>, config: ContextConfig, request: AgentRequest,
-  run: AgentRun, checkpoint: () => void, signal?: AbortSignal) {
+  run: AgentRun, checkpoint: () => void, availableTools: typeof agentTools, toolTokens: number, signal?: AbortSignal) {
   let calls = 0
   let pricedCalls = 0
   const thinking = thinkingProfile(target.provider, target.model)
@@ -36,7 +34,7 @@ export function createCompletion(target: ReturnType<typeof resolveTarget>, confi
     } : message)
     const thinkingLevel = options.shortWrite && thinking.options.some(option => option.value === "low")
       ? "low" : target.thinkingLevel
-    const tools = options.tools ? agentTools : undefined
+    const tools = options.tools ? availableTools : undefined
     let usage: Extract<ProviderChunk, { type: "usage" }> | undefined
     let outputTokens = 0
     const maxTokens = config.maxTokens || undefined

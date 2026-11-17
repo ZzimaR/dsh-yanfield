@@ -49,7 +49,7 @@ import { ChatHistorySheet } from "./ChatHistorySheet";
 import { ChatMessageView } from "./ChatMessageView";
 import { ContextDrawer } from "./ContextDrawer";
 import { useContextPreview } from "./ContextMeter";
-import type { AgentRequest, AgentRun } from "@/lib/ai/agent/types";
+import { isChapterOperation, type AgentRequest, type AgentRun } from "@/lib/ai/agent/types";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
 import { requestAutoReview } from "@/lib/ai/agent/client";
 import { ModelPicker } from "./ModelPicker";
@@ -521,7 +521,7 @@ export function AiPanel({
       const newlyReady = run.status === "ready" && currentRun?.status !== "ready";
       currentRun = run;
       if (newlyReady && activeTabKeyRef.current === originalKey &&
-        run.changes.some(change => change.kind === "chapter" && change.state === "pending")) {
+        run.changes.some(change => change.kind === "chapter" && !isChapterOperation(change) && change.state === "pending")) {
         // React can batch the running and ready snapshots into the same render.
         requestAutoReview(run);
       }

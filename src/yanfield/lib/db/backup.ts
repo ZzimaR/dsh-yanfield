@@ -246,7 +246,12 @@ function copyIds(rows: Rows): Map<string, string> {
   }
   for (const row of rows.agent_runs) {
     const run = JSON.parse(String(row.data)) as AgentRun
-    for (const change of run.changes) add(change.id)
+    for (const change of run.changes) {
+      add(change.id)
+      // A deleted chapter is absent from the table but an applied proposal can restore it.
+      if (change.chapterDirectory?.kind === "delete" && change.state === "applied" && change.appliedId) add(change.appliedId)
+      if (change.chapterPair?.kind === "merge" && change.state === "applied") add(change.chapterPair.second.id)
+    }
   }
   return ids
 }
