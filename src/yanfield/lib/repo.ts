@@ -355,12 +355,16 @@ export function createChapter(
     createdAt: now,
     updatedAt: now,
   };
+  restoreChapter(chapter);
+  return chapter;
+}
+
+export function restoreChapter(chapter: Chapter): void {
   run(
     `INSERT INTO chapters (id,novel_id,volume_id,title,content,summary,status,order_index,word_count,notes,created_at,updated_at)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [chapter.id, chapter.novelId, chapter.volumeId, chapter.title, chapter.content, chapter.summary, chapter.status, chapter.orderIndex, chapter.wordCount, chapter.notes, now, now],
+    [chapter.id, chapter.novelId, chapter.volumeId, chapter.title, chapter.content, chapter.summary, chapter.status, chapter.orderIndex, chapter.wordCount, chapter.notes, chapter.createdAt, chapter.updatedAt],
   );
-  return chapter;
 }
 
 export function updateChapter(id: ID, data: Partial<Chapter>): Chapter {
@@ -374,6 +378,13 @@ export function deleteChapter(id: ID): void {
   run("DELETE FROM chapters WHERE id = ?", [id]);
 }
 
+/** The caller owns the transaction for the manuscript and directory changes. */
+export function setChapterPositions(novelId: ID, positions: readonly Pick<Chapter, "id" | "volumeId" | "orderIndex">[]): void {
+  for (const { id, volumeId, orderIndex } of positions) {
+    run("UPDATE chapters SET volume_id = ?, order_index = ? WHERE novel_id = ? AND id = ?", [volumeId, orderIndex, novelId, id]);
+  }
+}
+
 export function moveChapter(id: ID, target: { volumeId?: ID | null; orderIndex?: number }): Chapter {
   const current = getChapter(id);
   if (!current) throw new Error(`chapter not found: ${id}`);
@@ -385,8 +396,8 @@ export function moveChapter(id: ID, target: { volumeId?: ID | null; orderIndex?:
   const index = target.orderIndex === undefined ? siblings.length : Math.max(0, Math.min(target.orderIndex, siblings.length));
   siblings.splice(index, 0, id);
   tx(() => {
-    run("UPDATE chapters SET volume_id = ?, updated_at = ? WHERE id = ?", [volumeId, nowIso(), id]);
-    siblings.forEach((cid, i) => run("UPDATE chapters SET order_index = ? WHERE id = ?", [i, cid]));
+    run("UPDATE chapters SET updated_at = ? WHERE id = ?", [nowIso(), id]);
+    setChapterPositions(current.novelId, siblings.map((cid, orderIndex) => ({ id: cid, volumeId, orderIndex })));
   });
   return updateChapter(id, {});
 }

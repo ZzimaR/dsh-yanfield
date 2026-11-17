@@ -67,12 +67,54 @@ export const proseSchema = z.discriminatedUnion("mode", [
   }),
 ])
 export const deleteSchema = z.strictObject({ kind: z.enum(cardKinds), id, reason })
+export const splitChapterSchema = z.strictObject({
+  id,
+  anchor: z.string().trim().min(1).max(300).describe("Verbatim start of the first top-level paragraph or block to move to the next chapter."),
+  block: z.number().int().min(2).optional().describe("One-based top-level block number. Supply only to disambiguate a repeated paragraph start."),
+  destination: z.discriminatedUnion("kind", [
+    z.strictObject({ kind: z.literal("new"), title: z.string().trim().min(1).max(200) }),
+    z.strictObject({ kind: z.literal("existing"), id }),
+  ]).describe("Create a chapter or reuse an already saved chapter whose text contains the entire moved tail in order."),
+  reason,
+})
+const chapterTitle = z.string().trim().min(1).max(200)
+export const moveChapterSchema = z.strictObject({
+  id, anchorId: id, placement: z.enum(["before", "after"]), title: chapterTitle.optional(), reason,
+})
+export const renameChapterSchema = z.strictObject({ id, title: chapterTitle, reason })
+export const deleteChapterSchema = z.strictObject({ id, reason })
+const blockAnchor = z.string().trim().min(1).max(300).describe("Verbatim start of one unique top-level block.")
+export const mergeChaptersSchema = z.strictObject({
+  id: id.describe("ID of the earlier chapter, whose identity is kept."),
+  secondId: id.describe("ID of the immediately following chapter in the same volume."),
+  title: chapterTitle.optional(),
+  reason,
+})
+export const moveChapterBlocksSchema = z.strictObject({
+  id: id.describe("Source chapter ID."),
+  secondId: id.describe("Destination chapter ID."),
+  range: z.union([
+    z.strictObject({ from: blockAnchor, through: blockAnchor.optional() }),
+    z.strictObject({ edge: z.enum(["start", "end"]), count: z.number().int().min(1) }),
+  ]).describe("One inclusive continuous range of top-level blocks. Omit through to move just the from block."),
+  insert: z.union([
+    z.strictObject({ edge: z.enum(["start", "end"]) }),
+    z.strictObject({ anchor: blockAnchor, placement: z.enum(["before", "after"]) }),
+  ]),
+  reason,
+})
 
 const definitions = {
   search: [searchSchema, "Find chapters or cards by name, title or alias. Omit kind for the book overview."],
   read: [readSchema, "Read a specific chapter, outline, card or archive. Follow nextOffset to read long material."],
   write: [writeSchema.extend({ items: z.array(itemSchema).min(1).max(20) }), "Stage one or many cards or outlines. Modify only requested fields. Read existing targets first. Include evidence for fields taken from a prose candidate or when the author requests quotations. Put occupations in identity and narrative roles in role."],
   edit_prose: [proseSchema, "Stage prose for review. patch replaces an exact unique excerpt, selection edits only the editor selection, append preserves prior prose. Use rewrite only for new prose or a requested full rewrite."],
+  split_chapter: [splitChapterSchema, "Stage a chapter split as one review item. Read the saved source chapter first, then quote the start of the first paragraph of the second half. This preserves the original paragraphs and puts the second half immediately after the source. When repairing a partial split, read and reuse the already saved second half."],
+  move_chapter: [moveChapterSchema, "Stage moving a saved chapter immediately before or after another saved chapter, including across volumes. Read both chapters first. Include title only if the author also requested a rename."],
+  rename_chapter: [renameChapterSchema, "Stage changing a saved chapter title. Read the chapter first. A rename does not move it."],
+  delete_chapter: [deleteChapterSchema, "Stage deleting one saved chapter only when the author explicitly requested deleting that entire chapter. Read the chapter first. The review lists any linked material that blocks deletion."],
+  merge_chapters: [mergeChaptersSchema, "Stage merging two adjacent saved chapters in the same volume. Read both. Keep their prose and formatting in order, retain the first chapter and remove the second. Only set a new title if requested. Use this instead of rewriting prose or deleting a chapter separately."],
+  move_chapter_blocks: [moveChapterBlocksSchema, "Stage moving a continuous block range between two saved chapters as one review item. Read both first. Use edge and count for first or last N paragraphs, or quote unique block starts. Both chapters remain. Use this instead of separate prose edits."],
   delete: [deleteSchema, "Stage deletion of one entire saved card, only when explicitly requested. Read the card first."],
 } as const
 

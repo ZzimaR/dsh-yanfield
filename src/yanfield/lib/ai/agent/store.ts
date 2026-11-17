@@ -6,6 +6,9 @@ import { sameFields, validatePatch } from "./schema";
 import { applyBlockDiff, diffBlocks } from "@/lib/diff/blocks";
 import type { AgentChange, AgentRun, EntityKind, Fields } from "./types";
 import { agentLinkField, agentLinkKey, type AgentLinkKind } from "./links";
+import { applyChapterSplit, undoChapterSplit } from "./chapter-split";
+import { applyChapterDirectoryAction, chapterDependencies, undoChapterDirectoryAction } from "./chapter-directory";
+import { applyChapterPair, undoChapterPair } from "./chapter-pair";
 
 const linkReaders = {
   chapter: repo.getChapter,
@@ -139,6 +142,14 @@ export function propose(
 ): AgentChange {
   const after = validatePatch(kind,patch);
   if (targetId && run.changes.some(c=>c.op==="delete" && c.kind===kind && c.targetId===targetId && c.state==="pending")) throw new ApiError("这张资料已有待确认的删除；如需改为修改，请先丢弃删除候选",409);
+  if (kind === "chapter" && targetId &&
+    (run.changes.some(c => c.chapterDirectory && c.targetId === targetId && c.state === "pending") ||
+    run.changes.some(c => c.chapterSplit && c.state === "pending" &&
+      (c.targetId === targetId || c.chapterSplit.existing?.id === targetId)) ||
+    run.changes.some(c => c.chapterPair && c.state === "pending" &&
+      (c.targetId === targetId || c.chapterPair.second.id === targetId)))) {
+    throw new ApiError("这些章节已有待审改动，请先处理后再继续", 409);
+  }
   const existing = run.changes.find(c=>!c.op && c.kind===kind && c.targetId===targetId && c.state==="pending" && (targetId || c.title === title));
   let before: Fields | null = existing?.before ?? null;
   const dependency = targetId ? run.changes.find(c=>c.id===targetId && c.kind==="chapter" && !c.targetId) : undefined;
@@ -290,6 +301,13 @@ export function applyChanges(id: string, selections: {id:string; fields?:string[
       if (!change) throw new ApiError("改动不存在",400);
       if (change.state==="applied") continue; // persistent idempotency
       if (change.state!=="pending") throw new ApiError("这项改动已结束",409);
+      if (change.chapterSplit || change.chapterDirectory || change.chapterPair) {
+        if (choice.fields !== undefined || choice.blocks !== undefined) throw new ApiError("请整体应用章节操作候选", 400);
+        if (change.chapterSplit) applyChapterSplit(value, change);
+        else if (change.chapterPair) applyChapterPair(value, change);
+        else applyChapterDirectoryAction(value, change);
+        continue;
+      }
       const dependency = value.changes.find(c=>c.id===change.targetId);
       const target = dependency ? dependency.appliedId : change.targetId;
       if (dependency && !target) throw new ApiError("请先应用新章，再应用它的章纲",400);
@@ -354,6 +372,9 @@ export function undoChanges(id: string): AgentRun {
     const deleted:AgentChange[]=[];
     for (const c of [...value.changes].reverse()) {
       if (c.state!=="applied" || !c.appliedId) continue;
+      if (c.chapterSplit) { undoChapterSplit(value, c); continue; }
+      if (c.chapterDirectory) { undoChapterDirectoryAction(value, c); continue; }
+      if (c.chapterPair) { undoChapterPair(value, c); continue; }
       if (c.op==="delete") { deleted.push(c); continue; }
       if (!sameFields(readEntity(c.kind,c.appliedId,value.novelId),c.saved)) throw new ApiError(`「${c.title}」已有后续修改，不能覆盖撤回`,409);
       if (c.before) {
@@ -361,7 +382,7 @@ export function undoChanges(id: string): AgentRun {
         write(c.kind,c.appliedId,value.novelId,patch);
       } else {
         if (c.kind==="chapter") {
-          if (get("SELECT id FROM chapter_blueprints WHERE chapter_id=?",[c.appliedId]) || repo.getArchiveByChapter(c.appliedId) || get("SELECT id FROM foreshadows WHERE planted_chapter_id=? OR payoff_chapter_id=?",[c.appliedId,c.appliedId]) || get("SELECT id FROM chat_sessions WHERE chapter_id=?",[c.appliedId])) throw new ApiError("新章已有后续关联资料，请先处理关联后再撤回",409);
+          if (chapterDependencies(c.appliedId).length) throw new ApiError("新章已有后续关联资料，请先处理关联后再撤回",409);
           repo.deleteChapter(c.appliedId);
         } else if (c.kind==="world") {
           if (repo.listWorld(value.novelId).some(w=>w.parentId===c.appliedId)) throw new ApiError("新设定已有子级，不能撤回",409);

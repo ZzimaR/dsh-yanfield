@@ -207,7 +207,7 @@ try {
     scriptedReplies.push(...replies.map(script => async (messages, tools) => {
       const value = typeof script === "function" ? await script(messages, tools) : script
       if (!value || typeof value !== "object" || !value.args) return value
-      if (["write", "edit_prose", "delete"].includes(value.name)) {
+      if (["write", "edit_prose", "delete", "split_chapter", "move_chapter", "rename_chapter", "delete_chapter", "merge_chapters", "move_chapter_blocks"].includes(value.name)) {
         return { ...value, args: { reason: message, ...value.args } }
       }
       return value
@@ -463,7 +463,9 @@ try {
       assert.equal(current.current.request, cardImport)
       assert.equal(current.history[0].content, "不要动设定，只改第一章正文。")
       assert.equal(current.previousCandidates.length, 1)
-      assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "write", "edit_prose", "delete"])
+      assert.deepEqual(tools.map(tool => tool.name), [
+        "search", "read", "write", "edit_prose", "split_chapter", "move_chapter", "rename_chapter", "delete_chapter", "merge_chapters", "move_chapter_blocks", "delete",
+      ])
       for (const tool of tools) {
         assert.equal(tool.parameters.type, "object", `${tool.name} must declare object parameters for OpenAI-compatible servers`)
         assert(tool.parameters.properties, `${tool.name} must declare top-level properties`)
@@ -805,6 +807,213 @@ try {
   assert.equal((await api("POST", `/ai/agent/${deletion.id}/apply`, { novelId, op: "undo" })).status, 200)
   assert.equal((await api("GET", `/characters/${disposable.id}`)).data.name, "Extra")
 
+  const splitVolume = (await api("POST", "/volumes", { novelId, title: "Chapter operations fixture" })).data
+  const fixtureChapter = async (title, content) =>
+    (await api("POST", "/chapters", { novelId, volumeId: splitVolume.id, title, content })).data
+  const readSaved = id => tool("read", { kind: "chapter", id })
+  const getChapter = async id => (await api("GET", `/chapters/${id}`)).data
+  const orderedChapters = async () => (await api("GET", `/novels/${novelId}/tree`)).data.volumes
+    .find(volume => volume.id === splitVolume.id).chapters.map(chapter => chapter.id)
+  const undo = run => api("POST", `/ai/agent/${run.id}/apply`, { novelId, op: "undo" })
+  const head = "<p>The valley stayed quiet.</p>"
+  const tail = "<p><strong>The bell</strong> rang at dawn.</p><blockquote><p>A new road.</p></blockquote>"
+  const whole = head + "\n" + tail + "<p></p>"
+  const splitSource = await fixtureChapter("Original split source", whole)
+  const following = await fixtureChapter("Following chapter", "<p>Another day.</p>")
+  const routed = await agentRun("拆章：从钟响那段开始另起一章", [
+    (_messages, tools) => {
+      assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "split_chapter"])
+      return readSaved(splitSource.id)
+    },
+    tool("edit_prose", {
+      id: splitSource.id, mode: "patch", instruction: "Wrong tool",
+      edits: [{ original: "The valley stayed quiet.", replacement: "Wrong change." }],
+    }),
+    (messages, tools) => {
+      assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "split_chapter"])
+      assert.equal(JSON.parse(messages.findLast(message => message.role === "tool").content[0].text).error.code, "TOOL_NOT_ALLOWED")
+      return tool("split_chapter", { reason: "另起一章", id: splitSource.id, anchor: "The bell rang", destination: { kind: "new", title: "Scoped split" } })
+    },
+    reply,
+  ])
+  assert.equal(routed.steps.find(step => step.tool === "edit_prose").status, "error")
+  assert.equal(routed.incomplete, undefined)
+  assert.equal(routed.changes.length, 1)
+  assert.equal(routed.changes[0].chapterSplit.title, "Scoped split")
+  assert.equal((await getChapter(splitSource.id)).content, whole)
+
+  const splitRun = await agentRun("Split the original chapter at the bell", [
+    readSaved(splitSource.id),
+    tool("split_chapter", { id: splitSource.id, anchor: "The bell rang", destination: { kind: "new", title: "The bell" } }),
+    reply,
+  ])
+  assert.equal(splitRun.changes.length, 1)
+  assert.deepEqual(await orderedChapters(), [splitSource.id, following.id])
+  const splitSelection = { id: splitRun.changes[0].id }
+  const splitEndpoint = `/ai/agent/${splitRun.id}/apply`
+  const applySplit = selections => api("POST", splitEndpoint, { novelId, selections })
+  assert.equal((await applySplit([{ ...splitSelection, fields: ["content"] }])).status, 400)
+  assert.equal((await applySplit([splitSelection, { id: "missing-change" }])).status, 400)
+  assert.equal((await getChapter(splitSource.id)).content, whole)
+  assert.deepEqual(await orderedChapters(), [splitSource.id, following.id])
+  const committedSplit = await applySplit([splitSelection])
+  assert.equal(committedSplit.status, 200)
+  const secondHalfId = committedSplit.data.changes[0].chapterSplit.saved.id
+  assert.deepEqual(await orderedChapters(), [splitSource.id, secondHalfId, following.id])
+  assert.equal((await getChapter(splitSource.id)).content + (await getChapter(secondHalfId)).content, whole)
+  assert.equal((await applySplit([splitSelection])).status, 200)
+  assert.equal((await undo(splitRun)).status, 200)
+  assert.deepEqual(await orderedChapters(), [splitSource.id, following.id])
+  assert.equal((await getChapter(splitSource.id)).content, whole)
+
+  const existingTail = await fixtureChapter("Existing second half", "<p>Carryover.</p>" + tail)
+  const requestRepair = () => agentRun("Finish the split using the existing second half", [
+    readSaved(splitSource.id), readSaved(existingTail.id),
+    tool("split_chapter", { id: splitSource.id, anchor: "The bell rang", destination: { kind: "existing", id: existingTail.id } }),
+    reply,
+  ])
+  const staleRepair = await requestRepair()
+  assert.equal((await api("POST", `/chapters/${existingTail.id}/move`, { orderIndex: 0 })).status, 200)
+  assert.equal((await apply(staleRepair, staleRepair.changes)).status, 409)
+  assert.equal((await getChapter(splitSource.id)).content, whole)
+  const repair = await requestRepair()
+  assert.equal((await apply(repair, repair.changes)).status, 200)
+  assert.deepEqual(await orderedChapters(), [splitSource.id, existingTail.id, following.id])
+  assert.equal((await getChapter(splitSource.id)).content, head)
+  assert.equal((await getChapter(existingTail.id)).content, existingTail.content)
+  assert.equal((await undo(repair)).status, 200)
+  assert.equal((await getChapter(splitSource.id)).content, whole)
+  assert.deepEqual(await orderedChapters(), [existingTail.id, splitSource.id, following.id])
+
+  const move = await agentRun("Move and rename the existing second half", [
+    readSaved(existingTail.id), readSaved(following.id),
+    tool("move_chapter", { id: existingTail.id, anchorId: following.id, placement: "after", title: "Moving chapter" }),
+    reply,
+  ])
+  assert.equal((await apply(move, move.changes)).status, 200)
+  assert.deepEqual(await orderedChapters(), [splitSource.id, following.id, existingTail.id])
+  assert.equal((await getChapter(existingTail.id)).title, "Moving chapter")
+  assert.equal((await undo(move)).status, 200)
+  assert.deepEqual(await orderedChapters(), [existingTail.id, splitSource.id, following.id])
+  const otherVolume = (await api("POST", "/volumes", { novelId, title: "Move destination fixture" })).data
+  const crossAnchor = (await api("POST", "/chapters", { novelId, volumeId: otherVolume.id, title: "Cross-volume anchor" })).data
+  const crossMove = await agentRun("Move chapter: Move the second half to the other volume", [
+    (_messages, tools) => {
+      assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "move_chapter"])
+      return readSaved(existingTail.id)
+    }, readSaved(crossAnchor.id),
+    tool("move_chapter", { id: existingTail.id, anchorId: crossAnchor.id, placement: "after" }), reply,
+  ])
+  assert.equal((await apply(crossMove, crossMove.changes)).status, 200)
+  assert.deepEqual(await orderedChapters(), [splitSource.id, following.id])
+  assert.equal((await getChapter(existingTail.id)).volumeId, otherVolume.id)
+  assert.equal((await getChapter(existingTail.id)).orderIndex, 1)
+  assert.equal((await undo(crossMove)).status, 200)
+  assert.deepEqual(await orderedChapters(), [existingTail.id, splitSource.id, following.id])
+  const rename = await agentRun("重命名章节：改名为 Second half renamed", [
+    (_messages, tools) => {
+      assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "rename_chapter"])
+      return readSaved(existingTail.id)
+    }, tool("rename_chapter", { id: existingTail.id, title: "Second half renamed" }), reply,
+  ])
+  assert.equal((await apply(rename, rename.changes)).status, 200)
+  assert.equal((await getChapter(existingTail.id)).title, "Second half renamed")
+  assert.deepEqual(await orderedChapters(), [existingTail.id, splitSource.id, following.id])
+  assert.equal((await undo(rename)).status, 200)
+  const removeChapter = id => agentRun("Delete chapter: Delete this saved chapter", [
+    (_messages, tools) => {
+      assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "delete_chapter"])
+      return readSaved(id)
+    }, tool("delete_chapter", { id }), reply,
+  ])
+  const deleteRun = await removeChapter(existingTail.id)
+  assert.equal((await apply(deleteRun, deleteRun.changes)).status, 200)
+  assert.equal((await api("GET", `/chapters/${existingTail.id}`)).status, 404)
+  assert.equal((await undo(deleteRun)).status, 200)
+  assert.equal((await getChapter(existingTail.id)).content, existingTail.content)
+  assert.deepEqual(await orderedChapters(), [existingTail.id, splitSource.id, following.id])
+  const lateBlockedDelete = await removeChapter(existingTail.id)
+  assert.equal((await api("PATCH", `/chapters/${existingTail.id}/blueprint`, { goal: "A linked blueprint" })).status, 200)
+  const blockedDelete = await removeChapter(existingTail.id)
+  assert.deepEqual(blockedDelete.changes[0].chapterDirectory.blockers, ["章纲"])
+  assert.equal((await apply(lateBlockedDelete, lateBlockedDelete.changes)).status, 409)
+  assert.equal((await apply(blockedDelete, blockedDelete.changes)).status, 409)
+  assert.equal((await getChapter(existingTail.id)).content, existingTail.content)
+  const backupSplit = await requestRepair()
+  const removedForBackup = (await api("POST", "/chapters", {
+    novelId, volumeId: otherVolume.id, title: "Deleted chapter in backup", content: "<p>Restore me.</p>",
+  })).data
+  const backupDeletion = await removeChapter(removedForBackup.id)
+  assert.equal((await apply(backupDeletion, backupDeletion.changes)).status, 200)
+
+  const pairVolume = (await api("POST", "/volumes", { novelId, title: "Paired operations fixture" })).data
+  const pairChapter = async (title, content) =>
+    (await api("POST", "/chapters", { novelId, volumeId: pairVolume.id, title, content })).data
+  const firstPair = await pairChapter("First pair chapter", head + tail)
+  const secondPair = await pairChapter("Second pair chapter", "<p>Wind at the window.</p><p>Then a knock.</p>")
+  const thirdPair = await pairChapter("Third pair chapter", "<p>Final chapter.</p>")
+  const pairOrder = async () => (await api("GET", `/novels/${novelId}/tree`)).data.volumes
+    .find(volume => volume.id === pairVolume.id).chapters.map(chapter => chapter.id)
+  const mergePair = (secondId = secondPair.id) => agentRun("Merge chapters: Join the first two chapters", [
+    (_messages, tools) => {
+      assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "merge_chapters"])
+      return readSaved(firstPair.id)
+    }, readSaved(secondId),
+    tool("merge_chapters", { id: firstPair.id, secondId, title: "Combined pair" }), reply,
+  ])
+  const nonAdjacentMerge = await mergePair(thirdPair.id)
+  assert.equal(nonAdjacentMerge.changes.length, 0)
+  assert.equal(nonAdjacentMerge.incomplete, 1)
+  const merge = await mergePair()
+  assert.equal(merge.changes.length, 1)
+  assert.deepEqual(await pairOrder(), [firstPair.id, secondPair.id, thirdPair.id])
+  assert.equal((await apply(merge, merge.changes)).status, 200)
+  assert.deepEqual(await pairOrder(), [firstPair.id, thirdPair.id])
+  assert.equal((await getChapter(firstPair.id)).content, firstPair.content + secondPair.content)
+  assert.equal((await getChapter(firstPair.id)).title, "Combined pair")
+  assert.equal((await undo(merge)).status, 200)
+  assert.deepEqual(await pairOrder(), [firstPair.id, secondPair.id, thirdPair.id])
+  assert.equal((await getChapter(firstPair.id)).content, firstPair.content)
+  assert.equal((await getChapter(secondPair.id)).content, secondPair.content)
+
+  const earlyMerge = await mergePair()
+  await api("PATCH", `/chapters/${secondPair.id}/blueprint`, { goal: "Linked data must survive." })
+  assert.equal((await apply(earlyMerge, earlyMerge.changes)).status, 409)
+  assert.deepEqual((await mergePair()).changes[0].chapterPair.blockers, ["章纲"])
+  assert.deepEqual(await pairOrder(), [firstPair.id, secondPair.id, thirdPair.id])
+
+  const movePair = () => agentRun("跨章移动段落：把第一章最后两段放到敲门前", [
+    (_messages, tools) => {
+      assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "move_chapter_blocks"])
+      return readSaved(firstPair.id)
+    }, readSaved(secondPair.id),
+    tool("move_chapter_blocks", { id: firstPair.id, secondId: secondPair.id, range: { edge: "end", count: 2 },
+      insert: { anchor: "Then a knock.", placement: "before" } }), reply,
+  ])
+  const transfer = await movePair()
+  assert.equal((await api("POST", `/ai/agent/${transfer.id}/apply`, {
+    novelId, selections: [{ id: transfer.changes[0].id }, { id: "missing-change" }],
+  })).status, 400)
+  assert.equal((await getChapter(firstPair.id)).content, firstPair.content)
+  assert.equal((await getChapter(secondPair.id)).content, secondPair.content)
+  assert.equal((await apply(transfer, transfer.changes)).status, 200)
+  assert.equal((await getChapter(firstPair.id)).content, head)
+  assert.equal((await getChapter(secondPair.id)).content, "<p>Wind at the window.</p>" + tail + "<p>Then a knock.</p>")
+  assert.deepEqual(await pairOrder(), [firstPair.id, secondPair.id, thirdPair.id])
+  assert.equal((await undo(transfer)).status, 200)
+  assert.equal((await getChapter(firstPair.id)).content, firstPair.content)
+  assert.equal((await getChapter(secondPair.id)).content, secondPair.content)
+  const staleTransfer = await movePair()
+  await api("PATCH", `/chapters/${secondPair.id}`, { content: secondPair.content + "<p>Author addition.</p>" })
+  assert.equal((await apply(staleTransfer, staleTransfer.changes)).status, 409)
+  assert.equal((await getChapter(firstPair.id)).content, firstPair.content)
+  const consumedPair = await pairChapter("Second chapter of backup merge", "<p>Restore this chapter after import.</p>")
+  const pairBackupMerge = await agentRun("Merge chapters: Join the backup pair", [
+    readSaved(thirdPair.id), readSaved(consumedPair.id),
+    tool("merge_chapters", { id: thirdPair.id, secondId: consumedPair.id, title: "Backup merge" }), reply,
+  ])
+  assert.equal((await apply(pairBackupMerge, pairBackupMerge.changes)).status, 200)
+
   const richText = '<ul><li><p>One</p><ul><li><p>Nested</p></li></ul></li></ul><blockquote><p>Quote</p></blockquote><hr>'
   const original = richText + "<p>She  paused.</p><p>End.</p>"
   const revised = richText + "<p>She paused.</p><p>New ending.</p>"
@@ -814,6 +1023,7 @@ try {
 
   await checkBackups({
     call, api, dbPath, novelId, chapter, qaVolume, archive, session, attemptedAgain, scriptedReplies,
+    chapterOperations: { backupSplit, backupDeletion, pairBackupMerge },
     async restart() {
       const freshHost = await import(`${pathToFileURL(path.join(root, "dist", "host.js")).href}?restart-after-restore`)
       freshHost.apply(ctx)

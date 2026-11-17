@@ -3,23 +3,28 @@ import { ApiError } from "@/lib/api-utils"
 import { isInvalidToolInputError, isOutputLimitError, type AiMessage, type NativeToolCall } from "@/lib/ai/provider"
 import { uid } from "@/lib/ui/cn"
 import type { AiStreamEvent } from "@/lib/types"
-import { messageTokens, toolTokens, type Complete } from "./complete"
+import { messageTokens, type Complete } from "./complete"
 import { stageFields } from "./changes"
 import { proposalReceipt } from "./receipt"
 import { TOOL_RECEIPT_LIMIT } from "./read-page"
 import { proposeDelete } from "./store"
+import { stageChapterSplit } from "./chapter-split"
+import { stageChapterDirectoryAction } from "./chapter-directory"
+import { stageChapterPair } from "./chapter-pair"
 import { streamThoughts } from "./thoughts"
-import { deleteSchema, itemSchema, proseSchema, readSchema, searchSchema, writeSchema } from "./tools"
+import { deleteChapterSchema, deleteSchema, itemSchema, mergeChaptersSchema, moveChapterBlocksSchema, moveChapterSchema, proseSchema, readSchema, renameChapterSchema, searchSchema, splitChapterSchema, writeSchema } from "./tools"
 import { ENTITY_LABEL, type AgentChange, type AgentRequest, type AgentRun, type AgentStep, type Fields } from "./types"
 import type { Workspace } from "./workspace"
 
 const labels: Record<string, string> = {
-  search: "查找相关资料", read: "读取材料", write: "准备资料改动", edit_prose: "写作与修订", delete: "准备删除资料",
+  search: "查找相关资料", read: "读取材料", write: "准备资料改动", edit_prose: "写作与修订", delete: "准备删除资料", split_chapter: "准备拆章",
+  move_chapter: "准备移动章节", rename_chapter: "准备重命名章节", delete_chapter: "准备删除章节",
+  merge_chapters: "准备合并章节", move_chapter_blocks: "准备跨章移动段落",
 }
 
 const MAX_ROUNDS = 20
 const MAX_CALLS = 60
-const writingTools = new Set(["write", "edit_prose", "delete"])
+const writingTools = new Set(["write", "edit_prose", "delete", "split_chapter", "move_chapter", "rename_chapter", "delete_chapter", "merge_chapters", "move_chapter_blocks"])
 
 function target(change: AgentChange) {
   return { kind: change.kind, id: change.targetId ?? change.id, title: change.title, changeId: change.id }
@@ -43,8 +48,10 @@ export async function* runTools(input: {
   run: AgentRun; request: AgentRequest; prior?: AgentRun; workspace: Workspace; complete: Complete;
   messages: AiMessage[]; budget: number; checkpoint: () => void; edit: Edit; organize: (id: string) => AsyncGenerator<AiStreamEvent, Fields>;
   signal?: AbortSignal
+  toolTokens: number
+  allowedTools?: ReadonlySet<string>
 }): AsyncGenerator<AiStreamEvent> {
-  const { run, request, prior, workspace, complete, messages, budget, checkpoint, edit, organize, signal } = input
+  const { run, request, prior, workspace, complete, messages, budget, checkpoint, edit, organize, signal, toolTokens, allowedTools } = input
   const initial = messages.length
   const failures = new Map<string, Failure>()
   const attempts = new Map<string, number>()
@@ -76,6 +83,13 @@ export async function* runTools(input: {
     let key = `${call.name}:arguments`
     let title = ""
     try {
+      if (allowedTools && !allowedTools.has(call.name)) {
+        step.status = "error"
+        step.detail = "本轮只能使用所选章节操作"
+        const error = { code: "TOOL_NOT_ALLOWED", message: step.detail }
+        if (!run.changes.length) failures.set("chapter-tool", { tool: call.name, title, error })
+        return { ok: false, error, availableTools: [...allowedTools] }
+      }
       const raw: unknown = JSON.parse(call.input)
       if (call.name === "search") {
         const args = searchSchema.parse(raw)
@@ -152,6 +166,65 @@ export async function* runTools(input: {
         step.detail = "候选已准备，等待确认"
         recovered(key)
         recovered("delete:arguments")
+        return { ok: true, changeId: change.id, title: change.title, state: "pending" }
+      }
+      if (call.name === "split_chapter") {
+        const args = splitChapterSchema.parse(raw)
+        key = `split_chapter:${args.id}`
+        assertReason(args.reason)
+        if ((attempts.get(key) ?? 0) >= 3) throw new Error("此项已多次失败，请核对后再继续")
+        const change = stageChapterSplit(run, args, workspace.observed)
+        step.targets = [target(change)]
+        step.detail = "候选已准备，等待确认"
+        recovered(key)
+        recovered("split_chapter:arguments")
+        recovered("chapter-tool")
+        const split = change.chapterSplit!
+        return { ok: true, changeId: change.id, title: change.title, destination: split.title,
+          destinationEffect: split.existing ? "keep_existing_text_and_position_after_source" : "insert_new_chapter_after_source", state: "pending" }
+      }
+      if (call.name === "merge_chapters" || call.name === "move_chapter_blocks") {
+        const args = call.name === "merge_chapters" ? { ...mergeChaptersSchema.parse(raw), kind: "merge" as const }
+          : { ...moveChapterBlocksSchema.parse(raw), kind: "transfer" as const }
+        key = `${call.name}:${args.id}:${args.secondId}`
+        assertReason(args.reason)
+        if ((attempts.get(key) ?? 0) >= 3) throw new Error("此项已多次失败，请核对后再继续")
+        const change = stageChapterPair(run, args, workspace.observed)
+        const pair = change.chapterPair!
+        step.targets = [target(change)]
+        recovered("chapter-tool")
+        if (pair.kind === "merge" && pair.blockers.length) {
+          step.status = "partial"
+          step.detail = "后章仍有关联资料或会话，请先处理关联后再合并"
+          failures.set(key, { tool: call.name, title: pair.second.title, error: { code: "LINKED_CHAPTER", message: step.detail } })
+          return { ok: true, changeId: change.id, state: "blocked", chapter: pair.second.title, dependencies: pair.blockers }
+        }
+        step.detail = "候选已准备，等待确认"
+        recovered(key)
+        recovered(`${call.name}:arguments`)
+        return { ok: true, changeId: change.id, state: "pending", first: change.title, second: pair.second.title,
+          result: pair.kind === "merge" ? "first_keeps_both_texts_second_removed" : "both_chapters_kept_with_adjusted_text" }
+      }
+      if (call.name === "move_chapter" || call.name === "rename_chapter" || call.name === "delete_chapter") {
+        const args = call.name === "move_chapter" ? { ...moveChapterSchema.parse(raw), kind: "move" as const }
+          : call.name === "rename_chapter" ? { ...renameChapterSchema.parse(raw), kind: "rename" as const }
+          : { ...deleteChapterSchema.parse(raw), kind: "delete" as const }
+        key = `${call.name}:${args.id}`
+        assertReason(args.reason)
+        if ((attempts.get(key) ?? 0) >= 3) throw new Error("此项已多次失败，请核对后再继续")
+        const change = stageChapterDirectoryAction(run, args, workspace.observed)
+        step.targets = [target(change)]
+        const action = change.chapterDirectory
+        recovered("chapter-tool")
+        if (action?.kind === "delete" && action.blockers.length) {
+          step.status = "partial"
+          step.detail = "章节仍有关联资料或会话，请先处理关联后再删除"
+          failures.set(key, { tool: call.name, title: change.title, error: { code: "LINKED_CHAPTER", message: step.detail } })
+          return { ok: true, changeId: change.id, title: change.title, state: "blocked", dependencies: action.blockers }
+        }
+        step.detail = "候选已准备，等待确认"
+        recovered(key)
+        recovered(`${call.name}:arguments`)
         return { ok: true, changeId: change.id, title: change.title, state: "pending" }
       }
       if (call.name === "edit_prose") {

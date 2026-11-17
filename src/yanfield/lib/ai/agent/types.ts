@@ -2,11 +2,35 @@ import type { AiUsage, ContextConfig } from "@/lib/types";
 
 export type EntityKind = "chapter" | "blueprint" | "character" | "world" | "location" | "foreshadow" | "outline" | "volume-outline";
 export type Fields = Record<string, unknown>;
+export type ChapterPosition = { id: string; volumeId: string | null; orderIndex: number }
+export interface ChapterSplit {
+  title: string
+  content: string
+  existing?: import("@/lib/types").Chapter
+  saved?: import("@/lib/types").Chapter
+  orderBefore: ChapterPosition[]
+  orderAfter?: ChapterPosition[]
+}
+export type ChapterDirectoryAction =
+  | { kind: "move"; anchorId: string; anchorTitle: string; placement: "before" | "after"; volumeId: string | null; orderBefore: ChapterPosition[]; orderAfter?: ChapterPosition[] }
+  | { kind: "rename" }
+  | { kind: "delete"; orderBefore: ChapterPosition[]; orderAfter?: ChapterPosition[]; blockers: string[] }
+export type ChapterPairAction = {
+  second: import("@/lib/types").Chapter
+  firstLinks: string[]
+  moved: string
+} & (
+  | { kind: "merge"; blockers: string[]; orderBefore: ChapterPosition[]; orderAfter?: ChapterPosition[] }
+  | { kind: "transfer"; nextContent: string; saved?: import("@/lib/types").Chapter }
+)
 export interface AgentChange {
   id: string;
   kind: EntityKind;
-  /** Omitted for create/update. Delete only targets saved characters, locations, settings and foreshadows. */
+  /** Omitted for create/update. Chapter deletion also records its directory position. */
   op?: "delete";
+  chapterSplit?: ChapterSplit;
+  chapterDirectory?: ChapterDirectoryAction;
+  chapterPair?: ChapterPairAction;
   targetId: string | null;
   title: string;
   reason: string;
@@ -17,6 +41,9 @@ export interface AgentChange {
   saved?: Fields;
   appliedId?: string;
   state: "pending" | "applied" | "rejected" | "reverted";
+}
+export function isChapterOperation(change: AgentChange): boolean {
+  return Boolean(change.chapterSplit || change.chapterDirectory || change.chapterPair)
 }
 export interface AgentStep { id: string; label: string; detail: string; detailValues?: Record<string, string | number>; status: "running" | "complete" | "partial" | "error"; issues?: { title: string; message: string; fields?: { path: string; message: string }[] }[]; tool?:string; targets?: (AgentReference & {changeId?:string})[] }
 export interface AgentReference { kind: EntityKind; id: string; title: string }

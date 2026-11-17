@@ -22,7 +22,7 @@ async function api(path, { body, method = body ? "POST" : "GET", signal, status 
 }
 
 const suite = process.argv[3] ?? "all"
-assert(["all", "long", "edges", "draft", "evidence"].includes(suite), "Choose all, long, edges, draft, or evidence")
+assert(["all", "long", "edges", "draft", "evidence", "chapters", "pairs"].includes(suite), "Choose all, long, edges, draft, evidence, chapters, or pairs")
 const book = await api("/novels", { body: { title: "Yanfield QA · " + suite + " · " + new Date().toISOString() } })
 const novelId = book.id
 const create = (path, body) => api(path, { body: { novelId, ...body } })
@@ -43,6 +43,94 @@ const apply = (run, changes = run.changes, status) => api(`/ai/agent/${run.id}/a
   body: { novelId, selections: changes.map(change => ({ id: change.id })) }, status,
 })
 const saved = async chapter => (await api(`/chapters/${chapter.id}`)).content
+
+async function pairedChapterRouting() {
+  const volume = await create("/volumes", { title: "Pair routing fixtures" })
+  const head = "<p>船工把旧灯挂到了门外。</p>"
+  const tail = "<p><strong>天亮时，渡口起了雾。</strong></p><p>钟声只响了一次。</p>"
+  const first = await create(chapters, { volumeId: volume.id, title: "灯火", content: head + tail })
+  const second = await create(chapters, { volumeId: volume.id, title: "邮船", content: "<p>邮船停在桥下。</p>" })
+  for (const [expected, locale, message] of [
+    ["merge_chapters", "zh", "把《灯火》和紧跟的《邮船》并成一章，标题改成《雾里的邮船》，两篇原文照顺序拼起来。"],
+    ["move_chapter_blocks", "zh", "帮我把《灯火》最后两段挪到《邮船》的开头，剩下的字别动。"],
+    ["merge_chapters", "en", 'Merge chapters: Join “灯火” and “邮船” into a single chapter titled “雾里的邮船”.'],
+    ["move_chapter_blocks", "en", 'Move paragraphs between chapters: Move the last two paragraphs of “灯火” to the beginning of “邮船”.'],
+  ]) {
+    const { run } = await modelRun(expected + " · " + locale, message, { chapterId: first.id, locale })
+    assert.deepEqual([...new Set(run.steps.map(step => step.tool).filter(tool => !["search", "read"].includes(tool)))], [expected])
+    assert.equal(run.incomplete, undefined)
+    assert.equal(run.changes.length, 1)
+    const change = run.changes[0]
+    assert.equal(change.targetId, first.id)
+    assert.equal(change.chapterPair.second.id, second.id)
+    if (expected === "merge_chapters") {
+      assert.equal(change.chapterPair.kind, "merge")
+      assert.equal(change.after.content, first.content + second.content)
+      assert.equal(change.after.title, "雾里的邮船")
+    } else {
+      assert.equal(change.chapterPair.kind, "transfer")
+      assert.equal(change.after.content, head)
+      assert.equal(change.chapterPair.nextContent, tail + second.content)
+    }
+    assert.equal(await saved(first), first.content)
+    assert.equal(await saved(second), second.content)
+  }
+}
+
+async function chapterRouting() {
+  const volume = await create("/volumes", { title: "Routing fixtures" })
+  const head = "<p>船工把旧灯挂到了门外。</p>"
+  const tail = "<p>第二天清早，渡口忽然起了雾。</p><p>钟声只响了一次。</p>"
+  const first = await create(chapters, { volumeId: volume.id, title: "旧灯", content: head + tail })
+  const next = await create(chapters, { volumeId: volume.id, title: "钟楼", content: "<p>守钟人点亮了炉火。</p>" })
+  const existing = await create(chapters, { volumeId: volume.id, title: "渡口起雾", content: "<p>夜终于过去。</p>" + tail })
+  await create("/characters", { name: "渡口起雾", identity: "Test card with the same name as a chapter" })
+  const verify = async (label, message, tool, check, options = {}) => {
+    const { run } = await modelRun(label, message, { chapterId: first.id, ...options })
+    const mutations = run.steps.filter(step => !["search", "read"].includes(step.tool))
+    assert.deepEqual([...new Set(mutations.map(step => step.tool))], tool ? [tool] : [], label)
+    assert.equal(run.incomplete, undefined, label)
+    assert.equal(run.changes.length, tool ? 1 : 0, label)
+    if (check) check(run.changes[0])
+    assert.equal(await saved(first), head + tail, "Proposals must not change the saved source")
+  }
+  await verify("拆章", "帮我拆章吧。从「第二天清早，渡口忽然起了雾」那段开头拆出去，新章叫《雾中船》。",
+    "split_chapter", change => {
+      assert.equal(change.targetId, first.id)
+      assert.equal(change.after.content, head)
+      assert.equal(change.chapterSplit.title, "雾中船")
+      assert.equal(change.chapterSplit.content, tail)
+    })
+  await verify("补做拆章", "《渡口起雾》已经有《旧灯》的后半段了，帮我补完拆章。从「第二天清早，渡口忽然起了雾」开始全移出去，直接用已有的《渡口起雾》。",
+    "split_chapter", change => assert.equal(change.chapterSplit.existing.id, existing.id))
+  await verify("移动并改名", "把《渡口起雾》挪到《钟楼》前面，顺便把它改名为《清晨的雾》。",
+    "move_chapter", change => {
+      assert.equal(change.targetId, existing.id)
+      assert.equal(change.chapterDirectory.anchorId, next.id)
+      assert.equal(change.chapterDirectory.placement, "before")
+      assert.equal(change.after.title, "清晨的雾")
+    })
+  await verify("英文改名", 'Rename the chapter titled “钟楼” to “钟声”. Keep its place in the chapter list.',
+    "rename_chapter", change => {
+      assert.equal(change.targetId, next.id)
+      assert.equal(change.after.title, "钟声")
+    }, { locale: "en" })
+  await verify("章节和人物同名时删整章", "删除整章《渡口起雾》。", "delete_chapter",
+    change => assert.equal(change.targetId, existing.id))
+  await verify("删除一句而非整章", "删掉《旧灯》末段里的「钟声只响了一次。」这句话。", "edit_prose",
+    change => assert.equal(change.after.content, (head + tail).replace("钟声只响了一次。", "")))
+  await verify("只问怎么拆章", "如果我想把《旧灯》拆成两章，应该从哪里拆？只说你的建议。", null)
+  await verify("承接上一轮拆章", "可以，帮我拆章吧。", "split_chapter",
+    change => {
+      assert.equal(change.after.content, head)
+      assert.equal(change.chapterSplit.title, "起雾")
+    }, { history: [
+      { role: "user", content: "你看《旧灯》怎么分成两章比较好？" },
+      { role: "assistant", content: "建议从「第二天清早，渡口忽然起了雾。」开始另起一章，叫《起雾》。" },
+    ] })
+  await verify("菜单指定的英文拆章", 'Split chapter: Begin a new chapter titled “Fog Bell” at the paragraph starting “第二天清早，渡口忽然起了雾”.',
+    "split_chapter", change => assert.equal(change.chapterSplit.title, "Fog Bell"), { locale: "en" })
+}
 
 async function longManuscript() {
   const first = await create("/volumes", { title: "第一卷 渡口" })
@@ -187,3 +275,5 @@ if (suite === "all" || suite === "long") await longManuscript()
 if (suite === "all" || suite === "edges") await edges()
 if (suite === "all" || suite === "draft") await draftAndOutline()
 if (suite === "all" || suite === "evidence") await evidenceReview()
+if (suite === "all" || suite === "chapters") await chapterRouting()
+if (suite === "all" || suite === "pairs") await pairedChapterRouting()

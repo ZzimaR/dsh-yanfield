@@ -15,7 +15,7 @@ import { diffInline } from "@/lib/diff/blocks";
 import { AGENT_COMMIT_CHANGED, AGENT_UPDATED,broadcastRun,commitAgent,isAgentCommitting,openAgentReview } from "@/lib/ai/agent/client";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
 import { agentLinkField, agentLinkKey } from "@/lib/ai/agent/links";
-import { ENTITY_LABEL, FIELD_LABEL, type AgentChange, type AgentRun, type AgentReference, type AgentThought } from "@/lib/ai/agent/types";
+import { ENTITY_LABEL, FIELD_LABEL, isChapterOperation, type AgentChange, type AgentRun, type AgentReference, type AgentThought } from "@/lib/ai/agent/types";
 import { t, useT } from "@/lib/i18n";
 import { BLUEPRINT_TENSION_LABEL } from "@/lib/types";
 
@@ -72,6 +72,7 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
   const [confirmation,setConfirmation]=React.useState<{ op: "delete" | "discard"; changes: AgentChange[] } | null>(null);
   const materialDetailsId=React.useId();
   const materialButtons=React.useRef<Record<string,HTMLButtonElement|null>>({});
+  const chapterActionButtons=React.useRef<Record<string,HTMLButtonElement|null>>({});
   const [picked,setPicked]=React.useState<Record<string,boolean>>({});
   const [fields,setFields]=React.useState<Record<string,string[]>>({});
   const [localBusy,setBusy]=React.useState(false);
@@ -113,15 +114,21 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
   };
   if(!run)return <div className="mt-3 text-[12px] text-ink-3">{error||tr("正在读取任务…")}{error?<Button size="sm" onClick={refresh}>{tr("重试")}</Button>:null}</div>;
   const pending=run.changes.filter(c=>c.state==="pending");
+  const ordinaryPending = pending.some(change => !isChapterOperation(change));
+  const showBatchApply = ordinaryPending || pending.length > 1;
   const applied=run.changes.filter(c=>c.state==="applied");
   const live=run.changes.filter(c=>c.state!=="rejected"&&c.state!=="reverted");
   const materials=live.filter(c=>c.kind!=="chapter");
   const chapters=live.filter(c=>c.kind==="chapter");
   const discussion = run.status==="complete" && !run.changes.length && !run.error;
-  const isPicked=(change:AgentChange)=>picked[change.id]??!change.evidence?.length;
+  const isBlocked = (change: AgentChange) => Boolean(
+    (change.chapterDirectory?.kind === "delete" && change.chapterDirectory.blockers.length) ||
+    (change.chapterPair?.kind === "merge" && change.chapterPair.blockers.length),
+  );
+  const isPicked=(change:AgentChange)=>!isBlocked(change) && (picked[change.id]??!change.evidence?.length);
   const apply=(changes:AgentChange[])=>mutate(async()=>{
     const result=await commitAgent(run,{selections:changes.map(c=>({id:c.id,fields:fields[c.id]}))},bridge);
-    const chapter=result.changes.find(c=>changes.some(selected=>selected.id===c.id)&&c.kind==="chapter"&&c.state==="applied");
+    const chapter=result.changes.find(c=>changes.some(selected=>selected.id===c.id)&&c.kind==="chapter"&&c.op!=="delete"&&c.state==="applied");
     const id=chapter?.appliedId||chapter?.targetId;
     if(id)window.dispatchEvent(new CustomEvent("yanfield:agent-navigate",{detail:{kind:"chapter",id}}));
     return result;
@@ -129,7 +136,7 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
   const selected=pending.filter(isPicked);
   const reviewMaterial=materials.find(c=>c.id===expandedMaterial);
   const applySelection=(changes:AgentChange[])=>{
-    if(changes.some(c=>c.op==="delete"))setConfirmation({op:"delete",changes});
+    if(changes.some(c=>c.op==="delete" || c.chapterPair?.kind === "merge"))setConfirmation({op:"delete",changes});
     else void apply(changes);
   };
   const navigateTo=(kind:AgentReference["kind"],id:string)=>{
@@ -137,6 +144,11 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
   };
   const openTarget=(target:AgentReference & {changeId?:string})=>{
     const candidate=run.changes.find(c=>c.id===(target.changeId||target.id));
+    if (candidate && isChapterOperation(candidate)) {
+      setRecordOpen(false);
+      window.requestAnimationFrame(() => chapterActionButtons.current[candidate.id]?.focus());
+      return;
+    }
     if(candidate && (!candidate.appliedId||candidate.op==="delete")){
       if(candidate.kind==="chapter"){openAgentReview(run,candidate.id);return;}
       if(!materials.includes(candidate))return;
@@ -166,6 +178,58 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
       <button type="button" className="my-2 flex w-full items-center justify-center gap-1 text-[11px] text-ink-3" onClick={()=>setExpanded(expanded===c.id?null:c.id)}><ChevronDown className="size-3"/>{expanded===c.id?tr("收起"):tr("展开全文")}</button>
       {c.state==="applied"?<Button className="w-full justify-center border-accent/20 bg-accent/5 py-2 text-accent hover:bg-accent/10" size="sm" variant="secondary" icon={<BookOpen className="size-3"/>} disabled={running||busy||disabled} onClick={()=>openTarget({kind:"chapter",id:c.appliedId||c.targetId||c.id,title:c.title,changeId:c.id})}>{tr("打开正文 · 继续编辑")}</Button>:null}
       <Button className="mt-1 w-full justify-center" size="sm" variant="ghost" disabled={running||busy||disabled} onClick={()=>openAgentReview(run,c.id)}>{isPending?tr("在正文中审阅改动"):tr("查看历史改动")}</Button>
+    </div>;
+  };
+  const chapterActionCard = (c: AgentChange) => {
+    const split = c.chapterSplit;
+    const action = c.chapterDirectory;
+    const pair = c.chapterPair;
+    const pending = c.state === "pending";
+    const blocked = isBlocked(c);
+    const label = split ? tr("拆章 · {title}", { title: c.title })
+      : pair?.kind === "merge" ? tr("合并章节")
+      : pair?.kind === "transfer" ? tr("跨章移动段落")
+      : action?.kind === "delete" ? tr("准备删除章节「{title}」", { title: c.title })
+      : action?.kind === "move" ? tr("移动章节「{title}」", { title: c.title })
+      : tr("重命名章节「{title}」", { title: c.title });
+    const nextTitle = typeof c.after.title === "string" ? c.after.title : null;
+    return <div key={c.id} className="space-y-2 border-t border-line/70 px-4 py-4 text-[12px]">
+      <div className="flex items-center gap-2">
+        {pending && showBatchApply ? <input type="checkbox" aria-label={tr("选择{title}", { title: c.title })} checked={isPicked(c)} disabled={busy || running || disabled || blocked} onChange={event => setPicked(value => ({ ...value, [c.id]: event.target.checked }))} /> : null}
+        <span className="min-w-0 flex-1 break-words font-medium">{label}</span>
+        {!pending ? <span className="shrink-0 text-ink-3">{tr(c.state === "applied" ? "已应用" : c.state === "reverted" ? "已撤回" : "已丢弃")}</span> : null}
+      </div>
+      {split ? <>
+        <p className="break-words text-ink-3">{tr(split.existing ? "截短原章，保留已有章节「{title}」并放在原章之后。" : "截短原章，并在其后插入新章「{title}」。", { title: split.title })}</p>
+        <details className="space-y-2">
+          <summary className="cursor-pointer text-accent">{tr("查看拆章正文")}</summary>
+          <p className="text-ink-3">{tr("原章保留的正文")}</p>
+          <div className="scroll-thin max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-surface-2 p-2 font-serif">{stripHtml(String(c.after.content))}</div>
+          <p className="text-ink-3">{split.existing ? tr("已有后半章的正文") : tr("移到下一章的正文")}</p>
+          <div className="scroll-thin max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-surface-2 p-2 font-serif">{stripHtml(split.existing?.content ?? split.content)}</div>
+        </details>
+      </> : null}
+      {pair ? <>
+        <p className="break-words text-ink-3">{tr(pair.kind === "merge"
+          ? "把「{second}」接到「{first}」末尾，合并后移除「{second}」。"
+          : "从「{first}」移出段落，并插入「{second}」。", { first: c.title, second: pair.second.title })}</p>
+        {pair.kind === "merge" && pair.firstLinks.length > 0 ? <p className="text-ink-3">{tr("前章保留这些关联，档案会标记为待更新。{items}", { items: pair.firstLinks.map(item => tr(item)).join(tr("、")) })}</p> : null}
+        {pair.kind === "merge" && blocked ? <p className="text-danger">{tr("后章的这些关联需要先处理。{items}", { items: pair.blockers.map(item => tr(item)).join(tr("、")) })}</p> : null}
+        <details className="space-y-2">
+          <summary className="cursor-pointer text-accent">{tr(pair.kind === "merge" ? "查看拼接位置" : "查看两章改动")}</summary>
+          <p className="break-words text-ink-3">{pair.kind === "merge" ? tr("拼接前的正文 · {title}", { title: c.title }) : tr("移动后的正文 · {title}", { title: c.title })}</p>
+          <div className="scroll-thin max-h-44 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-surface-2 p-2 font-serif">{stripHtml(String(pair.kind === "merge" ? c.before?.content ?? "" : c.after.content)) || tr("正文为空")}</div>
+          <p className="break-words text-ink-3">{pair.kind === "merge" ? tr("接在后面的正文 · {title}", { title: pair.second.title }) : tr("移动后的正文 · {title}", { title: pair.second.title })}</p>
+          <div className="scroll-thin max-h-44 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-surface-2 p-2 font-serif">{stripHtml(pair.kind === "merge" ? pair.moved : pair.nextContent) || tr("正文为空")}</div>
+        </details>
+      </> : null}
+      {action?.kind === "move" ? <p className="break-words text-ink-3">{tr(action.placement === "before" ? "移到「{title}」之前。" : "移到「{title}」之后。", { title: action.anchorTitle })}</p> : null}
+      {nextTitle ? <p className="break-words text-ink-3">{tr("新标题为「{title}」。", { title: nextTitle })}</p> : null}
+      {action?.kind === "delete" && blocked ? <p className="text-danger">{tr("请先处理以下关联，再重新发起删除。{items}", { items: action.blockers.map(item => tr(item)).join(tr("、")) })}</p> : null}
+      {pending ? <div className="flex flex-wrap items-center gap-2">
+        <button type="button" ref={element => { chapterActionButtons.current[c.id] = element; }} className="text-ink-3 hover:text-danger" disabled={busy || disabled} onClick={() => setConfirmation({ op: "discard", changes: [c] })}>{tr("丢弃此项")}</button>
+        <Button size="sm" variant="primary" className="ml-auto" disabled={busy || disabled || blocked} onClick={() => applySelection([c])}>{split ? tr("应用拆章") : pair?.kind === "merge" ? tr("应用合并") : pair?.kind === "transfer" ? tr("应用段落移动") : tr("应用此项")}</Button>
+      </div> : null}
     </div>;
   };
   const materialChip=(c:AgentChange)=>{
@@ -237,7 +301,8 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
   };
   return <div className="min-w-0" data-testid="agent-run-card">
     {(thinking || completedThoughts) ? <div className="px-1 py-1">
-      <ThinkingPreview text={thinking ? thought?.text ?? "" : completedThoughts} active={thinking} />
+      {/* Once prose is visible, keep new reasoning inside the disclosure so it doesn't move the draft. */}
+      <ThinkingPreview text={thinking ? thought?.text ?? "" : ""} completed={completedThoughts} active={thinking} showInline={!run.preview} />
     </div> : null}
     <AgentProgress run={run} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
     {running && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}
@@ -261,7 +326,7 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
         })}
       </ul>
     </div> : null}
-    {settled && chapters.length ? <div className="mt-3 overflow-hidden rounded-lg border border-line/80 bg-surface fade-in">{chapters.map(chapterCard)}</div> : null}
+    {settled && chapters.length ? <div className="mt-3 overflow-hidden rounded-lg border border-line/80 bg-surface fade-in">{chapters.map(c => isChapterOperation(c) ? chapterActionCard(c) : chapterCard(c))}</div> : null}
     {settled && materials.length ? <section aria-label={tr("资料改动")} className="mt-3 rounded-lg border border-line/80 bg-surface fade-in">
       <div className="px-3 py-2.5">
         <div className="mb-1.5 text-[11px] text-ink-3">{materials.some(c=>c.state==="pending")?tr("资料待确认"):tr("资料改动")} <span className="text-ink-4">· {tr("{count} 项",{count:materials.length})}</span></div>
@@ -313,16 +378,20 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
       </details>)}
       <button type="button" className="mt-2 text-accent underline" onClick={async()=>{try{await copyText(JSON.stringify({runId:run.id,errorCode:run.errorCode,model:run.model,provider:run.provider,diagnostics:run.diagnostics},null,2));toast({title:tr("已复制调试信息"),tone:"success"});}catch{toast({title:tr("复制失败，请手动选中调试详情"),tone:"error"});}}}>{tr("复制调试信息")}</button>
     </details>:null}
-    {settled && !discussion && pending.length?<div className="mt-2 flex flex-wrap items-center gap-2">
+    {settled && !discussion && showBatchApply?<div className="mt-2 flex flex-wrap items-center gap-2">
       {pending.length?<Button variant="primary" size="sm" className="min-h-9 flex-1 justify-center shadow-none" loading={busy} disabled={disabled||!selected.length||selected.some(c=>fields[c.id]?.length===0)} onClick={()=>applySelection(selected)}>{tr("应用选中的 {count} 项",{count:selected.length})}{selected.some(c=>c.op==="delete")?tr("（含删除 {count}）",{count:selected.filter(c=>c.op==="delete").length}):""}</Button>:null}
-      {onContinue && pending.length?<button type="button" className="text-[11px] text-ink-3 hover:text-accent" disabled={busy||disabled} onClick={()=>onContinue(tr("请基于这份候选继续修改："), runId)}>{tr("继续修改")}</button>:null}
+      {onContinue && ordinaryPending?<button type="button" className="text-[11px] text-ink-3 hover:text-accent" disabled={busy||disabled} onClick={()=>onContinue(tr("请基于这份候选继续修改："), runId)}>{tr("继续修改")}</button>:null}
     </div>:null}
     {confirmation?<ConfirmDialog open danger
-      title={tr(confirmation.op==="delete"?"确认删除":"丢弃此项")}
+      title={tr(confirmation.op==="delete"?(confirmation.changes.some(c => c.chapterPair?.kind === "merge") ? "确认合并章节" : "确认删除"):"丢弃此项")}
       description={confirmation.op==="delete"
-        ?tr("应用这些改动将删除 {count} 条资料。应用后可以撤回本轮。",{count:confirmation.changes.filter(c=>c.op==="delete").length})
+        ?confirmation.changes.some(c => c.chapterPair?.kind === "merge")
+          ?tr("合并将保留前章并移除后章。确认后会一起保存所选改动，可以撤回本轮。")
+          :confirmation.changes.some(c => c.chapterDirectory?.kind === "delete")
+          ?tr("应用后将删除选中的章节及其他待删除项。可以撤回本轮。")
+          :tr("应用这些改动将删除 {count} 条资料。应用后可以撤回本轮。",{count:confirmation.changes.filter(c=>c.op==="delete").length})
         :tr("丢弃「{title}」的候选改动？",{title:confirmation.changes[0].title||tr(ENTITY_LABEL[confirmation.changes[0].kind])})}
-      confirmText={confirmation.op==="delete"?"确认删除":"丢弃此项"}
+      confirmText={confirmation.op==="delete"?(confirmation.changes.some(c => c.chapterPair?.kind === "merge") ? "确认合并章节" : "确认删除"):"丢弃此项"}
       onClose={()=>setConfirmation(null)}
       onConfirm={()=>{
         setConfirmation(null);

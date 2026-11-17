@@ -27,6 +27,7 @@ import {
 import { Button, Dropdown, IconButton, Kbd, Segmented, type DropdownItem } from "@/components/ui/kit";
 import { cn } from "@/lib/ui/cn";
 import { useT } from "@/lib/i18n";
+import { requestedChapterTool } from "@/lib/ai/agent/chapter-tool";
 import type { MentionRef, MentionOption, PanelMode } from "./types";
 import { MENTION_TYPE_LABEL } from "./utils";
 import { STYLE_OPTIONS } from "./styles";
@@ -217,11 +218,16 @@ export function ChatComposer({
     const el = textareaRef.current;
     const caret = el?.selectionStart ?? value.length;
     const start = slash.open ? Math.max(0, Math.min(slash.start, value.length)) : caret;
-    onChange(`${value.slice(0, start)}${option.prompt}${value.slice(caret)}`);
+    const prompt = tr(option.prompt);
+    const draft = value.slice(0, start) + value.slice(caret);
+    const nextValue = option.chapterOperation
+      ? prompt + (requestedChapterTool(draft) ? draft.replace(/^\s*[^:\n：]+[:：]\s*/, "") : draft.trimStart())
+      : `${value.slice(0, start)}${prompt}${value.slice(caret)}`;
+    onChange(nextValue);
     setSlash({ open: false, query: "", start: 0 });
     window.requestAnimationFrame(() => {
       el?.focus();
-      const next = start + option.prompt.length;
+      const next = option.chapterOperation ? nextValue.length : start + prompt.length;
       el?.setSelectionRange(next, next);
     });
   };
@@ -243,8 +249,8 @@ export function ChatComposer({
     const options = skillOptions ?? [];
     const query = slash.query.trim().toLowerCase();
     if (!query) return options;
-    return options.filter((option) => option.label.toLowerCase().includes(query));
-  }, [skillOptions, slash.query]);
+    return options.filter((option) => option.label.toLowerCase().includes(query) || tr(option.label).toLowerCase().includes(query));
+  }, [skillOptions, slash.query, tr]);
 
   /**
    * Enter 发送、Shift+Enter 换行；Ctrl / ⌘ + Enter 不再作为发送键（保持普通换行）。

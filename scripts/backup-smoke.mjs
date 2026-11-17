@@ -6,7 +6,7 @@ import { gzipSync, gunzipSync } from "node:zlib"
 
 const backupHeader = Buffer.from("YANFIELD-1\n")
 
-export async function checkBackups({ call, api, dbPath, novelId, chapter, qaVolume, archive, session, attemptedAgain, scriptedReplies, restart }) {
+export async function checkBackups({ call, api, dbPath, novelId, chapter, qaVolume, archive, session, attemptedAgain, scriptedReplies, restart, chapterOperations }) {
   const novelRoute = `/novels/${novelId}`
   const original = (await api("GET", novelRoute)).data
   const other = (await api("POST", "/novels", { title: "Unrelated manuscript" })).data
@@ -128,6 +128,24 @@ export async function checkBackups({ call, api, dbPath, novelId, chapter, qaVolu
     assert.equal(applied.status, 200, JSON.stringify(applied.data))
     assert.match((await api("GET", `/chapters/${copyChapter.id}`)).data.content, /Polished/)
     assert.doesNotMatch((await api("GET", `/chapters/${chapter.id}`)).data.content, /Polished/)
+    const copiedRuns = db.prepare("SELECT data FROM agent_runs WHERE novel_id = ?").all(copyId).map(row => JSON.parse(row.data))
+    const copiedSplit = copiedRuns.find(run => run.request === chapterOperations.backupSplit.request && run.changes[0]?.state === "pending")
+    const split = copiedSplit.changes[0]
+    assert.notEqual(split.chapterSplit.existing.id, chapterOperations.backupSplit.changes[0].chapterSplit.existing.id)
+    const appliedSplit = await api("POST", `/ai/agent/${copiedSplit.id}/apply`, { novelId: copyId, selections: [{ id: split.id }] })
+    assert.equal(appliedSplit.status, 200, JSON.stringify(appliedSplit.data))
+    const deleted = copiedRuns.find(run => run.changes[0]?.title === chapterOperations.backupDeletion.changes[0].title)
+    const undoDeletion = await api("POST", `/ai/agent/${deleted.id}/apply`, { novelId: copyId, op: "undo" })
+    assert.equal(undoDeletion.status, 200, JSON.stringify(undoDeletion.data))
+    const restoredChapterId = undoDeletion.data.changes[0].appliedId
+    assert.notEqual(restoredChapterId, chapterOperations.backupDeletion.changes[0].targetId)
+    assert.equal((await api("GET", `/chapters/${restoredChapterId}`)).data.content, "<p>Restore me.</p>")
+    const copiedMerge = copiedRuns.find(run => run.request === chapterOperations.pairBackupMerge.request)
+    const mergedAwayId = copiedMerge.changes[0].chapterPair.second.id
+    assert.notEqual(mergedAwayId, chapterOperations.pairBackupMerge.changes[0].chapterPair.second.id)
+    const undoMerge = await api("POST", `/ai/agent/${copiedMerge.id}/apply`, { novelId: copyId, op: "undo" })
+    assert.equal(undoMerge.status, 200, JSON.stringify(undoMerge.data))
+    assert.equal((await api("GET", `/chapters/${mergedAwayId}`)).data.content, "<p>Restore this chapter after import.</p>")
     scriptedReplies.push("The restored conversation continues.")
     const continued = await call("POST", "/yanfield/api/ai/agent", JSON.stringify({
       novelId: copyId, sessionId: copySession.id, chapterId: copyChapter.id, previousRunId: copyRunId, message: "Continue",
