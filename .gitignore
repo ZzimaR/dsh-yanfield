@@ -6,6 +6,7 @@ client/styles.generated.css
 src/generated/
 .tmp-test/
 /dist/
+/site-dist/
 /*.tgz
 
 # ACL recovery backups from the Windows sandbox fix

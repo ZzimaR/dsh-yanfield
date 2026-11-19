@@ -188,11 +188,14 @@ npm test    # build dist/, check the manifest and run smoke tests
 client/     plugin half: Shadow DOM mount, slot registration, style entry
 src/host.ts host half: REST/SSE routes under /yanfield, model and account bridge
 src/yanfield/  the desk itself (React components, domain logic, SQLite access)
-scripts/    build, check, smoke, reinstall
+scripts/    build, check, smoke, reinstall, website build
+site/       source of the website (yanfield.com)
 docs/       features, AI and cost, architecture, development, FAQ
 ```
 
 See [development](docs/en/development.md) for the build chain and local testing, [architecture](docs/en/architecture.md) for the data model, [features](docs/en/features.md) for the full list, [AI and cost](docs/en/ai-and-cost.md) for model details, and [FAQ](docs/en/faq.md) for troubleshooting.
+
+The website ([yanfield.com](https://yanfield.com)) is a static site in `site/`: `npm run build:site` builds it, `npm run check:site` checks it, `npm run preview:site` previews it locally, and GitHub Pages deploys it from `main`. See [website](docs/en/website.md) for details and the domain cutover steps.
 
 中文文档：[README.md](README.md) · [docs/](docs/features.md)
 
