@@ -3,7 +3,7 @@ import * as repo from "@/lib/repo"
 import { extractJson } from "@/lib/ai/prompts"
 import { stripHtml, uid } from "@/lib/ui/cn"
 import { materialResultSchema, MATERIAL_PROMPT, prepareMaterial, type ExistingMaterial, type MaterialSource } from "./materials"
-import { propose, supersedeRun, validateLinks } from "./store"
+import { propose, readEntity, supersedeRun, validateLinks } from "./store"
 import { sameFields } from "./schema"
 import { cardKinds, itemSchema } from "./tools"
 import type { AiMessage } from "@/lib/ai/provider"
@@ -23,17 +23,20 @@ export function stageFields(input: z.infer<typeof itemSchema>, reason: string, r
   const fromPrior = draft && prior?.changes.includes(draft)
   const actualId = draft ? draft.targetId : id ?? null
   const isCard = kind === "character" || kind === "location" || kind === "world" || kind === "foreshadow"
-  if (id && !workspace.observed.has(key)) throw new Error("修改前请先读取目标对象")
+  if (id && !workspace.observed.has(key) &&
+      (kind !== "blueprint" || input.sourceChapterId !== id || draft || readEntity(kind, id, run.novelId))) {
+    throw new Error("修改前请先读取目标对象")
+  }
   if (draft?.op === "delete") throw new Error("这张资料已有待确认的删除；如需改为修改，请先丢弃删除候选")
   if (draft?.evidence?.some(evidence => evidence.candidate) && fromPrior) {
     throw new Error("这条资料依赖尚未确认的正文，请先审阅该正文")
   }
   if (kind === "blueprint" && input.sourceChapterId) {
-    const source = workspace.observed.get(`chapter:${input.sourceChapterId}`)
-    if (!source || (workspace.chapterPages.get(input.sourceChapterId) ?? 0) < String(source.content ?? "").length) {
+    const source = workspace.reviewedChapterBody(input.sourceChapterId)
+    if (source === undefined) {
       throw new Error("请按 nextOffset 读完当前章正文，再生成章纲")
     }
-    if (!stripHtml(String(source.content ?? ""))) throw new Error("当前章节还没有可用于整理章纲的正文")
+    if (!stripHtml(source)) throw new Error("当前章节还没有可用于整理章纲的正文")
   }
   validateLinks(kind, fields, run.novelId, actualId)
   const cited = "evidence" in input ? input.evidence?.map(citation => {

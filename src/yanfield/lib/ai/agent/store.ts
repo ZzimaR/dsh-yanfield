@@ -9,6 +9,8 @@ import { agentLinkField, agentLinkKey, type AgentLinkKind } from "./links";
 import { applyChapterSplit, undoChapterSplit } from "./chapter-split";
 import { applyChapterDirectoryAction, chapterDependencies, undoChapterDirectoryAction } from "./chapter-directory";
 import { applyChapterPair, undoChapterPair } from "./chapter-pair";
+import { applyChapterBatch, undoChapterBatch } from "./chapter-batch";
+import { isChapterOperation } from "./types";
 
 const linkReaders = {
   chapter: repo.getChapter,
@@ -147,7 +149,9 @@ export function propose(
     run.changes.some(c => c.chapterSplit && c.state === "pending" &&
       (c.targetId === targetId || c.chapterSplit.existing?.id === targetId)) ||
     run.changes.some(c => c.chapterPair && c.state === "pending" &&
-      (c.targetId === targetId || c.chapterPair.second.id === targetId)))) {
+      (c.targetId === targetId || c.chapterPair.second.id === targetId)) ||
+    run.changes.some(c => c.chapterBatch && c.state === "pending" &&
+      c.chapterBatch.entries.some(entry => entry.before.id === targetId || entry.duplicateIn?.id === targetId)))) {
     throw new ApiError("这些章节已有待审改动，请先处理后再继续", 409);
   }
   const existing = run.changes.find(c=>!c.op && c.kind===kind && c.targetId===targetId && c.state==="pending" && (targetId || c.title === title));
@@ -301,10 +305,11 @@ export function applyChanges(id: string, selections: {id:string; fields?:string[
       if (!change) throw new ApiError("改动不存在",400);
       if (change.state==="applied") continue; // persistent idempotency
       if (change.state!=="pending") throw new ApiError("这项改动已结束",409);
-      if (change.chapterSplit || change.chapterDirectory || change.chapterPair) {
+      if (isChapterOperation(change)) {
         if (choice.fields !== undefined || choice.blocks !== undefined) throw new ApiError("请整体应用章节操作候选", 400);
         if (change.chapterSplit) applyChapterSplit(value, change);
         else if (change.chapterPair) applyChapterPair(value, change);
+        else if (change.chapterBatch) applyChapterBatch(value, change);
         else applyChapterDirectoryAction(value, change);
         continue;
       }
@@ -375,6 +380,7 @@ export function undoChanges(id: string): AgentRun {
       if (c.chapterSplit) { undoChapterSplit(value, c); continue; }
       if (c.chapterDirectory) { undoChapterDirectoryAction(value, c); continue; }
       if (c.chapterPair) { undoChapterPair(value, c); continue; }
+      if (c.chapterBatch) { undoChapterBatch(value, c); continue; }
       if (c.op==="delete") { deleted.push(c); continue; }
       if (!sameFields(readEntity(c.kind,c.appliedId,value.novelId),c.saved)) throw new ApiError(`「${c.title}」已有后续修改，不能覆盖撤回`,409);
       if (c.before) {

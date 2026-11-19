@@ -22,7 +22,7 @@ async function api(path, { body, method = body ? "POST" : "GET", signal, status 
 }
 
 const suite = process.argv[3] ?? "all"
-assert(["all", "long", "edges", "draft", "evidence", "chapters", "pairs"].includes(suite), "Choose all, long, edges, draft, evidence, chapters, or pairs")
+assert(["all", "long", "edges", "draft", "evidence", "chapters", "pairs", "batch"].includes(suite), "Choose all, long, edges, draft, evidence, chapters, pairs, or batch")
 const book = await api("/novels", { body: { title: "Yanfield QA · " + suite + " · " + new Date().toISOString() } })
 const novelId = book.id
 const create = (path, body) => api(path, { body: { novelId, ...body } })
@@ -43,6 +43,78 @@ const apply = (run, changes = run.changes, status) => api(`/ai/agent/${run.id}/a
   body: { novelId, selections: changes.map(change => ({ id: change.id })) }, status,
 })
 const saved = async chapter => (await api(`/chapters/${chapter.id}`)).content
+
+async function chapterBatchRouting() {
+  const volume = await create("/volumes", { title: "Chapter repair fixtures" })
+  const head = "<p>渡船缓缓离岸。</p>"
+  const tail1 = "<p>桥下落了一封信。</p><p>她把信放入袖口。</p>"
+  const tail2 = "<p>灯笼挂在树梢。</p><p>雪停了。</p>"
+  const fixtures = [
+    ["第一章 渡口", head + tail1],
+    ["第二章 来信", "<p>夜色已深。</p>" + tail1],
+    ["第二章 灯笼", head + tail2],
+    ["第三章 回城", "<p>城门打开了。</p>"],
+    ["第三章 夜雪", "<p>她抬头看过去。</p>" + tail2],
+  ]
+  const rows = []
+  for (const [title, content] of fixtures) rows.push(await create(chapters, { volumeId: volume.id, title, content }))
+  const [first, letter, lantern, city, snow] = rows
+  const plan = "保留拆开的章节。截掉《渡口》中《来信》已保留的重复章尾，截掉《灯笼》中《夜雪》已保留的重复章尾。把《夜雪》移到《回城》之前。《灯笼》改为「第三章 灯笼」，《夜雪》改为「第四章 夜雪」，《回城》改为「第五章 回城」，其他不用改。"
+  const verify = async (message, history) => {
+    const { run } = await modelRun("两处半拆及目录整理", message, { chapterId: first.id, history })
+    assert.deepEqual(run.steps.filter(step => !["search", "read"].includes(step.tool)).map(step => step.tool), ["organize_chapters"])
+    assert.equal(run.incomplete, undefined)
+    assert.equal(run.changes.length, 1)
+    const batch = run.changes[0].chapterBatch
+    assert.deepEqual(batch.orderAfter.map(item => item.id), [first.id, letter.id, lantern.id, snow.id, city.id])
+    const entries = new Map(batch.entries.map(entry => [entry.before.id, entry]))
+    assert.equal(entries.get(first.id).after.content, head)
+    assert.equal(entries.get(lantern.id).after.content, head)
+    assert.equal(entries.get(lantern.id).after.title, "第三章 灯笼")
+    assert.equal(entries.get(snow.id).after.title, "第四章 夜雪")
+    assert.equal(entries.get(city.id).after.title, "第五章 回城")
+    return run
+  }
+  await verify("选一，按刚才的方案全部处理。", [
+    { role: "user", content: "有两处拆章没做完，你帮我看看应该怎么收尾。" },
+    { role: "assistant", content: "方案一：" + plan + "\n方案二：撤回拆章。你选哪一个？" },
+  ])
+  const scoped = await verify("批量整理章节：" + plan)
+  assert.equal(await saved(first), first.content)
+  await apply(scoped)
+  assert.equal(await saved(first), head)
+  assert.equal(await saved(lantern), head)
+  await api(`/ai/agent/${scoped.id}/apply`, { body: { novelId, op: "undo" } })
+  assert.equal(await saved(first), first.content)
+  assert.equal(await saved(lantern), lantern.content)
+
+  const transition = "转眼间，天色沉了下来。"
+  const { run: continued } = await modelRun("同一轮补过渡及摘要",
+    "批量整理章节：先截掉《渡口》和《灯笼》已在《来信》和《夜雪》保存的重复章尾。" +
+    `然后在《渡口》截尾后补一句独立的章尾过渡，原句是「${transition}」。最后读取《渡口》的改后正文并写一条摘要。这三步都放进同一张候选，不要求我中途确认。`,
+    { chapterId: first.id })
+  assert.equal(continued.incomplete, undefined)
+  assert.equal(continued.changes.length, 1)
+  const edits = new Map(continued.changes[0].chapterBatch.entries.map(entry => [entry.before.id, entry]))
+  assert.equal(edits.get(first.id).after.content, head + `<p>${transition}</p>`)
+  assert(edits.get(first.id).after.summary)
+  assert.equal(edits.get(lantern.id).after.content, head)
+
+  const { run: mixed } = await modelRun("接续去重、小改和摘要", "继续改吧，还没改好。", {
+    chapterId: first.id,
+    history: [
+      { role: "user", content: "删掉《渡口》已在《来信》保留的重复章尾。《来信》开头的「夜色已深。」改成「夜色已深，灯火未熄。」。给改后的《来信》补一句摘要。合成同一张待审候选，全做完。" },
+      { role: "assistant", content: "《渡口》末尾通过写作与修订工具定位失败。《来信》第一段和摘要也还没改。我准备从已有的章节开始，只处理这三个剩余事项。" },
+    ],
+  })
+  const pending = mixed.changes.filter(change => change.state === "pending")
+  assert.equal(mixed.incomplete, undefined)
+  assert.equal(pending.length, 1)
+  const mixedEntries = new Map(pending[0].chapterBatch.entries.map(entry => [entry.before.id, entry.after]))
+  assert.equal(mixedEntries.get(first.id).content, head)
+  assert.equal(mixedEntries.get(letter.id).content, "<p>夜色已深，灯火未熄。</p>" + tail1)
+  assert(mixedEntries.get(letter.id).summary)
+}
 
 async function pairedChapterRouting() {
   const volume = await create("/volumes", { title: "Pair routing fixtures" })
@@ -277,3 +349,4 @@ if (suite === "all" || suite === "draft") await draftAndOutline()
 if (suite === "all" || suite === "evidence") await evidenceReview()
 if (suite === "all" || suite === "chapters") await chapterRouting()
 if (suite === "all" || suite === "pairs") await pairedChapterRouting()
+if (suite === "all" || suite === "batch") await chapterBatchRouting()

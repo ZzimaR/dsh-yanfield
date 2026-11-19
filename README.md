@@ -190,11 +190,14 @@ npm test    # 构建 dist/，再运行清单检查与冒烟测试
 client/     插件半区：Shadow DOM 挂载、插槽注册、样式入口
 src/host.ts 宿主半区：/yanfield 下的 REST/SSE 路由、模型与账号桥接
 src/yanfield/  写作台本体（React 组件、领域逻辑、SQLite 访问）
-scripts/    构建、自检、冒烟、重装
+scripts/    构建、自检、冒烟、重装、官网构建
+site/       官网（yanfield.com）源码
 docs/       功能、AI 与费用、架构、开发、常见问题
 ```
 
 从本地源码安装到隔离 profile 的步骤见 [本地联调](docs/development.md#五本地联调)。架构与数据模型见 [架构说明](docs/architecture.md)，功能清单见 [功能说明](docs/features.md)，AI 接入和费用见 [AI 与费用](docs/ai-and-cost.md)，排障见 [常见问题](docs/faq.md)。
+
+官网（[yanfield.com](https://yanfield.com)）是 `site/` 下的纯静态站点：`npm run build:site` 构建，`npm run check:site` 检查，`npm run preview:site` 本地预览，推送到 `main` 后由 GitHub Pages 部署。细节与域名迁移步骤见 [官网](docs/website.md)。
 
 English docs: [README.en.md](README.en.md) · [docs/en/](docs/en/features.md)
 

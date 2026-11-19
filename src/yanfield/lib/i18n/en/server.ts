@@ -10,6 +10,12 @@ import type { TranslateValue } from "../core"
  * the variables at the call site.
  */
 export const server: Record<string, TranslateValue> = {
+  "段内修改未匹配，已找到可核对的重复章尾": "The inline edit did not match. A duplicated chapter ending is available for review.",
+  "段内修改没有匹配到唯一的原文": "The inline edit did not match a unique excerpt.",
+  "未找到可安全截去的重复章尾，请核对两章正文": "No duplicate ending could be safely removed. Review both chapters.",
+  "每次批量整理只能处理同一卷的章节": "Organize chapters from one volume at a time.",
+  "保留重复段落的章节不能同时截尾": "A chapter retaining duplicated paragraphs cannot also be trimmed in the same proposal.",
+  "填写章节摘要前请按 nextOffset 读完整章正文": "Follow nextOffset to read the whole chapter before writing its summary.",
   "段落位置无法唯一确定，请引用段首原文": "The paragraph could not be uniquely identified. Quote its opening words.",
   "源章节没有这么多段落": "The source chapter has fewer paragraphs than requested.",
   "移动范围的结束段必须在起始段之后": "The ending paragraph must follow the starting paragraph.",

@@ -11,7 +11,8 @@ import { Button, ConfirmDialog, Markdown, Sheet, useToast } from "@/components/u
 import { apiGet, apiPatch, notifyDataChanged, useDataChanged } from "@/lib/client/api";
 import { useEditorBridge } from "@/lib/editor/bridge";
 import { countWords, stripHtml } from "@/lib/ui/cn";
-import { diffInline } from "@/lib/diff/blocks";
+import { diffBlocks, diffInline } from "@/lib/diff/blocks";
+import { chapterReviewSections } from "@/lib/editor/agent-review";
 import { AGENT_COMMIT_CHANGED, AGENT_UPDATED,broadcastRun,commitAgent,isAgentCommitting,openAgentReview } from "@/lib/ai/agent/client";
 import { displayAgentReply } from "@/lib/ai/agent/reply";
 import { agentLinkField, agentLinkKey } from "@/lib/ai/agent/links";
@@ -184,9 +185,11 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
     const split = c.chapterSplit;
     const action = c.chapterDirectory;
     const pair = c.chapterPair;
+    const batch = c.chapterBatch;
     const pending = c.state === "pending";
     const blocked = isBlocked(c);
     const label = split ? tr("拆章 · {title}", { title: c.title })
+      : batch ? tr("批量整理章节")
       : pair?.kind === "merge" ? tr("合并章节")
       : pair?.kind === "transfer" ? tr("跨章移动段落")
       : action?.kind === "delete" ? tr("准备删除章节「{title}」", { title: c.title })
@@ -209,6 +212,31 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
           <div className="scroll-thin max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-surface-2 p-2 font-serif">{stripHtml(split.existing?.content ?? split.content)}</div>
         </details>
       </> : null}
+      {batch ? <>
+        {batch.orderBefore.some((entry, index) => entry.id !== batch.orderAfter[index].id) ? (
+          <details className="space-y-2">
+            <summary className="cursor-pointer text-accent">{tr("查看目录顺序")}</summary>
+            <p className="text-ink-3">{tr("原顺序")}</p>
+            <ol className="list-decimal space-y-1 pl-5">{batch.orderBefore.map(entry => <li key={entry.id} className="break-words">{batch.titles[entry.id]}</li>)}</ol>
+            <p className="text-ink-3">{tr("新顺序")}</p>
+            <ol className="list-decimal space-y-1 pl-5">{batch.orderAfter.map(entry => <li key={entry.id} className="break-words">{batch.entries.find(edit => edit.before.id === entry.id)?.after.title ?? batch.titles[entry.id]}</li>)}</ol>
+          </details>
+        ) : null}
+        {batch.entries.map(entry => <details key={entry.before.id} className="space-y-1">
+          <summary className="cursor-pointer break-words text-accent">{entry.before.title}</summary>
+          {entry.after.title !== undefined ? <p className="break-words">{tr("新标题为「{title}」。", { title: entry.after.title })}</p> : null}
+          {entry.after.summary !== undefined ? <FieldChange before={entry.before.summary} after={entry.after.summary} wholeValue /> : null}
+          {entry.proseBase !== undefined ? <div className="scroll-thin max-h-44 space-y-2 overflow-y-auto">
+            {diffBlocks(entry.before.content, entry.proseBase).items.map(block => <FieldChange key={block.id} before={block.beforeText} after={block.afterText} />)}
+          </div> : null}
+          {entry.duplicateIn ? <>
+            <p className="text-ink-3">{tr("截去 {count} 段重复章尾，原文已保留在「{title}」。", { count: entry.removedBlocks, title: entry.duplicateIn?.title })}</p>
+            <div className="scroll-thin max-h-44 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-surface-2 p-2 font-serif">{stripHtml(entry.removedText ?? entry.before.content.slice(entry.after.content?.length))}</div>
+          </> : null}
+          {entry.transitions?.start ? <p className="break-words">{tr("章首过渡：{text}", { text: entry.transitions.start })}</p> : null}
+          {entry.transitions?.end ? <p className="break-words">{tr("章尾过渡：{text}", { text: entry.transitions.end })}</p> : null}
+        </details>)}
+      </> : null}
       {pair ? <>
         <p className="break-words text-ink-3">{tr(pair.kind === "merge"
           ? "把「{second}」接到「{first}」末尾，合并后移除「{second}」。"
@@ -226,6 +254,8 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
       {action?.kind === "move" ? <p className="break-words text-ink-3">{tr(action.placement === "before" ? "移到「{title}」之前。" : "移到「{title}」之后。", { title: action.anchorTitle })}</p> : null}
       {nextTitle ? <p className="break-words text-ink-3">{tr("新标题为「{title}」。", { title: nextTitle })}</p> : null}
       {action?.kind === "delete" && blocked ? <p className="text-danger">{tr("请先处理以下关联，再重新发起删除。{items}", { items: action.blockers.map(item => tr(item)).join(tr("、")) })}</p> : null}
+      {batch && chapterReviewSections(c).length ? <Button size="sm" variant="ghost" className="w-full justify-center" disabled={busy || disabled}
+        onClick={() => openAgentReview(run, c.id)}>{pending ? tr("在正文中审阅改动") : tr("查看历史改动")}</Button> : null}
       {pending ? <div className="flex flex-wrap items-center gap-2">
         <button type="button" ref={element => { chapterActionButtons.current[c.id] = element; }} className="text-ink-3 hover:text-danger" disabled={busy || disabled} onClick={() => setConfirmation({ op: "discard", changes: [c] })}>{tr("丢弃此项")}</button>
         <Button size="sm" variant="primary" className="ml-auto" disabled={busy || disabled || blocked} onClick={() => applySelection([c])}>{split ? tr("应用拆章") : pair?.kind === "merge" ? tr("应用合并") : pair?.kind === "transfer" ? tr("应用段落移动") : tr("应用此项")}</Button>
@@ -301,8 +331,7 @@ export function AgentRunCard({runId,novelId,initial,thought,liveReply,streaming,
   };
   return <div className="min-w-0" data-testid="agent-run-card">
     {(thinking || completedThoughts) ? <div className="px-1 py-1">
-      {/* Once prose is visible, keep new reasoning inside the disclosure so it doesn't move the draft. */}
-      <ThinkingPreview text={thinking ? thought?.text ?? "" : ""} completed={completedThoughts} active={thinking} showInline={!run.preview} />
+      <ThinkingPreview text={thinking ? thought?.text ?? "" : ""} completed={completedThoughts} active={thinking} live={Boolean(streaming && running)} />
     </div> : null}
     <AgentProgress run={run} compact={!running || run.answering} renderTargets={step=>step.targets?.length?<div className="mt-1.5 flex flex-wrap gap-1.5">{step.targets.map(chip)}</div>:null}/>
     {running && run.references.length?<details className="px-1 py-1 text-[11px] text-ink-3"><summary className="cursor-pointer">{tr("已读取资料 · {count}",{count:run.references.length})}</summary><div className="my-2 flex flex-wrap gap-1.5">{run.references.map(chip)}</div></details>:null}

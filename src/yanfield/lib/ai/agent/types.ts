@@ -23,6 +23,22 @@ export type ChapterPairAction = {
   | { kind: "merge"; blockers: string[]; orderBefore: ChapterPosition[]; orderAfter?: ChapterPosition[] }
   | { kind: "transfer"; nextContent: string; saved?: import("@/lib/types").Chapter }
 )
+export interface ChapterBatchAction {
+  volumeId: string | null
+  orderBefore: ChapterPosition[]
+  orderAfter: ChapterPosition[]
+  titles: Record<string, string>
+  entries: {
+    before: import("@/lib/types").Chapter
+    after: { title?: string; summary?: string; content?: string }
+    saved?: import("@/lib/types").Chapter
+    duplicateIn?: import("@/lib/types").Chapter
+    removedBlocks?: number
+    removedText?: string
+    transitions?: Partial<Record<"start" | "end", string>>
+    proseBase?: string
+  }[]
+}
 export interface AgentChange {
   id: string;
   kind: EntityKind;
@@ -31,6 +47,7 @@ export interface AgentChange {
   chapterSplit?: ChapterSplit;
   chapterDirectory?: ChapterDirectoryAction;
   chapterPair?: ChapterPairAction;
+  chapterBatch?: ChapterBatchAction;
   targetId: string | null;
   title: string;
   reason: string;
@@ -43,7 +60,7 @@ export interface AgentChange {
   state: "pending" | "applied" | "rejected" | "reverted";
 }
 export function isChapterOperation(change: AgentChange): boolean {
-  return Boolean(change.chapterSplit || change.chapterDirectory || change.chapterPair)
+  return Boolean(change.chapterSplit || change.chapterDirectory || change.chapterPair || change.chapterBatch)
 }
 export interface AgentStep { id: string; label: string; detail: string; detailValues?: Record<string, string | number>; status: "running" | "complete" | "partial" | "error"; issues?: { title: string; message: string; fields?: { path: string; message: string }[] }[]; tool?:string; targets?: (AgentReference & {changeId?:string})[] }
 export interface AgentReference { kind: EntityKind; id: string; title: string }

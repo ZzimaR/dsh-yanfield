@@ -1,7 +1,7 @@
-import { ZodError } from "zod"
+import { ZodError, type z } from "zod"
 import { ApiError } from "@/lib/api-utils"
 import { isInvalidToolInputError, isOutputLimitError, type AiMessage, type NativeToolCall } from "@/lib/ai/provider"
-import { uid } from "@/lib/ui/cn"
+import { stripHtml, uid } from "@/lib/ui/cn"
 import type { AiStreamEvent } from "@/lib/types"
 import { messageTokens, type Complete } from "./complete"
 import { stageFields } from "./changes"
@@ -11,8 +11,9 @@ import { proposeDelete } from "./store"
 import { stageChapterSplit } from "./chapter-split"
 import { stageChapterDirectoryAction } from "./chapter-directory"
 import { stageChapterPair } from "./chapter-pair"
+import { stageChapterBatch, suggestChapterTailRepair } from "./chapter-batch"
 import { streamThoughts } from "./thoughts"
-import { deleteChapterSchema, deleteSchema, itemSchema, mergeChaptersSchema, moveChapterBlocksSchema, moveChapterSchema, proseSchema, readSchema, renameChapterSchema, searchSchema, splitChapterSchema, writeSchema } from "./tools"
+import { deleteChapterSchema, deleteSchema, itemSchema, mergeChaptersSchema, moveChapterBlocksSchema, moveChapterSchema, organizeChaptersSchema, proseSchema, readSchema, renameChapterSchema, searchSchema, splitChapterSchema, writeSchema } from "./tools"
 import { ENTITY_LABEL, type AgentChange, type AgentRequest, type AgentRun, type AgentStep, type Fields } from "./types"
 import type { Workspace } from "./workspace"
 
@@ -20,11 +21,13 @@ const labels: Record<string, string> = {
   search: "查找相关资料", read: "读取材料", write: "准备资料改动", edit_prose: "写作与修订", delete: "准备删除资料", split_chapter: "准备拆章",
   move_chapter: "准备移动章节", rename_chapter: "准备重命名章节", delete_chapter: "准备删除章节",
   merge_chapters: "准备合并章节", move_chapter_blocks: "准备跨章移动段落",
+  organize_chapters: "准备批量整理章节",
 }
 
 const MAX_ROUNDS = 20
 const MAX_CALLS = 60
-const writingTools = new Set(["write", "edit_prose", "delete", "split_chapter", "move_chapter", "rename_chapter", "delete_chapter", "merge_chapters", "move_chapter_blocks"])
+const writingTools = new Set(["write", "edit_prose", "delete", "split_chapter", "move_chapter", "rename_chapter", "delete_chapter", "merge_chapters", "move_chapter_blocks", "organize_chapters"])
+const REASON_ERROR = "改动原因须逐字引用本轮作者指令，请核对后重试"
 
 function target(change: AgentChange) {
   return { kind: change.kind, id: change.targetId ?? change.id, title: change.title, changeId: change.id }
@@ -55,6 +58,7 @@ export async function* runTools(input: {
   const initial = messages.length
   const failures = new Map<string, Failure>()
   const attempts = new Map<string, number>()
+  const tailRecovery = new Map<string, string>()
   let callsMade = 0
   let outputRetry = false
 
@@ -67,10 +71,11 @@ export async function* runTools(input: {
     failures.delete(key)
     attempts.delete(key)
   }
-  const assertReason = (reason: string) => {
+  const assertReason = (reason: string, key: string) => {
     if (!reason.trim() || !request.message.includes(reason)) {
-      throw new ApiError("改动原因须逐字引用本轮作者指令，请核对后重试", 400)
+      throw new ApiError(REASON_ERROR, 400)
     }
+    recovered(`${key}:reason`)
   }
   const titleOf = (item: unknown) => {
     if (!item || typeof item !== "object") return ""
@@ -82,6 +87,7 @@ export async function* runTools(input: {
   async function* execute(call: NativeToolCall, step: AgentStep): AsyncGenerator<AiStreamEvent, Fields> {
     let key = `${call.name}:arguments`
     let title = ""
+    let patch: Extract<z.infer<typeof proseSchema>, { mode: "patch" }> | undefined
     try {
       if (allowedTools && !allowedTools.has(call.name)) {
         step.status = "error"
@@ -120,16 +126,18 @@ export async function* runTools(input: {
       }
       if (call.name === "write") {
         const args = writeSchema.parse(raw)
-        assertReason(args.reason)
+        assertReason(args.reason, key)
         recovered(key)
         const items = args.items.map((value, index) => {
           const itemTitle = titleOf(value)
           const { kind, id } = (value && typeof value === "object" ? value : {}) as Fields
           const targetId = id ?? (kind === "blueprint" ? run.chapterId : kind === "outline" ? run.novelId : undefined)
           const itemKey = `write:${String(kind ?? "")}:${String(targetId ?? itemTitle).normalize("NFKC").trim().toLowerCase() || index + 1}`
+          let sourceChapterId: string | undefined
           try {
             if ((attempts.get(itemKey) ?? 0) >= 3) throw new Error("此项已多次失败，请核对后再继续")
             const item = itemSchema.parse(value)
+            if (item.kind === "blueprint") sourceChapterId = item.sourceChapterId
             const change = stageFields(item, args.reason, run, workspace, prior)
             step.targets ??= []
             if (!step.targets.some(entry => entry.changeId === change.id)) step.targets.push(target(change))
@@ -138,8 +146,14 @@ export async function* runTools(input: {
             return { index: index + 1, kind: item.kind, title: change.title, ok: true as const, changeId, changedFields, evidence: change.evidence?.map(({ field, sourceId }) => ({ field, sourceId })),
               ...(possiblyRemoved.length ? { possiblyRemoved: possiblyRemoved.slice(0, 3) } : {}) }
           } catch (error) {
+            const issue = toolError(error)
+            if (sourceChapterId && issue.message === "请按 nextOffset 读完当前章正文，再生成章纲") {
+              failures.set(itemKey, { tool: call.name, title: itemTitle, error: issue })
+              return { index: index + 1, kind, title: itemTitle, ok: false as const, error: issue, retryable: true,
+                nextRead: { kind: "chapter", id: sourceChapterId, offset: workspace.chapterPages.get(sourceChapterId) ?? 0 } }
+            }
             return { index: index + 1, kind, title: itemTitle,
-              ...failure(itemKey, call.name, itemTitle, toolError(error)) }
+              ...failure(itemKey, call.name, itemTitle, issue) }
           }
         })
         const failed = items.filter(item => !item.ok)
@@ -155,7 +169,7 @@ export async function* runTools(input: {
       if (call.name === "delete") {
         const args = deleteSchema.parse(raw)
         key = `delete:${args.kind}:${args.id}`
-        assertReason(args.reason)
+        assertReason(args.reason, key)
         workspace.permitted(args.kind, args.id)
         const row = workspace.observed.get(`${args.kind}:${args.id}`)
         if (!row || workspace.candidate(args.kind, args.id)) throw new Error("删除前请先读取目标对象")
@@ -171,7 +185,7 @@ export async function* runTools(input: {
       if (call.name === "split_chapter") {
         const args = splitChapterSchema.parse(raw)
         key = `split_chapter:${args.id}`
-        assertReason(args.reason)
+        assertReason(args.reason, key)
         if ((attempts.get(key) ?? 0) >= 3) throw new Error("此项已多次失败，请核对后再继续")
         const change = stageChapterSplit(run, args, workspace.observed)
         step.targets = [target(change)]
@@ -183,11 +197,43 @@ export async function* runTools(input: {
         return { ok: true, changeId: change.id, title: change.title, destination: split.title,
           destinationEffect: split.existing ? "keep_existing_text_and_position_after_source" : "insert_new_chapter_after_source", state: "pending" }
       }
+      if (call.name === "organize_chapters") {
+        const args = organizeChaptersSchema.parse(raw)
+        key = `organize_chapters:${[...new Set([...args.changes, ...args.moves].map(item => item.id))].sort().join(",")}`
+        assertReason(args.reason, key)
+        if ((attempts.get(key) ?? 0) >= 3) throw new Error("此项已多次失败，请核对后再继续")
+        const previousContent = new Map(run.changes.flatMap(change => change.state === "pending"
+          ? (change.chapterBatch?.entries ?? []).map(entry => [entry.before.id, entry.after.content] as const) : []))
+        const change = stageChapterBatch(run, args, workspace.observed, workspace.chapterPages)
+        const batch = change.chapterBatch!
+        for (const entry of batch.entries) {
+          if (entry.after.content !== previousContent.get(entry.before.id)) workspace.chapterPages.delete(entry.before.id)
+          const failed = `edit_prose:${entry.before.id}`
+          if (entry.duplicateIn && entry.duplicateIn.id === tailRecovery.get(failed)) {
+            recovered(failed)
+            tailRecovery.delete(failed)
+          }
+        }
+        step.targets = [target(change)]
+        step.detail = "候选已准备，等待确认"
+        recovered(key)
+        recovered("organize_chapters:arguments")
+        recovered("chapter-tool")
+        return { ok: true, changeId: change.id, state: "pending", chapterCount: batch.entries.length,
+          updates: batch.entries.map(entry => ({
+            id: entry.before.id, title: entry.after.title ?? entry.before.title, summary: entry.after.summary !== undefined,
+            transition: Object.keys(entry.transitions ?? {}),
+          })),
+          orderChanged: batch.orderBefore.some((entry, index) => entry.id !== batch.orderAfter[index].id),
+          trimmed: batch.entries.filter(entry => entry.removedBlocks).map(entry => ({
+            title: entry.before.title, duplicateIn: entry.duplicateIn?.title, paragraphs: entry.removedBlocks,
+          })) }
+      }
       if (call.name === "merge_chapters" || call.name === "move_chapter_blocks") {
         const args = call.name === "merge_chapters" ? { ...mergeChaptersSchema.parse(raw), kind: "merge" as const }
           : { ...moveChapterBlocksSchema.parse(raw), kind: "transfer" as const }
         key = `${call.name}:${args.id}:${args.secondId}`
-        assertReason(args.reason)
+        assertReason(args.reason, key)
         if ((attempts.get(key) ?? 0) >= 3) throw new Error("此项已多次失败，请核对后再继续")
         const change = stageChapterPair(run, args, workspace.observed)
         const pair = change.chapterPair!
@@ -210,7 +256,7 @@ export async function* runTools(input: {
           : call.name === "rename_chapter" ? { ...renameChapterSchema.parse(raw), kind: "rename" as const }
           : { ...deleteChapterSchema.parse(raw), kind: "delete" as const }
         key = `${call.name}:${args.id}`
-        assertReason(args.reason)
+        assertReason(args.reason, key)
         if ((attempts.get(key) ?? 0) >= 3) throw new Error("此项已多次失败，请核对后再继续")
         const change = stageChapterDirectoryAction(run, args, workspace.observed)
         step.targets = [target(change)]
@@ -229,11 +275,24 @@ export async function* runTools(input: {
       }
       if (call.name === "edit_prose") {
         const args = proseSchema.parse(raw)
+        if (args.mode === "patch") patch = args
         const requestedTitle = args.mode === "rewrite" ? args.title : undefined
         key = `edit_prose:${args.id ?? requestedTitle ?? run.chapterId ?? ""}`
-        assertReason(args.reason)
+        assertReason(args.reason, key)
         if ((attempts.get(key) ?? 0) >= 3) throw new Error("此项已多次失败，请核对后再继续")
         title = requestedTitle ?? String(args.id && workspace.observed.get(`chapter:${args.id}`)?.title || "")
+        if (args.mode === "patch" && !request.writingPreset && !args.organizeNotes &&
+            run.changes.some(change => change.state === "pending" && change.chapterBatch?.entries.some(entry =>
+              entry.before.id === args.id || entry.duplicateIn?.id === args.id))) {
+          const change = stageChapterBatch(run, {
+            changes: [{ id: args.id, inlineEdits: args.edits }], moves: [], reason: args.reason,
+          }, workspace.observed, workspace.chapterPages)
+          workspace.chapterPages.delete(args.id)
+          step.targets = [target(change)]
+          step.detail = "候选已准备，等待确认"
+          recovered(key)
+          return { ok: true, changeId: change.id, title, state: "pending", groupedWithChapterBatch: true }
+        }
         const result = yield* edit(args)
         const change = run.changes.find(change => change.id === result.changeId)!
         step.targets = [target(change)]
@@ -264,6 +323,27 @@ export async function* runTools(input: {
       step.status = "error"
       step.detail = issue.message
       if (issue.fields?.length) step.issues = [{ title, message: issue.message, fields: issue.fields }]
+      if (issue.message === REASON_ERROR) {
+        return { ...failure(`${key}:reason`, call.name, title, issue), reasonExample: request.message.slice(0, 160).trimEnd() }
+      }
+      if (patch && (
+        issue.message === "选区已变化或无法定位，请重新选择正文" ||
+        issue.message === "修订未能保留原来的段落结构，请重试或缩小选区"
+      )) {
+        const hint = suggestChapterTailRepair(run.novelId, patch.id)
+        step.detail = hint ? "段内修改未匹配，已找到可核对的重复章尾" : "段内修改没有匹配到唯一的原文"
+        const error = { code: "PATCH_NOT_LOCATED", message: step.detail }
+        const result = failure(key, call.name, title, error)
+        if (!hint) return { ...result, patchScope: "single_paragraph_exact_excerpt" }
+        const { removedText, ...match } = hint
+        const tail = stripHtml(removedText)
+        if (patch.edits.every(edit => !edit.replacement.trim() && tail.includes(edit.original.trim().slice(0, 24)))) {
+          tailRecovery.set(key, hint.duplicateTailIn)
+        }
+        return { ...result, patchScope: "single_paragraph_exact_excerpt",
+          forDuplicatedTail: { tool: "organize_chapters", changes: [{ id: patch.id, duplicateTailIn: match.duplicateTailIn }],
+            retainedIn: match.title, matchingParagraphs: match.paragraphs } }
+      }
       return writingTools.has(call.name) ? failure(key, call.name, title, issue) : { ok: false, error: issue }
     }
   }
