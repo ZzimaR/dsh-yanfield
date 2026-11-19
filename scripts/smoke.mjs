@@ -207,7 +207,7 @@ try {
     scriptedReplies.push(...replies.map(script => async (messages, tools) => {
       const value = typeof script === "function" ? await script(messages, tools) : script
       if (!value || typeof value !== "object" || !value.args) return value
-      if (["write", "edit_prose", "delete", "split_chapter", "move_chapter", "rename_chapter", "delete_chapter", "merge_chapters", "move_chapter_blocks"].includes(value.name)) {
+      if (["write", "edit_prose", "delete", "split_chapter", "move_chapter", "rename_chapter", "delete_chapter", "merge_chapters", "move_chapter_blocks", "organize_chapters"].includes(value.name)) {
         return { ...value, args: { reason: message, ...value.args } }
       }
       return value
@@ -464,7 +464,7 @@ try {
       assert.equal(current.history[0].content, "不要动设定，只改第一章正文。")
       assert.equal(current.previousCandidates.length, 1)
       assert.deepEqual(tools.map(tool => tool.name), [
-        "search", "read", "write", "edit_prose", "split_chapter", "move_chapter", "rename_chapter", "delete_chapter", "merge_chapters", "move_chapter_blocks", "delete",
+        "search", "read", "write", "edit_prose", "split_chapter", "move_chapter", "rename_chapter", "delete_chapter", "merge_chapters", "move_chapter_blocks", "organize_chapters", "delete",
       ])
       for (const tool of tools) {
         assert.equal(tool.parameters.type, "object", `${tool.name} must declare object parameters for OpenAI-compatible servers`)
@@ -1013,6 +1013,167 @@ try {
     tool("merge_chapters", { id: thirdPair.id, secondId: consumedPair.id, title: "Backup merge" }), reply,
   ])
   assert.equal((await apply(pairBackupMerge, pairBackupMerge.changes)).status, 200)
+
+  const batchVolume = (await api("POST", "/volumes", { novelId, title: "Batch repair fixture" })).data
+  const land = "<p>They crossed the hills.</p>"
+  const landTail = "<p><em>Riverside.</em></p><p>Marsh berries.</p>"
+  const secondTail = "<p>The bridge opened.</p><p>A new road waited.</p>"
+  const batchFixtures = [
+    ["Chapter 1 · Leaving", land + "\n" + landTail + "<p></p>"],
+    ["Chapter 2 · River", "<p>From the road.</p>" + landTail],
+    ["Chapter 2 · Bridge", head + secondTail],
+    ["Chapter 3 · Departure", "<p>The group left.</p>"],
+    ["Chapter 3 · Crossing", "<p>It had been a quiet day.</p>" + secondTail],
+  ]
+  const batchChapters = []
+  for (const [title, content] of batchFixtures) {
+    batchChapters.push((await api("POST", "/chapters", { novelId, volumeId: batchVolume.id, title, content })).data)
+  }
+  const [landSource, landCopy, bridgeSource, departure, bridgeCopy] = batchChapters
+  const batchArgs = {
+    changes: [
+      { id: landSource.id, duplicateTailIn: landCopy.id },
+      { id: bridgeSource.id, duplicateTailIn: bridgeCopy.id, title: "Chapter 3 · Bridge" },
+      { id: bridgeCopy.id, title: "Chapter 4 · Crossing" },
+      { id: departure.id, title: "Chapter 5 · Departure", summary: "The group departs." },
+    ],
+    moves: [{ id: bridgeCopy.id, anchorId: departure.id, placement: "before" }],
+  }
+  const batchText = "批量整理章节：完成两处拆章并整理顺序和章名"
+  const runBatch = (args, retryReason = false) => agentRun(batchText, [
+    (_messages, tools) => {
+      assert.deepEqual(tools.map(tool => tool.name), ["search", "read", "organize_chapters"])
+      return readSaved(landSource.id)
+    },
+    ...batchChapters.slice(1).map(chapter => readSaved(chapter.id)),
+    ...(retryReason ? [
+      tool("organize_chapters", { ...args, reason: "Earlier discussion" }),
+      messages => {
+        const receipt = JSON.parse(messages.findLast(message => message.role === "tool").content[0].text)
+        assert.equal(receipt.reasonExample, batchText)
+        return tool("organize_chapters", args)
+      },
+    ] : [tool("organize_chapters", args)]),
+    reply,
+  ])
+  const batchState = async () => (await api("GET", `/novels/${novelId}/tree`)).data.volumes
+    .find(volume => volume.id === batchVolume.id).chapters.map(({ id, title, content, summary }) => ({ id, title, content, summary }))
+  const beforeBatch = await batchState()
+  const notDuplicated = await runBatch({ changes: [{ id: landSource.id, duplicateTailIn: departure.id }], moves: [] })
+  assert.equal(notDuplicated.changes.length, 0)
+  const organized = await runBatch(batchArgs, true)
+  assert.equal(organized.incomplete, undefined)
+  assert.equal(organized.changes.length, 1)
+  assert.deepEqual(organized.changes[0].chapterBatch.entries.filter(entry => entry.removedBlocks).map(entry => entry.removedBlocks), [2, 2])
+  assert.deepEqual(await batchState(), beforeBatch)
+
+  assert.equal((await apply(organized, organized.changes)).status, 200)
+  const afterBatch = await batchState()
+  assert.deepEqual(afterBatch.map(chapter => chapter.id), [landSource.id, landCopy.id, bridgeSource.id, bridgeCopy.id, departure.id])
+  assert.deepEqual(afterBatch.map(chapter => chapter.title), [landSource.title, landCopy.title, "Chapter 3 · Bridge", "Chapter 4 · Crossing", "Chapter 5 · Departure"])
+  assert.deepEqual(afterBatch.map(chapter => chapter.content), [land, landCopy.content, head, bridgeCopy.content, departure.content])
+  assert.equal(afterBatch.at(-1).summary, "The group departs.")
+  assert.equal((await undo(organized)).status, 200)
+  assert.deepEqual(await batchState(), beforeBatch)
+  const staleBatch = await runBatch(batchArgs)
+  await api("PATCH", `/chapters/${landCopy.id}`, { content: "<p>Changed by the author.</p>" })
+  assert.equal((await apply(staleBatch, staleBatch.changes)).status, 409)
+  assert.equal((await getChapter(landSource.id)).content, landSource.content)
+  assert.equal((await getChapter(departure.id)).title, departure.title)
+
+  await api("PATCH", `/chapters/${landCopy.id}`, { content: landCopy.content })
+  const appendedTransition = "The sun was already high."
+  const extended = await agentRun("批量整理章节：两处截尾，补过渡，再填写摘要", [
+    tool("organize_chapters", {
+      changes: [{ id: landSource.id, duplicateTailIn: landCopy.id }, { id: departure.id, title: "Chapter 5 · Departure" }],
+      moves: [{ id: bridgeCopy.id, anchorId: departure.id, placement: "before" }],
+    }),
+    tool("organize_chapters", { changes: [
+      { id: bridgeSource.id, duplicateTailIn: bridgeCopy.id },
+      { id: landSource.id, transition: { edge: "end", text: appendedTransition } },
+    ] }),
+    readSaved(landSource.id),
+    messages => {
+      const receipts = messages.filter(message => message.role === "tool").map(message => JSON.parse(message.content[0].text))
+      assert.equal(receipts[0].changeId, receipts[1].changeId)
+      assert.equal(receipts.at(-1).content, land + "<p>" + appendedTransition + "</p>")
+      assert.equal(receipts.at(-1).pendingBatch, true)
+      return tool("organize_chapters", { changes: [{ id: landSource.id, summary: "They crossed the hills before noon." }] })
+    },
+    reply,
+  ])
+  assert.equal(extended.incomplete, undefined)
+  assert.equal(extended.changes.length, 1)
+  assert.equal((await apply(extended, extended.changes)).status, 200)
+  assert.equal((await getChapter(landSource.id)).content, land + "<p>" + appendedTransition + "</p>")
+  assert.equal((await getChapter(bridgeSource.id)).content, head)
+  assert.equal((await getChapter(landSource.id)).summary, "They crossed the hills before noon.")
+  assert.equal((await undo(extended)).status, 200)
+  assert.deepEqual(await batchState(), beforeBatch)
+
+  const mixedRecovery = await agentRun("删掉《Leaving》与《River》重复的章尾，把《River》首句的 road 改成 harbor，并填写它的摘要", [
+    readSaved(landSource.id),
+    readSaved(landCopy.id),
+    tool("edit_prose", { id: landSource.id, mode: "patch", instruction: "Delete the duplicated ending",
+      edits: [{ original: "Riverside.\nMarsh berries.", replacement: "" }] }),
+    messages => {
+      const receipt = JSON.parse(messages.findLast(message => message.role === "tool").content[0].text)
+      assert.equal(receipt.error.code, "PATCH_NOT_LOCATED")
+      assert.deepEqual(receipt.forDuplicatedTail.changes, [{ id: landSource.id, duplicateTailIn: landCopy.id }])
+      return tool("edit_prose", { id: landCopy.id, mode: "patch", instruction: "Correct one word",
+        edits: [{ original: "From the road.", replacement: "From the harbor." }] })
+    },
+    readSaved(landCopy.id),
+    messages => {
+      const receipt = JSON.parse(messages.findLast(message => message.role === "tool").content[0].text)
+      assert.match(receipt.content, /From the harbor\./)
+      return tool("organize_chapters", { changes: [
+        { id: landSource.id, duplicateTailIn: landCopy.id },
+        { id: landCopy.id, summary: "The party left from the harbor." },
+      ] })
+    },
+    tool("edit_prose", { id: landCopy.id, mode: "patch", instruction: "Adjust the punctuation in the same draft",
+      edits: [{ original: "From the harbor.", replacement: "From the harbor!" }] }),
+    reply,
+  ])
+  assert.equal(mixedRecovery.incomplete, undefined)
+  assert.deepEqual(mixedRecovery.changes.map(change => change.state), ["rejected", "pending"])
+  assert.equal((await apply(mixedRecovery, mixedRecovery.changes.filter(change => change.state === "pending"))).status, 200)
+  assert.equal((await getChapter(landSource.id)).content, land)
+  assert.equal((await getChapter(landCopy.id)).content, landCopy.content.replace("From the road.", "From the harbor!"))
+  assert.equal((await getChapter(landCopy.id)).summary, "The party left from the harbor.")
+  assert.equal((await undo(mixedRecovery)).status, 200)
+  assert.deepEqual(await batchState(), beforeBatch)
+
+  const outlineTarget = tool("write", { items: [{ kind: "blueprint", id: landSource.id, sourceChapterId: landSource.id,
+    fields: { goal: "Show the party crossing the hills before noon." } }] })
+  const outlineAfterTrim = await agentRun("截去重复章尾，并根据修改后的原章填写章纲", [
+    tool("organize_chapters", { changes: [{ id: landSource.id, duplicateTailIn: landCopy.id }] }),
+    outlineTarget,
+    messages => {
+      const receipt = JSON.parse(messages.findLast(message => message.role === "tool").content[0].text)
+      assert.deepEqual(receipt.items[0].nextRead, { kind: "chapter", id: landSource.id, offset: 0 })
+      return tool("read", { kind: "chapter", id: landSource.id, offset: 8 })
+    },
+    messages => {
+      const receipt = JSON.parse(messages.findLast(message => message.role === "tool").content[0].text)
+      assert.equal(receipt.nextOffset, 0)
+      return tool("read", { kind: "chapter", id: landSource.id, offset: 0, limit: 12 })
+    },
+    messages => {
+      const receipt = JSON.parse(messages.findLast(message => message.role === "tool").content[0].text)
+      assert.equal(receipt.contentTotal, land.length)
+      assert.equal(receipt.nextOffset, null)
+      return outlineTarget
+    },
+    reply,
+  ])
+  assert.equal(outlineAfterTrim.incomplete, undefined)
+  assert.deepEqual(outlineAfterTrim.changes.map(change => change.kind), ["chapter", "blueprint"])
+  assert.equal((await apply(outlineAfterTrim, outlineAfterTrim.changes)).status, 200)
+  assert.equal((await getChapter(landSource.id)).content, land)
+  assert.equal((await api("GET", `/chapters/${landSource.id}/blueprint`)).data.goal, "Show the party crossing the hills before noon.")
+  assert.equal((await undo(outlineAfterTrim)).status, 200)
 
   const richText = '<ul><li><p>One</p><ul><li><p>Nested</p></li></ul></li></ul><blockquote><p>Quote</p></blockquote><hr>'
   const original = richText + "<p>She  paused.</p><p>End.</p>"

@@ -2,6 +2,7 @@ import type { TranslateValue } from "../core"
 
 /** editor copy: writing desk chrome, chapter tree, outline, codex, archives, review. */
 export const editor: Record<string, TranslateValue> = {
+  "此候选会整体应用，包含正文和其他章节改动。": "This applies the whole proposal, including text and other chapter changes.",
   "AI 协作面板": "AI collaboration panel",
   "AI 快捷任务": "Quick AI tasks",
   "AI 正在按本章正文提取，可能需要几十秒。": "AI is extracting from this chapter's text. This can take a few dozen seconds.",

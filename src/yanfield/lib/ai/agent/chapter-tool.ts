@@ -19,5 +19,8 @@ export function requestedChapterTool(message: string) {
     case "跨章移动段落":
     case "move paragraphs between chapters":
       return "move_chapter_blocks"
+    case "批量整理章节":
+    case "organize chapters":
+      return "organize_chapters"
   }
 }

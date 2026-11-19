@@ -195,6 +195,7 @@ export function proseEditor(novel: Novel, request: AgentRequest, config: Context
     }
     if (mode === "append") appendBases.set(change.id, appendBase)
     workspace.chapterPages.delete(change.id)
+    if (actualId) workspace.chapterPages.delete(actualId)
     run.preview = ""
     return { changeId: change.id, title, state: "pending", words: countWords(content), generatedWords: generated,
       ...(minimumWords ? { minimumWords, targetWords, mode } : {}) }

@@ -2,6 +2,23 @@ import { diffBlocks, splitBlocks } from "@/lib/diff/blocks";
 import { isChapterOperation, type AgentChange, type AgentRun } from "@/lib/ai/agent/types";
 
 export interface AgentReviewState { run: AgentRun; changeId: string }
+export function chapterReviewSections(change: AgentChange) {
+  if (change.kind !== "chapter") return []
+  if (change.chapterBatch) {
+    return change.chapterBatch.entries.flatMap(entry => {
+      const after = (change.state === "applied" ? entry.saved?.content : undefined) ?? entry.after.content
+      return after === undefined || after === entry.before.content ? [] : [{
+        chapterId: entry.before.id, title: entry.after.title ?? entry.before.title, before: entry.before.content, after,
+      }]
+    })
+  }
+  if (isChapterOperation(change)) return []
+  const after = (change.state === "applied" ? change.saved?.content : undefined) ?? change.after.content
+  return typeof after === "string" ? [{
+    chapterId: change.appliedId ?? change.targetId, title: change.title,
+    before: String(change.before?.content ?? ""), after,
+  }] : []
+}
 
 /** Stable identity for one review candidate: `${run.id}:${change.id}`. */
 export function reviewKey(runId: string, changeId: string): string {

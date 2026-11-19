@@ -19,7 +19,7 @@ function stepKey(step: AgentStep): string {
 export function AgentProgress({run,compact=false,renderTargets}:{run:AgentRun;compact?:boolean;renderTargets:(step:AgentStep)=>React.ReactNode}) {
   const tr=useT();
   const progress=run.progress??[];
-  const important=(step:AgentStep)=>step.status!=="complete" || ["edit_prose","write","write_chapter","propose","propose_cards","delete","organize_materials","split_chapter","move_chapter","rename_chapter","delete_chapter","merge_chapters","move_chapter_blocks"].includes(step.tool??"");
+  const important=(step:AgentStep)=>step.status!=="complete" || ["edit_prose","write","write_chapter","propose","propose_cards","delete","organize_materials","split_chapter","move_chapter","rename_chapter","delete_chapter","merge_chapters","move_chapter_blocks","organize_chapters"].includes(step.tool??"");
   const visibleSteps: {step: AgentStep; index: number; repeated: boolean}[] = [];
   let previousKey = "";
   run.steps.forEach((step, index) => {

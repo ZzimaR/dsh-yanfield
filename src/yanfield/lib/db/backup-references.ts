@@ -14,7 +14,7 @@ const referenceFields = new Set([
 const referenceObjects = new Set([
   "requestContext", "snapshot", "fields", "mentions", "before", "after", "saved", "relations", "changes",
   "evidence", "references", "steps", "targets", "payload", "archive",
-  "chapterSplit", "chapterDirectory", "chapterPair", "second", "existing", "orderBefore", "orderAfter",
+  "chapterSplit", "chapterDirectory", "chapterPair", "chapterBatch", "entries", "duplicateIn", "second", "existing", "orderBefore", "orderAfter",
 ])
 
 // Follow the structured links used by proposals and chat actions. Manuscript, chat and note text
@@ -31,6 +31,10 @@ function remapLinks(value: unknown, ids: IdMap): unknown {
 
 export function restoreAgentRun(value: AgentRun, ids: IdMap): AgentRun {
   const run = remapLinks(value, ids) as AgentRun
+  for (const { chapterBatch } of run.changes) {
+    if (chapterBatch) chapterBatch.titles = Object.fromEntries(Object.entries(chapterBatch.titles)
+      .map(([id, title]) => [remapId(id, ids), title]))
+  }
   if (run.linkTitles && ids.size) {
     run.linkTitles = Object.fromEntries(Object.entries(run.linkTitles).map(([key, title]) => {
       const colon = key.indexOf(":") + 1

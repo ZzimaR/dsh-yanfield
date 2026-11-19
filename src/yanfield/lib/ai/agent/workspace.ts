@@ -15,6 +15,7 @@ export function openWorkspace(novel: Novel, request: AgentRequest, config: Conte
   const observed = new Map<string, Fields | null>()
   const materials = new Map<string, unknown>()
   const chapterPages = new Map<string, number>()
+  const readBodies = new Map<string, { content: string; ranges: [number, number][] }>()
   const visibleKinds: Partial<Record<EntityKind, boolean>> = {
     character: config.includeCharacters, world: config.includeWorld, location: config.includeWorld,
     foreshadow: config.includeForeshadows, outline: config.includeNovelOutline,
@@ -30,6 +31,19 @@ export function openWorkspace(novel: Novel, request: AgentRequest, config: Conte
     return run.changes.find(change => change.id === id && change.kind === kind && change.state === "pending" && !isChapterOperation(change))
       ?? prior?.changes.find(change => change.id === id && change.kind === kind && change.state === "pending" && !isChapterOperation(change))
   }
+  function chapterDraft(id: string): Fields | undefined {
+    const batchEntry = run.changes.find(change => change.state === "pending" &&
+      change.chapterBatch?.entries.some(entry => entry.before.id === id))
+      ?.chapterBatch?.entries.find(entry => entry.before.id === id)
+    const prose = run.changes.find(change => change.kind === "chapter" && change.targetId === id &&
+      change.state === "pending" && !isChapterOperation(change) && !change.op && typeof change.after.content === "string")
+    return batchEntry ? { ...batchEntry.after, pendingBatch: true } : prose ? { ...prose.after, pendingProse: true } : undefined
+  }
+  function reviewedChapterBody(id: string) {
+    const current = String(chapterDraft(id)?.content ?? observed.get(`chapter:${id}`)?.content ?? "")
+    const read = readBodies.get(id)
+    return read?.content === current && (chapterPages.get(id) ?? -1) >= current.length ? current : undefined
+  }
   function read(kind: EntityKind, id: string): Fields | null {
     permitted(kind, id)
     const draft = candidate(kind, id)
@@ -43,17 +57,14 @@ export function openWorkspace(novel: Novel, request: AgentRequest, config: Conte
       observed.set(`blueprint:${id}`, null)
       return null
     }
-    if (kind === "blueprint" && run.changes.some(change =>
-      change.id === id && change.kind === "chapter" && !change.targetId && change.state === "pending")) {
-      observed.set(`blueprint:${id}`, null)
-      return null
-    }
     const explicit = mentioned(kind, id)
     const saved = visibleEntity(kind, id, novel.id, chapterIndex, explicit)
     observed.set(`${kind}:${id}`, saved)
     if (!saved) return null
     const snapshot = request.snapshot
-    const row = snapshot?.id === id && snapshot.kind === kind
+    const pending = kind === "chapter" ? chapterDraft(id) : undefined
+    const row = pending ? { ...saved, ...pending }
+      : snapshot?.id === id && snapshot.kind === kind
       ? { ...saved, ...Object.fromEntries(Object.entries(snapshot.fields).filter(([key]) => Object.hasOwn(patchSchemas[kind].shape, key))) }
       : saved
     if (!run.references.some(reference => reference.kind === kind && reference.id === id)) {
@@ -128,8 +139,22 @@ export function openWorkspace(novel: Novel, request: AgentRequest, config: Conte
     const { content: _content, ...metadata } = row
     const page = chapterReadPage({ id, title: row.title ?? row.name, wordCount: row.wordCount,
       ...(kind === "chapter" && !field ? metadata : { field: key, fields: Object.keys(row) }), content }, offset, limit)
-    if (kind === "chapter" && (!field || field === "content") && offset === (chapterPages.get(id) ?? 0)) {
-      chapterPages.set(id, Number(page.contentOffset) + String(page.content).length)
+    if (kind === "chapter" && (!field || field === "content")) {
+      const previous = readBodies.get(id)
+      const ranges = previous?.content === content && chapterPages.has(id) ? previous.ranges : []
+      const start = Number(page.contentOffset)
+      const ordered = [...ranges, [start, start + String(page.content).length] as [number, number]].sort((a, b) => a[0] - b[0])
+      const joined: [number, number][] = []
+      for (const [from, to] of ordered) {
+        const last = joined.at(-1)
+        if (last && from <= last[1]) last[1] = Math.max(last[1], to)
+        else joined.push([from, to])
+      }
+      const readThrough = joined[0]?.[0] === 0 ? joined[0][1] : 0
+      readBodies.set(id, { content, ranges: joined })
+      chapterPages.set(id, readThrough)
+      if (readThrough < content.length) { page.nextOffset = readThrough; page.truncated = true }
+      else { page.nextOffset = null; page.truncated = false }
     }
     return page
   }
@@ -140,7 +165,7 @@ export function openWorkspace(novel: Novel, request: AgentRequest, config: Conte
     return kind === "outline" ? novel.title : ""
   }
 
-  return { outlineTitle, chapterIndex, chapters, candidate, observed, materials, chapterPages, permitted, mentioned, read, readPage, search, cards }
+  return { outlineTitle, chapterIndex, chapters, candidate, observed, materials, chapterPages, reviewedChapterBody, permitted, mentioned, read, readPage, search, cards }
 }
 
 export type Workspace = ReturnType<typeof openWorkspace>

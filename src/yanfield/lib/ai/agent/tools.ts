@@ -49,13 +49,14 @@ const proseTarget = {
 }
 const words = z.number().int().min(1).max(8000).optional()
 const minimumWords = words.describe("Only a minimum number the author explicitly required. Use words for the approximate target.")
+const inlineEdits = z.array(z.strictObject({
+  original: z.string().min(1).max(4000),
+  replacement: z.string().max(4000),
+})).min(1).max(30)
 export const proseSchema = z.discriminatedUnion("mode", [
   z.strictObject({
     ...proseTarget, mode: z.literal("patch"), id,
-    edits: z.array(z.strictObject({
-      original: z.string().min(1).max(4000),
-      replacement: z.string().max(4000),
-    })).min(1).max(30),
+    edits: inlineEdits,
   }),
   z.strictObject({ ...proseTarget, mode: z.literal("selection"), id, words }),
   z.strictObject({ ...proseTarget, mode: z.literal("append"), id, words, minimumWords }),
@@ -103,18 +104,32 @@ export const moveChapterBlocksSchema = z.strictObject({
   ]),
   reason,
 })
+export const organizeChaptersSchema = z.strictObject({
+  changes: z.array(z.strictObject({
+    id,
+    title: chapterTitle.optional(),
+    summary: z.string().trim().max(2000).optional(),
+    transition: z.strictObject({ edge: z.enum(["start", "end"]), text: z.string().trim().min(1).max(1000) })
+      .optional().describe("Insert a short plain-text transition at the beginning or end of the final chapter text."),
+    inlineEdits: inlineEdits.optional().describe("Exact single-paragraph edits in the retained chapter text."),
+    duplicateTailIn: id.optional().describe("Existing chapter already containing the source's duplicated ending. The server verifies and trims the exact duplicated suffix; no copied prose or anchor needed."),
+  })).max(30).default([]),
+  moves: z.array(z.strictObject({ id, anchorId: id, placement: z.enum(["before", "after"]) })).max(30).default([]),
+  reason,
+})
 
 const definitions = {
   search: [searchSchema, "Find chapters or cards by name, title or alias. Omit kind for the book overview."],
   read: [readSchema, "Read a specific chapter, outline, card or archive. Follow nextOffset to read long material."],
   write: [writeSchema.extend({ items: z.array(itemSchema).min(1).max(20) }), "Stage one or many cards or outlines. Modify only requested fields. Read existing targets first. Include evidence for fields taken from a prose candidate or when the author requests quotations. Put occupations in identity and narrative roles in role."],
-  edit_prose: [proseSchema, "Stage prose for review. patch replaces an exact unique excerpt, selection edits only the editor selection, append preserves prior prose. Use rewrite only for new prose or a requested full rewrite."],
+  edit_prose: [proseSchema, "Stage prose for review. Patch only replaces an exact unique excerpt within one paragraph. For a duplicated chapter ending, use organize_chapters with duplicateTailIn; for a transition paragraph, use organize_chapters with transition. Selection needs an editor selection, append preserves prior prose, and rewrite is for new prose or a requested full rewrite."],
   split_chapter: [splitChapterSchema, "Stage a chapter split as one review item. Read the saved source chapter first, then quote the start of the first paragraph of the second half. This preserves the original paragraphs and puts the second half immediately after the source. When repairing a partial split, read and reuse the already saved second half."],
   move_chapter: [moveChapterSchema, "Stage moving a saved chapter immediately before or after another saved chapter, including across volumes. Read both chapters first. Include title only if the author also requested a rename."],
   rename_chapter: [renameChapterSchema, "Stage changing a saved chapter title. Read the chapter first. A rename does not move it."],
   delete_chapter: [deleteChapterSchema, "Stage deleting one saved chapter only when the author explicitly requested deleting that entire chapter. Read the chapter first. The review lists any linked material that blocks deletion."],
   merge_chapters: [mergeChaptersSchema, "Stage merging two adjacent saved chapters in the same volume. Read both. Keep their prose and formatting in order, retain the first chapter and remove the second. Only set a new title if requested. Use this instead of rewriting prose or deleting a chapter separately."],
   move_chapter_blocks: [moveChapterBlocksSchema, "Stage moving a continuous block range between two saved chapters as one review item. Read both first. Use edge and count for first or last N paragraphs, or quote unique block starts. Both chapters remain. Use this instead of separate prose edits."],
+  organize_chapters: [organizeChaptersSchema, "Stage related chapter repairs, ordering, titles, summaries, inline edits and opening/closing transitions in one volume. Later calls in the same run update the same proposal. Use chapter IDs from search. For duplicateTailIn, the server compares saved paragraphs and trims only the source. Read every page before writing a summary. Use transition to add a bridge paragraph without rewriting existing prose."],
   delete: [deleteSchema, "Stage deletion of one entire saved card, only when explicitly requested. Read the card first."],
 } as const
 

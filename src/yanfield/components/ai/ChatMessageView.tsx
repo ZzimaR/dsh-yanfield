@@ -119,7 +119,7 @@ export const ChatMessageView = React.memo(function ChatMessageView({
           {message.model?<span className="ml-auto max-w-[58%] truncate text-[10px] text-ink-3" title={message.provider?`${message.provider} / ${message.model}`:message.model}>{message.model}</span>:null}
         </div>
 
-        {!hasAgentRun && <ThinkingPreview text={message.reasoning ?? ""} active={isStreaming && !message.content} />}
+        {!hasAgentRun && <ThinkingPreview text={message.reasoning ?? ""} active={isStreaming && !message.content} live={isStreaming} />}
 
         {message.content && !hasAgentRun ? (
           <Markdown text={message.content} className={cn("mt-1 text-[13px] leading-[1.9]", isStreaming && "ai-caret")} />

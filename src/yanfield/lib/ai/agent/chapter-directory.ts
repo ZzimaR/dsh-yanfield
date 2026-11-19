@@ -37,15 +37,16 @@ export function reindexChapters(novelId: string, positions: ChapterPosition[]) {
   repo.setChapterPositions(novelId, positions.map((entry, orderIndex) => ({ ...entry, orderIndex })))
 }
 
-export function hasChapterConflict(run: AgentRun, ids: readonly string[], volumes: Set<string | null>) {
+export function hasChapterConflict(run: AgentRun, ids: readonly string[], volumes: Set<string | null>, except: readonly AgentChange[] = []) {
   return run.changes.some(change => {
-    if (change.state !== "pending" || change.kind !== "chapter") return false
+    if (except.includes(change) || change.state !== "pending" || change.kind !== "chapter") return false
     const action = change.chapterDirectory
-    const order = change.chapterSplit?.orderBefore ?? (change.chapterPair?.kind === "merge" ? change.chapterPair.orderBefore : undefined)
+    const order = change.chapterBatch?.orderBefore ?? change.chapterSplit?.orderBefore ?? (change.chapterPair?.kind === "merge" ? change.chapterPair.orderBefore : undefined)
       ?? (action && "orderBefore" in action ? action.orderBefore : [])
     const linkedId = change.chapterSplit?.existing?.id ?? change.chapterPair?.second.id ?? (action?.kind === "move" ? action.anchorId : undefined)
     return (change.targetId !== null && ids.includes(change.targetId)) ||
       (linkedId !== undefined && ids.includes(linkedId)) ||
+      Boolean(change.chapterBatch?.entries.some(entry => ids.includes(entry.before.id) || Boolean(entry.duplicateIn && ids.includes(entry.duplicateIn.id)))) ||
       order.some(entry => volumes.has(entry.volumeId))
   })
 }

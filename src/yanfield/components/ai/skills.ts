@@ -63,5 +63,6 @@ export const SKILL_OPTIONS: SkillOption[] = [
   { label: "删除章节", prompt: "删除章节： ", chapterOperation: true, hint: "指定要删除的整章，审阅后再确认" },
   { label: "合并章节", prompt: "合并章节： ", chapterOperation: true, hint: "指定同一卷中相邻的两章" },
   { label: "跨章移动段落", prompt: "跨章移动段落： ", chapterOperation: true, hint: "指定源章节、要移走的段落和插入位置" },
+  { label: "批量整理章节", prompt: "批量整理章节： ", chapterOperation: true, hint: "一次整理目录、标题、摘要或已拆章的重复章尾" },
   ...SKILL_CARDS.map((skill) => ({ label: skill.label, hint: skill.description, prompt: skill.prompt })),
 ];

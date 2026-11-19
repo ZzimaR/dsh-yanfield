@@ -31,11 +31,12 @@ import { stashPendingCodexCard } from "./CodexPanel";
 import {
   autoReviewChange,
   reviewKey,
+  chapterReviewSections,
   updateAgentReview,
   type AgentReviewState,
 } from "@/lib/editor/agent-review";
 import { AGENT_REVIEW_READY, AGENT_UPDATED, isAgentCommitting } from "@/lib/ai/agent/client";
-import { isChapterOperation, type AgentRun } from "@/lib/ai/agent/types";
+import type { AgentRun } from "@/lib/ai/agent/types";
 import { EditorCanvas, type ChapterEditorPosition } from "./EditorCanvas";
 import { EditorHeader, type EditorTheme } from "./EditorHeader";
 import { EditorRightRail } from "./EditorRightRail";
@@ -393,7 +394,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
     await actions.refresh();
     const latest = await apiGet<AgentRun>(`/api/ai/agent/${run.id}?novelId=${encodeURIComponent(novelId)}`);
     const change = latest.changes.find(c => c.id === changeId);
-    if (!change || isChapterOperation(change)) return;
+    if (!change || !chapterReviewSections(change).length) return;
     if (onlyIfPending) {
       if (change.state !== "pending") return;
       if (change.targetId) {
@@ -402,12 +403,13 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
       }
       if (reviewRef.current || isAgentCommitting(run.id)) return;
     }
-    const targetChapter = change.appliedId || change.targetId;
+    const targetChapter = chapterReviewSections(change)[0]?.chapterId;
     if (targetChapter) {
       setChapterId(targetChapter);
       syncChapterRoute(targetChapter);
     }
     seenReviewKeys.add(reviewKey(latest.id, changeId));
+    setDrawerRightOpen(false);
     setReview({ run: latest, changeId });
   }, [actions, flush, novelId, setChapterId, setReview, syncChapterRoute]);
   const openReviewRef = React.useRef(openReview);
@@ -488,7 +490,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   React.useEffect(() => {
     if (!review) return;
     const change = review.run.changes.find(item => item.id === review.changeId);
-    const target = change?.appliedId || change?.targetId;
+    const target = change && chapterReviewSections(change)[0]?.chapterId;
     if (target && target !== chapterId) closeReview();
   }, [chapterId, review, closeReview]);
 
