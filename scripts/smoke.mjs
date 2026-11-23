@@ -367,6 +367,56 @@ try {
     reply,
   ], {})
   assert.equal(asksForEdit.changes[0].state, "pending")
+  const concurrentChapter = (await api("POST", "/chapters", {
+    novelId, title: "Concurrent save fixture", content: "<p>Original</p>",
+  })).data
+  const chapterRoute = `/chapters/${concurrentChapter.id}`
+  const stamp = "2099-01-01T00:00:00.000Z"
+  const fixtureDb = new DatabaseSync(dbPath)
+  try {
+    fixtureDb.prepare("UPDATE chapters SET updated_at = ? WHERE id = ?").run(stamp, concurrentChapter.id)
+  } finally {
+    fixtureDb.close()
+  }
+  const versionsRoute = `${chapterRoute}/versions`
+  const savedVersion = await api("POST", versionsRoute, { expectedUpdatedAt: stamp })
+  assert.equal(savedVersion.status, 201)
+  assert.equal(savedVersion.data.source, "manual")
+  const versionRoute = `${versionsRoute}/${savedVersion.data.id}`
+  assert.equal((await api("GET", versionRoute)).data.content, concurrentChapter.content)
+  assert.equal("content" in (await api("GET", versionsRoute)).data.items[0], false)
+  const firstSave = await api("PATCH", chapterRoute, { expectedUpdatedAt: stamp, content: "<p>Newer draft</p>" })
+  assert.equal(firstSave.status, 200)
+  assert.equal(firstSave.data.updatedAt, "2099-01-01T00:00:00.001Z")
+  const staleSave = await api("PATCH", chapterRoute, {
+    expectedUpdatedAt: stamp, title: "Stale title", content: concurrentChapter.content,
+  })
+  assert.equal(staleSave.status, 409)
+  assert.equal((await api("PATCH", chapterRoute, { expectedUpdatedAt: null, content: concurrentChapter.content })).status, 409)
+  assert.deepEqual((await api("GET", chapterRoute)).data, firstSave.data)
+  const nextSave = await api("PATCH", chapterRoute, { expectedUpdatedAt: firstSave.data.updatedAt, title: "Merged title" })
+  assert.equal(nextSave.status, 200)
+  assert.equal(nextSave.data.content, "<p>Newer draft</p>")
+  assert.equal(nextSave.data.title, "Merged title")
+  assert.equal((await api("POST", versionsRoute, { expectedUpdatedAt: stamp })).status, 409)
+  assert.equal((await api("PATCH", versionRoute, { expectedUpdatedAt: stamp })).status, 409)
+  assert.equal((await api("GET", versionsRoute)).data.items.length, 1)
+  const restoredVersion = await api("PATCH", versionRoute, { expectedUpdatedAt: nextSave.data.updatedAt })
+  assert.equal(restoredVersion.status, 200)
+  assert.equal(restoredVersion.data.content, concurrentChapter.content)
+  assert.equal(restoredVersion.data.title, nextSave.data.title)
+  const [restorePoint] = (await api("GET", versionsRoute)).data.items
+  assert.equal(restorePoint.source, "before_restore")
+  const restorePointRoute = `${versionsRoute}/${restorePoint.id}`
+  assert.equal((await api("GET", restorePointRoute)).data.content, nextSave.data.content)
+  const sameVersion = await api("PATCH", versionRoute, { expectedUpdatedAt: restoredVersion.data.updatedAt })
+  assert.equal(sameVersion.status, 200)
+  assert.equal((await api("GET", versionsRoute)).data.items.length, 2)
+  assert.equal((await api("DELETE", restorePointRoute)).status, 200)
+  assert.equal((await api("GET", restorePointRoute)).status, 404)
+  assert.equal((await api("DELETE", chapterRoute)).status, 200)
+  assert.equal((await api("GET", versionRoute)).status, 404)
+
   const chapter = (await api("POST", "/chapters", { novelId, title: "Test chapter", content: "<p>Before</p><p>Chosen</p><p>After</p>" })).data
   const selectionRun = await agentRun("Only replace the selected text", [
     tool("read", { kind: "chapter", id: chapter.id }),
@@ -943,6 +993,14 @@ try {
   const removedForBackup = (await api("POST", "/chapters", {
     novelId, volumeId: otherVolume.id, title: "Deleted chapter in backup", content: "<p>Restore me.</p>",
   })).data
+  const historyProtected = await api("POST", `/chapters/${removedForBackup.id}/versions`, {
+    expectedUpdatedAt: removedForBackup.updatedAt,
+  })
+  assert.equal(historyProtected.status, 201)
+  const blockedByHistory = await removeChapter(removedForBackup.id)
+  assert.deepEqual(blockedByHistory.changes[0].chapterDirectory.blockers, ["章节版本历史"])
+  assert.equal((await apply(blockedByHistory, blockedByHistory.changes)).status, 409)
+  assert.equal((await api("DELETE", `/chapters/${removedForBackup.id}/versions/${historyProtected.data.id}`)).status, 200)
   const backupDeletion = await removeChapter(removedForBackup.id)
   assert.equal((await apply(backupDeletion, backupDeletion.changes)).status, 200)
 

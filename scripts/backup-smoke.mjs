@@ -59,6 +59,9 @@ export async function checkBackups({ call, api, dbPath, novelId, chapter, qaVolu
     }
     const decode = file => JSON.parse(gunzipSync(file.subarray(backupHeader.length)).toString("utf8"))
     const encode = manifest => Buffer.concat([backupHeader, gzipSync(JSON.stringify(manifest))])
+    const savedChapter = (await api("GET", `/chapters/${chapter.id}`)).data
+    const version = await api("POST", `/chapters/${chapter.id}/versions`, { expectedUpdatedAt: savedChapter.updatedAt })
+    assert.equal(version.status, 201)
     const plain = await exportFile({ scope: "all", preferences })
     const manifest = decode(plain)
     const tableNames = db.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all()
@@ -97,6 +100,11 @@ export async function checkBackups({ call, api, dbPath, novelId, chapter, qaVolu
     const copyTree = (await api("GET", `/novels/${copyId}/tree`)).data
     const copyChapter = [...copyTree.looseChapters, ...copyTree.volumes.flatMap(volume => volume.chapters)].find(item => item.title === chapter.title)
     assert.notEqual(copyChapter.id, chapter.id)
+    const copiedVersions = `/chapters/${copyChapter.id}/versions`
+    const [copyVersion] = (await api("GET", copiedVersions)).data.items
+    assert.notEqual(copyVersion.id, version.data.id)
+    assert.equal((await api("GET", `${copiedVersions}/${copyVersion.id}`)).data.content, savedChapter.content)
+    assert.equal((await api("GET", `${copiedVersions}/${version.data.id}`)).status, 404)
     assert.equal(copyChapter.content, (await api("GET", `/chapters/${chapter.id}`)).data.content)
     assert.equal(JSON.parse(copied.data.preferences.books[copyId].chapter), copyChapter.id)
     const copyVolume = copyTree.volumes.find(volume => volume.title === qaVolume.title)
@@ -159,6 +167,7 @@ export async function checkBackups({ call, api, dbPath, novelId, chapter, qaVolu
     const migrated = structuredClone(selectedManifest)
     migrated.schema = 5
     delete migrated.rows.codex_order
+    delete migrated.rows.chapter_versions
     assert.equal((await importFile(encode(migrated))).status, 200, "Older snapshot schemas are migrated")
     const broken = structuredClone(selectedManifest)
     broken.rows.chapters[0].volume_id = "missing-volume"

@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Ellipsis,
+  History,
   Maximize2,
   Minimize2,
   Moon,
@@ -43,6 +44,7 @@ interface EditorHeaderProps {
   onOverview: () => void;
   onSave: () => void;
   canSave: boolean;
+  onOpenHistory?: () => void;
   /** 返回按钮的去向，例如「返回概览」 */
   backLabel?: string;
   onToggleLeft: () => void;
@@ -76,6 +78,7 @@ export function EditorHeader({
   onOverview,
   onSave,
   canSave,
+  onOpenHistory,
   backLabel,
   onToggleLeft,
   onToggleRight,
@@ -91,6 +94,7 @@ export function EditorHeader({
   const tr = useT();
   const backText = tr(backLabel ?? "返回概览");
   const moreItems: DropdownItem[] = [
+    ...(onOpenHistory ? [{ label: tr("章节版本历史"), icon: <History className="size-3.5" />, onSelect: onOpenHistory }] : []),
     { label: tr("作品概览"), icon: <BookOpen className="size-3.5" />, onSelect: onOverview },
     { separator: true },
     { label: tr("设置"), icon: <Settings2 className="size-3.5" />, onSelect: () => openSettingsDialog() },

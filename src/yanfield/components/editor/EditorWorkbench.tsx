@@ -7,7 +7,7 @@ import type { Editor } from "@tiptap/react";
 import { Feather, Plus } from "lucide-react";
 import { Button, ConfirmDialog, EmptyState, Sheet, useToast } from "@/components/ui/kit";
 import { AiTaskBar } from "@/components/ai/AiTaskBar";
-import { apiGet, apiPatch, useApi } from "@/lib/client/api";
+import { ApiError, apiGet, apiPatch, apiPost, notifyDataChanged, useApi } from "@/lib/client/api";
 import { EditorBridgeProvider } from "@/lib/editor/bridge";
 import { HAND_OFF_EVENT } from "@/lib/editor/hand-off";
 import { emitFocusAi } from "@/lib/editor/events";
@@ -15,9 +15,11 @@ import { isSaveShortcut, navigateAfterSaving, useEditorSaveGuard } from "@/lib/e
 import { toOne } from "@/lib/editor/normalize";
 import { readEditorLayoutSettings } from "@/lib/editor/settings";
 import { findChapter, findVolumeOfChapter, flattenChapters } from "@/lib/editor/types";
+import type { ChapterVersionSummary } from "@/lib/chapter-version";
 import type { ChapterPatch, SelectionInfo } from "@/lib/editor/types";
 import { useChapterContent } from "@/lib/editor/useChapterContent";
-import { useChapterDraft } from "@/lib/editor/useChapterDraft";
+import { sameChapterDraft } from "@/lib/editor/draft-recovery";
+import { useChapterDraft, type ChapterDraft } from "@/lib/editor/useChapterDraft";
 import { useEditorBridgeValue } from "@/lib/editor/useEditorBridgeValue";
 import { useNovelTree } from "@/lib/editor/useNovelTree";
 import { cn } from "@/lib/ui/cn";
@@ -26,6 +28,7 @@ import { useHotkeys, useLocalStorageState, useResizePanel, useYanfieldPanelBound
 import { useOverlayMotion } from "@/lib/ui/overlay-motion";
 import { applySurfaceDataset, applyTheme, readSurfaceTheme } from "@/lib/ui/theme";
 import type { AppSettings, Chapter } from "@/lib/types";
+import { ChapterHistory } from "./ChapterHistory";
 import { CommandPalette } from "./CommandPalette";
 import { stashPendingCodexCard } from "./CodexPanel";
 import {
@@ -95,6 +98,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   const [drawerRightOpen, setDrawerRightOpen] = React.useState(false);
   const rightDrawerRef = React.useRef<HTMLElement>(null);
   const { present: rightDrawerPresent, ...rightDrawerMotion } = useOverlayMotion(!isWide && drawerRightOpen, rightDrawerRef);
+  const [historyChapterId, setHistoryChapterId] = React.useState<string | null>(null);
   /** ⌘K 命令面板 */
   const [paletteOpen, setPaletteOpen] = React.useState(false);
 
@@ -152,7 +156,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   const chapterApi = useChapterContent(chapterRequestId, initialChapter);
   // Never show the previous request's body while switching chapters.
   const chapter = React.useMemo(() => chapterMeta && chapterApi.data?.id === chapterMeta.id
-    ? { ...chapterApi.data, ...chapterMeta, content: chapterApi.data.content }
+    ? { ...chapterApi.data, volumeId: chapterMeta.volumeId, orderIndex: chapterMeta.orderIndex }
     : null, [chapterMeta, chapterApi.data]);
   const volume = React.useMemo(() => findVolumeOfChapter(tree, chapterId), [tree, chapterId]);
 
@@ -231,19 +235,25 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
 
   /** 真正落库：PATCH 成功后把结果同步回目录树（不整树刷新，避免打断写作） */
   const persistChapter = React.useCallback(
-    async (id: string, patch: ChapterPatch): Promise<void> => {
+    async (id: string, patch: ChapterPatch, expectedUpdatedAt: string | null, baseline: ChapterDraft | null): Promise<Chapter> => {
       const { title, ...rest } = patch;
       const trimmedTitle = title?.trim();
       if (title !== undefined && !trimmedTitle) throw new Error(tr("章节标题不能为空，请填写标题后保存。"));
       const safePatch: ChapterPatch = trimmedTitle === undefined ? rest : { ...rest, title: trimmedTitle };
-      const updated = await saveGuard.runExclusive(id, () =>
-        apiPatch<Partial<Chapter>>(`/api/chapters/${id}`, safePatch),
-      );
-      actions.patchChapterLocal(id, {
-        ...(updated ?? {}),
-        ...safePatch,
-        updatedAt: updated?.updatedAt ?? new Date().toISOString(),
+      const url = `/api/chapters/${id}`;
+      const updated = await saveGuard.runExclusive(id, async () => {
+        try {
+          return await apiPatch<Chapter>(url, { ...safePatch, expectedUpdatedAt });
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 409 || !baseline) throw error;
+          const latest = await apiGet<Chapter>(url);
+          // A directory move can change the timestamp without changing the draft.
+          if (!sameChapterDraft(baseline, { ...latest, chapterId: latest.id })) throw error;
+          return apiPatch<Chapter>(url, { ...safePatch, expectedUpdatedAt: latest.updatedAt });
+        }
       });
+      actions.patchChapterLocal(id, updated);
+      return updated;
     },
     [actions, saveGuard, tr],
   );
@@ -254,7 +264,9 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
     lastSavedAt,
     hasUnsaved,
     hasUnsavedNow,
+    getSavedRevision,
     recoveryDraft,
+    hasConflict,
     restoreRecovery,
     discardRecovery,
     setTitle,
@@ -285,15 +297,24 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   const [discardRecoveryOpen, setDiscardRecoveryOpen] = React.useState(false);
   const [discardRecoveryLoading, setDiscardRecoveryLoading] = React.useState(false);
   React.useEffect(() => setDiscardRecoveryOpen(false), [chapterId]);
+  const editor = mountedEditor?.chapterId === chapterId ? mountedEditor?.instance ?? null : null;
+  const currentChapterRef = React.useRef(chapterId);
+  currentChapterRef.current = chapterId;
   const useSavedVersion = React.useCallback(async () => {
-    if (!chapter || !activeRecovery) return;
+    if (!chapter || (!activeRecovery && !hasConflict)) return;
     setDiscardRecoveryLoading(true);
     try {
-      const saved = await saveGuard.runExclusive(chapter.id, () => apiGet<Chapter>(`/api/chapters/${chapter.id}`));
-      adoptSaved(saved);
-      actions.patchChapterLocal(saved.id, saved);
-      discardRecovery();
-      setDiscardRecoveryOpen(false);
+      await saveGuard.runExclusive(chapter.id, async () => {
+        const saved = await apiGet<Chapter>(`/api/chapters/${chapter.id}`);
+        if (currentChapterRef.current !== saved.id) return;
+        adoptSaved(saved);
+        actions.patchChapterLocal(saved.id, saved);
+        discardRecovery(saved.id);
+        if (editor && !editor.isDestroyed) {
+          editor.commands.setContent(saved.content || "<p></p>", { emitUpdate: false });
+        }
+        setDiscardRecoveryOpen(false);
+      });
     } catch (error) {
       toast({
         title: tr("读取已保存章节失败"),
@@ -303,7 +324,20 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
     } finally {
       setDiscardRecoveryLoading(false);
     }
-  }, [chapter, activeRecovery, saveGuard, adoptSaved, actions, discardRecovery, toast, tr]);
+  }, [chapter, activeRecovery, hasConflict, saveGuard, adoptSaved, actions, discardRecovery, editor, toast, tr]);
+  const directoryActions = React.useMemo(() => ({
+    ...actions,
+    renameChapter: async (id: string, nextTitle: string) => {
+      if (id !== chapterId || !activeDraft || activeRecovery) return actions.renameChapter(id, nextTitle);
+      setTitle(nextTitle);
+      try {
+        await flush();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  }), [actions, chapterId, activeDraft, activeRecovery, setTitle, flush]);
 
   const chapterSelection = React.useRef(0);
   const chapterPositions = React.useRef(new Map<string, ChapterEditorPosition>());
@@ -361,19 +395,36 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
   const handleEditorReady = React.useCallback((instance: Editor | null, id: string | null) => {
     setMountedEditor(current => instance && id ? { instance, chapterId: id } : current?.chapterId === id ? null : current);
   }, []);
-  const editor = mountedEditor?.chapterId === chapterId ? mountedEditor?.instance ?? null : null;
   const rawBridge = useEditorBridgeValue(editor);
-  const currentChapterRef = React.useRef(chapterId);
-  currentChapterRef.current=chapterId;
+  React.useEffect(() => setHistoryChapterId(null), [chapterId]);
+  const syncSavedChapter = React.useCallback((saved: Chapter) => {
+    if (currentChapterRef.current !== saved.id) return;
+    adoptSaved(saved);
+    actions.patchChapterLocal(saved.id, saved);
+    editor?.commands.setContent(saved.content || "<p></p>", { emitUpdate: false });
+  }, [adoptSaved, actions, editor]);
   const bridge = React.useMemo(() => rawBridge ? {
     ...rawBridge, getChapterId:()=>chapterId, flush,
     setReadOnly:(locked:boolean)=>editor?.setEditable(!locked,false),
-    syncSaved:(saved:Chapter)=>{
-      if(currentChapterRef.current!==saved.id)return;
-      adoptSaved(saved); actions.patchChapterLocal(saved.id,saved);
-      editor?.commands.setContent(saved.content||"<p></p>",{emitUpdate:false});
-    },
-  } : null,[rawBridge,flush,adoptSaved,actions,editor,chapterId]);
+    syncSaved: syncSavedChapter,
+  } : null,[rawBridge,flush,syncSavedChapter,editor,chapterId]);
+
+  async function withSavedChapter<T>(id: string, write: (expectedUpdatedAt: string) => Promise<T>): Promise<T> {
+    const wasEditable = editor?.isEditable;
+    if (wasEditable) editor?.setEditable(false, false);
+    try {
+      await flush();
+      return await saveGuard.runExclusive(id, () => {
+        const revision = getSavedRevision(id);
+        if (currentChapterRef.current !== id || !revision) {
+          throw new Error(tr("章节已有新修改，请重新打开后再操作"));
+        }
+        return write(revision);
+      });
+    } finally {
+      if (wasEditable && editor && !editor.isDestroyed) editor.setEditable(true, false);
+    }
+  }
   /* ---------------- 正文改动审阅：手动入口 + 自动打开 ---------------- */
 
   /** 审阅状态与 ref 同步：事件监听读 ref，避免 state 变化导致监听器反复重挂。 */
@@ -714,6 +765,21 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
       <div
         className="flex h-full min-h-0 flex-col overflow-hidden bg-paper text-ink"
       >
+        {historyChapterId && historyChapterId === chapterId ? (
+          <ChapterHistory
+            key={historyChapterId}
+            chapterId={historyChapterId}
+            onClose={() => setHistoryChapterId(null)}
+            onCreate={() => withSavedChapter(historyChapterId, (expectedUpdatedAt) =>
+              apiPost<ChapterVersionSummary>(`/api/chapters/${historyChapterId}/versions`, { expectedUpdatedAt }),
+            )}
+            onRestore={(versionId) => withSavedChapter(historyChapterId, async (expectedUpdatedAt) => {
+              const restored = await apiPatch<Chapter>(`/api/chapters/${historyChapterId}/versions/${versionId}`, { expectedUpdatedAt });
+              syncSavedChapter(restored);
+              notifyDataChanged("archives");
+            })}
+          />
+        ) : null}
         {immersive ? null : (
           <EditorHeader
             novelId={novelId}
@@ -730,6 +796,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
             onOverview={goOverview}
             onSave={saveChapter}
             canSave={Boolean(activeDraft) && !activeRecovery}
+            onOpenHistory={chapterId && activeDraft && !activeRecovery ? () => setHistoryChapterId(chapterId) : undefined}
             backLabel={back.label}
             onToggleLeft={toggleLeft}
             onToggleRight={toggleRight}
@@ -763,7 +830,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
                   currentVolumeId={volume?.id ?? null}
                   tab={tab}
                   onTabChange={setTab}
-                  actions={actions}
+                  actions={directoryActions}
                   onSelectChapter={selectChapter}
                 />
               </aside>
@@ -781,6 +848,22 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
 
           {/* 中栏：正文 */}
           <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {hasConflict && !activeRecovery ? (
+              <div role="alert" className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-surface px-4 py-2 text-sm text-ink">
+                <p className="flex-1">{tr("章节已有新修改。请复制需要保留的内容，再打开已保存版本合并。")}</p>
+                <Button size="sm" variant="secondary" onClick={() => setDiscardRecoveryOpen(true)}>{tr("使用已保存版本")}</Button>
+              </div>
+            ) : null}
+            <ConfirmDialog
+              open={discardRecoveryOpen}
+              title={tr("丢弃临时草稿？")}
+              description={tr("临时草稿将被删除，无法撤销；数据库中已保存的章节不会改变。")}
+              confirmText={tr("丢弃草稿")}
+              danger
+              loading={discardRecoveryLoading}
+              onClose={() => setDiscardRecoveryOpen(false)}
+              onConfirm={() => void useSavedVersion()}
+            />
             {chapterApi.error && !chapter ? (
               <div role="alert" className="m-auto space-y-3 p-6 text-sm text-ink-3">
                 <p>{tr("正文加载失败：{error}", { error: chapterApi.error })}</p>
@@ -795,23 +878,13 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
                 <EmptyState
                   icon={<Feather className="size-5" />}
                   title={tr("发现未保存的临时草稿")}
-                  description={tr("上次离开时未能确认保存。数据库内容可能已经变化；恢复后请核对，保存会覆盖当前章节。临时草稿只保存在此浏览器标签页中，不能代替备份。")}
+                  description={tr("上次离开时未能确认保存。恢复草稿后可以核对内容。如果已保存版本有变化，请手动合并需要保留的内容。临时草稿只保存在此浏览器标签页中。")}
                   action={
                     <div className="flex flex-wrap justify-center gap-2">
                       <Button variant="primary" onClick={restoreRecovery}>{tr("恢复临时草稿")}</Button>
                       <Button variant="secondary" onClick={() => setDiscardRecoveryOpen(true)}>{tr("使用已保存版本")}</Button>
                     </div>
                   }
-                />
-                <ConfirmDialog
-                  open={discardRecoveryOpen}
-                  title={tr("丢弃临时草稿？")}
-                  description={tr("临时草稿将被删除，无法撤销；数据库中已保存的章节不会改变。")}
-                  confirmText={tr("丢弃草稿")}
-                  danger
-                  loading={discardRecoveryLoading}
-                  onClose={() => setDiscardRecoveryOpen(false)}
-                  onConfirm={() => void useSavedVersion()}
                 />
               </div>
             ) : chapter && activeDraft ? (
@@ -922,7 +995,7 @@ export function EditorWorkbench({ novelId, initialChapterId = null }: EditorWork
               currentVolumeId={volume?.id ?? null}
               tab={tab}
               onTabChange={setTab}
-              actions={actions}
+              actions={directoryActions}
               onSelectChapter={selectChapter}
             />
           </div>

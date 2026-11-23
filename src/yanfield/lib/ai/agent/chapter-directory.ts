@@ -1,5 +1,6 @@
 import { ApiError } from "@/lib/api-utils"
 import { get } from "@/lib/db"
+import { hasChapterVersions } from "@/lib/db/chapter-versions"
 import * as repo from "@/lib/repo"
 import type { Chapter } from "@/lib/types"
 import { uid } from "@/lib/ui/cn"
@@ -26,6 +27,7 @@ export function assertChapterTitle(novelId: string, volumeId: string | null, tit
 
 export function chapterDependencies(id: string): string[] {
   const labels: string[] = []
+  if (hasChapterVersions(id)) labels.push("章节版本历史")
   if (get("SELECT id FROM chapter_blueprints WHERE chapter_id = ?", [id])) labels.push("章纲")
   if (repo.getArchiveByChapter(id)) labels.push("故事档案")
   if (get("SELECT id FROM foreshadows WHERE planted_chapter_id = ? OR payoff_chapter_id = ?", [id, id])) labels.push("伏笔")

@@ -37,6 +37,20 @@ CREATE TABLE IF NOT EXISTS locations (
 CREATE INDEX IF NOT EXISTS idx_locations_novel ON locations(novel_id);
 `;
 
+const CHAPTER_VERSION_SCHEMA = `
+CREATE TABLE IF NOT EXISTS chapter_versions (
+  id TEXT PRIMARY KEY,
+  novel_id TEXT NOT NULL REFERENCES novels(id) ON DELETE CASCADE,
+  chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
+  chapter_title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  word_count INTEGER NOT NULL,
+  source TEXT NOT NULL CHECK (source IN ('manual', 'before_restore')),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chapter_versions_chapter ON chapter_versions(chapter_id, created_at DESC);
+`;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS novels (
   id TEXT PRIMARY KEY,
@@ -86,6 +100,8 @@ CREATE TABLE IF NOT EXISTS chapters (
 );
 CREATE INDEX IF NOT EXISTS idx_chapters_novel ON chapters(novel_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_chapters_volume ON chapters(volume_id, order_index);
+
+${CHAPTER_VERSION_SCHEMA}
 
 CREATE TABLE IF NOT EXISTS novel_outlines (
   id TEXT PRIMARY KEY,
@@ -399,6 +415,10 @@ const MIGRATIONS: ((db: DB) => void)[] = [
       ids TEXT NOT NULL,
       PRIMARY KEY (novel_id, group_key)
     )`);
+  },
+  // v7：章节正文版本历史。
+  (db) => {
+    db.exec(CHAPTER_VERSION_SCHEMA);
   },
 ];
 

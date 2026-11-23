@@ -85,7 +85,8 @@ Pick a model in Yanfield's Model services or in the writing assistant. Models ar
 **Writing**
 
 - Novel / volume / chapter tree with word counts and status; create, reorder, navigate
-- Autosave with adjustable delay plus manual save; live word, paragraph and reading-time stats
+- Autosave with an adjustable delay, manual save, and live word, paragraph, and reading-time stats
+- Chapter version history with snapshots, previews, and an automatic snapshot before restoring earlier text
 - Typography controls: serif or sans, size, weight, line height, letter spacing, paragraph spacing, margins, max line width
 - Focus mode, typewriter mode, writing goal and daily target
 - `Alt + 1` collapse the outline, `Alt + J` focus the AI box, `Ctrl / ⌘ + K` quick jump, `Ctrl / ⌘ + F` find in chapter
@@ -202,7 +203,7 @@ The website ([yanfield.com](https://yanfield.com)) is a static site in `site/`: 
 ## Roadmap
 
 - **v0.1.x (current)**: writing desk, notes system, AI review and cost visibility;
-- **Next**: chapter snapshots and rollback, EPUB export, richer writing stats;
+- **Next**: EPUB export and more detailed writing statistics;
 - **Later**: knowledge-graph view, model comparison, collaborative review.
 
 ## Credits

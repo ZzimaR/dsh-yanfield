@@ -19,7 +19,7 @@ type Column = { name: string; type: "TEXT" | "INTEGER" | "REAL"; pk: number; not
 
 // Parent tables precede dependents. Book scope follows the owning novel even for chat messages.
 const tables = [
-  "novels", "volumes", "chapters", "novel_outlines", "volume_outlines", "chapter_blueprints",
+  "novels", "volumes", "chapters", "chapter_versions", "novel_outlines", "volume_outlines", "chapter_blueprints",
   "characters", "world_settings", "locations", "foreshadows", "story_archives", "chat_sessions",
   "chat_messages", "prompt_presets", "ai_logs", "agent_runs", "codex_order",
   "providers", "app_settings", "word_snapshots",
@@ -112,6 +112,7 @@ const scopedLinks = [
   ["chapters", "volume_id", "volumes"],
   ["volume_outlines", "volume_id", "volumes"],
   ["chapter_blueprints", "chapter_id", "chapters"],
+  ["chapter_versions", "chapter_id", "chapters"],
   ["world_settings", "parent_id", "world_settings"],
   ["locations", "parent_id", "locations"],
   ["story_archives", "chapter_id", "chapters"],

@@ -30,7 +30,8 @@ Three columns:
 
 Writing features:
 
-- Autosave with adjustable delay (default 1.2s) plus manual save; save state shown in the header.
+- Autosave with an adjustable delay (1.2 seconds by default) and manual save. The header shows the save status. If the chapter changes in another window, the writing desk keeps your draft and pauses saving. Copy the text you want to keep, then choose **Use saved version** and merge your edits.
+- In the editor, open **More actions → Chapter version history** to save a snapshot, preview earlier text, or restore it. Yanfield saves the current text first so you can return to it. Restoring replaces the manuscript text and preserves the chapter title, summary, and status. Backups include snapshots. Deleting a chapter manually removes its history. The assistant cannot delete a chapter with snapshots or consume it as the second chapter in a merge.
 - Word / paragraph / reading-time stats; chapter status (draft, final, …).
 - Focus mode (hide side rails), typewriter mode (caret stays vertically centered).
 - Typography: serif or sans, size, weight, line height, letter spacing, paragraph spacing, margins, max line width, with a live preview.
