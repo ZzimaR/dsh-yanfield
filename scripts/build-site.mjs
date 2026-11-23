@@ -17,7 +17,8 @@ if (!siteUrl.endsWith("/")) siteUrl += "/"
 const noindex = siteUrl !== PRODUCTION_URL
 
 function tokenBlocks() {
-  return readFile(path.join(root, "src/yanfield/app/globals.css"), "utf8").then((css) => {
+  return readFile(path.join(root, "src/yanfield/app/globals.css"), "utf8").then((source) => {
+    const css = source.replaceAll("\r\n", "\n")
     const body = (selectorStart) => {
       const at = css.indexOf(selectorStart)
       if (at < 0) throw new Error(`globals.css: ${selectorStart} not found`)

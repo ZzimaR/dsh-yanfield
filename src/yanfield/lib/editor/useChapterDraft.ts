@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ApiError } from "@/lib/client/api";
 import type { Chapter, ChapterStatus } from "@/lib/types";
 import { readRecoveryDraft, removeMatchingRecoveryDraft, sameChapterDraft, writeRecoveryDraft } from "./draft-recovery";
 import { createSaveQueue } from "./save-queue";
@@ -9,11 +10,24 @@ import type { ChapterPatch, SaveState } from "./types";
 /** 当前章节的本地草稿（编辑器的唯一事实来源） */
 export interface ChapterDraft {
   chapterId: string;
+  expectedUpdatedAt?: string | null;
   title: string;
   content: string;
   summary: string;
   status: ChapterStatus;
   wordCount: number;
+}
+
+function toDraft(chapter: Chapter): ChapterDraft {
+  return {
+    chapterId: chapter.id,
+    expectedUpdatedAt: chapter.updatedAt,
+    title: chapter.title,
+    content: chapter.content,
+    summary: chapter.summary,
+    status: chapter.status,
+    wordCount: chapter.wordCount,
+  };
 }
 
 interface UseChapterDraftOptions {
@@ -24,7 +38,7 @@ interface UseChapterDraftOptions {
   /** 是否自动保存（AppSettings.autoSave） */
   autoSave?: boolean;
   /** 真正落库的 PATCH，由调用方接 /api/chapters/[id] */
-  onPersist: (chapterId: string, patch: ChapterPatch) => Promise<void>;
+  onPersist: (chapterId: string, patch: ChapterPatch, expectedUpdatedAt: string | null, baseline: ChapterDraft | null) => Promise<Chapter>;
   /** 保存失败提示 */
   onError?: (message: string) => void;
   /** 浏览器临时草稿不可用时的提示 */
@@ -38,9 +52,11 @@ export interface ChapterDraftApi {
   /** 是否存在尚未落库的改动（用于离开页面提示） */
   hasUnsaved: boolean;
   hasUnsavedNow: () => boolean;
+  getSavedRevision: (chapterId: string) => string | null;
   recoveryDraft: ChapterDraft | null;
+  hasConflict: boolean;
   restoreRecovery: () => void;
-  discardRecovery: () => void;
+  discardRecovery: (chapterId: string) => void;
   setTitle: (title: string) => void;
   setContent: (html: string, wordCount: number) => void;
   setSummary: (summary: string) => void;
@@ -72,7 +88,10 @@ export function useChapterDraft({
   const [hasUnsaved, setHasUnsaved] = React.useState(false);
   const [recoveryDraft, setRecoveryDraft] = React.useState<ChapterDraft | null>(null);
 
+  const [hasConflict, setHasConflict] = React.useState(false);
+  const conflictRef = React.useRef<ApiError | null>(null);
   const draftRef = React.useRef<ChapterDraft | null>(null);
+  const baselineRef = React.useRef<ChapterDraft | null>(null);
   const pendingRef = React.useRef(false);
   const unsavedRef = React.useRef(false);
   const recoveryRef = React.useRef<ChapterDraft | null>(null);
@@ -97,6 +116,11 @@ export function useChapterDraft({
   const setRecovery = React.useCallback((value: ChapterDraft | null) => {
     recoveryRef.current = value;
     setRecoveryDraft(value);
+  }, []);
+
+  const getSavedRevision = React.useCallback((chapterId: string) => {
+    const baseline = baselineRef.current;
+    return baseline?.chapterId === chapterId ? baseline.expectedUpdatedAt ?? null : null;
   }, []);
 
   const hasUnsavedNow = React.useCallback(() =>
@@ -125,18 +149,25 @@ export function useChapterDraft({
     pendingRef.current = false;
     setSaveState("saving");
     try {
-      await onPersistRef.current(current.chapterId, {
+      const saved = await onPersistRef.current(current.chapterId, {
         title: current.title, content: current.content, summary: current.summary,
         status: current.status, wordCount: current.wordCount,
-      });
+      }, current.expectedUpdatedAt ?? null, baselineRef.current);
       try {
         removeMatchingRecoveryDraft(window.sessionStorage, current);
       } catch (error) {
         reportRecoveryError("章节已保存，但无法清理浏览器临时草稿。", error);
       }
       if (draftRef.current?.chapterId === current.chapterId) {
+        const baseline = toDraft(saved);
+        baselineRef.current = baseline;
+        const next = pendingRef.current
+          ? { ...draftRef.current, expectedUpdatedAt: saved.updatedAt }
+          : baseline;
+        draftRef.current = next;
+        setDraft(next);
         unsavedRef.current = pendingRef.current;
-        setLastSavedAt(new Date().toISOString());
+        setLastSavedAt(saved.updatedAt);
         setSaveState(pendingRef.current ? "dirty" : "saved");
         setHasUnsaved(pendingRef.current);
       }
@@ -145,11 +176,18 @@ export function useChapterDraft({
         pendingRef.current = true;
         unsavedRef.current = true;
         setSaveState("error"); setHasUnsaved(true);
+        if (err instanceof ApiError && err.status === 409) {
+          conflictRef.current = err;
+          setHasConflict(true);
+          stashUnsaved();
+        }
       }
-      onErrorRef.current?.(err instanceof Error ? err.message : "保存失败");
+      if (!(err instanceof ApiError && err.status === 409)) {
+        onErrorRef.current?.(err instanceof Error ? err.message : "保存失败");
+      }
       throw err;
     }
-  }, [reportRecoveryError]);
+  }, [reportRecoveryError, stashUnsaved]);
 
   const [runSaveQueue] = React.useState(() =>
     createSaveQueue(() => pendingRef.current && draftRef.current !== null, saveNext),
@@ -162,13 +200,14 @@ export function useChapterDraft({
       onRecoveryErrorRef.current?.(message);
       throw new Error(message);
     }
+    if (conflictRef.current) throw conflictRef.current;
     await runSaveQueue();
   }, [clearTimer, runSaveQueue]);
 
   /** 排自动保存定时器 */
   const schedule = React.useCallback((): void => {
     clearTimer();
-    if (!autoSave) return;
+    if (!autoSave || conflictRef.current) return;
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
       void flush().catch(() => {});
@@ -183,6 +222,9 @@ export function useChapterDraft({
     pendingRef.current = false;
     unsavedRef.current = false;
     setRecovery(null);
+    conflictRef.current = null;
+    setHasConflict(false);
+    baselineRef.current = null;
     const next = chapterRef.current;
     if (!next) {
       draftRef.current = null;
@@ -192,14 +234,8 @@ export function useChapterDraft({
       setHasUnsaved(false);
       return;
     }
-    const fresh: ChapterDraft = {
-      chapterId: next.id,
-      title: next.title,
-      content: next.content,
-      summary: next.summary,
-      status: next.status,
-      wordCount: next.wordCount,
-    };
+    const fresh = toDraft(next);
+    baselineRef.current = fresh;
     draftRef.current = fresh;
     setDraft(fresh);
     setSaveState("idle");
@@ -230,10 +266,13 @@ export function useChapterDraft({
       pendingRef.current = true;
       unsavedRef.current = true;
       setHasUnsaved(true);
-      setSaveState("dirty");
-      schedule();
+      if (conflictRef.current) stashUnsaved();
+      else {
+        setSaveState("dirty");
+        schedule();
+      }
     },
-    [schedule],
+    [schedule, stashUnsaved],
   );
 
   const setTitle = React.useCallback((title: string) => patchDraft({ title }), [patchDraft]);
@@ -262,6 +301,9 @@ export function useChapterDraft({
 
   const restoreRecovery = React.useCallback(() => {
     if (!recoveryDraft || draftRef.current?.chapterId !== recoveryDraft.chapterId) return;
+    if (baselineRef.current?.expectedUpdatedAt !== recoveryDraft.expectedUpdatedAt) {
+      baselineRef.current = null;
+    }
     draftRef.current = recoveryDraft;
     pendingRef.current = true;
     unsavedRef.current = true;
@@ -271,20 +313,24 @@ export function useChapterDraft({
     setRecovery(null);
   }, [recoveryDraft, setRecovery]);
 
-  const discardRecovery = React.useCallback(() => {
-    if (!recoveryDraft) return;
+  const discardRecovery = React.useCallback((id: string) => {
+    if (draftRef.current?.chapterId !== id) return;
     try {
-      removeMatchingRecoveryDraft(window.sessionStorage, recoveryDraft);
+      const stored = readRecoveryDraft(window.sessionStorage, id);
+      if (stored) removeMatchingRecoveryDraft(window.sessionStorage, stored);
       setRecovery(null);
     } catch (error) {
       reportRecoveryError("无法移除浏览器临时草稿，请检查浏览器存储后重试。", error);
     }
-  }, [recoveryDraft, reportRecoveryError, setRecovery]);
+  }, [reportRecoveryError, setRecovery]);
 
   const adoptSaved = React.useCallback((saved: Chapter) => {
     if (draftRef.current?.chapterId !== saved.id) return;
     clearTimer();
-    const next: ChapterDraft = {chapterId:saved.id,title:saved.title,content:saved.content,summary:saved.summary,status:saved.status,wordCount:saved.wordCount};
+    const next = toDraft(saved);
+    baselineRef.current = next;
+    conflictRef.current = null;
+    setHasConflict(false);
     draftRef.current=next; pendingRef.current=false; unsavedRef.current=false;
     setDraft(next); setHasUnsaved(false); setSaveState("saved"); setLastSavedAt(saved.updatedAt);
   },[clearTimer]);
@@ -295,7 +341,9 @@ export function useChapterDraft({
     lastSavedAt,
     hasUnsaved: hasUnsaved || recoveryDraft !== null,
     hasUnsavedNow,
+    getSavedRevision,
     recoveryDraft,
+    hasConflict,
     restoreRecovery,
     discardRecovery,
     setTitle,

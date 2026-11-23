@@ -82,6 +82,7 @@ function patch<T extends Row>(
   data: Record<string, unknown>,
   jsonKeys: string[] = [],
   hasUpdatedAt = true,
+  updatedAt?: string,
 ): void {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -94,9 +95,7 @@ function patch<T extends Row>(
   }
   if (sets.length === 0) return;
   if (hasUpdatedAt) sets.push(`"updated_at" = ?`);
-  params.push(hasUpdatedAt ? nowIso() : undefined);
-  params.pop();
-  if (hasUpdatedAt) params.push(nowIso());
+  if (hasUpdatedAt) params.push(updatedAt ?? nowIso());
   run(`UPDATE ${table} SET ${sets.join(", ")} WHERE id = ?`, [...params, id]);
 }
 
@@ -367,8 +366,17 @@ export function restoreChapter(chapter: Chapter): void {
   );
 }
 
+function nextChapterStamp(previous: string): string {
+  const previousMs = Date.parse(previous);
+  return Number.isFinite(previousMs)
+    ? new Date(Math.max(Date.now(), previousMs + 1)).toISOString()
+    : nowIso();
+}
+
 export function updateChapter(id: ID, data: Partial<Chapter>): Chapter {
-  patch("chapters", id, CHAPTER_COLS, data as Record<string, unknown>);
+  const current = getChapter(id);
+  if (!current) throw new Error(`chapter not found: ${id}`);
+  patch("chapters", id, CHAPTER_COLS, data as Record<string, unknown>, [], true, nextChapterStamp(current.updatedAt));
   const next = getChapter(id);
   if (!next) throw new Error(`chapter not found: ${id}`);
   return next;
@@ -396,7 +404,7 @@ export function moveChapter(id: ID, target: { volumeId?: ID | null; orderIndex?:
   const index = target.orderIndex === undefined ? siblings.length : Math.max(0, Math.min(target.orderIndex, siblings.length));
   siblings.splice(index, 0, id);
   tx(() => {
-    run("UPDATE chapters SET updated_at = ? WHERE id = ?", [nowIso(), id]);
+    run("UPDATE chapters SET updated_at = ? WHERE id = ?", [nextChapterStamp(current.updatedAt), id]);
     setChapterPositions(current.novelId, siblings.map((cid, orderIndex) => ({ id: cid, volumeId, orderIndex })));
   });
   return updateChapter(id, {});

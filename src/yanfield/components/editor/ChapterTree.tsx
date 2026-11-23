@@ -769,7 +769,7 @@ export function ChapterTree({
           confirm?.kind === "delete-volume"
             ? tr("卷“{title}”和它的卷纲会被删除。卷里的章节会移到“未分卷”，正文还在。", { title: confirm.volume.title })
             : confirm?.kind === "delete-chapter"
-              ? tr("章节“{title}”的正文与章纲将一起删除。", { title: confirm.chapter.title })
+              ? tr("章节“{title}”的正文、章纲与版本历史将一起删除。", { title: confirm.chapter.title })
               : undefined
         }
         confirmText={tr("删除")}

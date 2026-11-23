@@ -8,6 +8,7 @@ function isChapterDraft(value: unknown, chapterId: string): value is ChapterDraf
   if (!value || typeof value !== "object") return false;
   const draft = value as Record<string, unknown>;
   return draft.chapterId === chapterId
+    && (draft.expectedUpdatedAt == null || typeof draft.expectedUpdatedAt === "string")
     && typeof draft.title === "string"
     && typeof draft.content === "string"
     && typeof draft.summary === "string"

@@ -18,3 +18,20 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: node scripts/check-i18n.mjs
+
+  site-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Check the site with Windows line endings
+        shell: pwsh
+        run: |
+          $css = (Resolve-Path 'src/yanfield/app/globals.css').Path
+          $content = [IO.File]::ReadAllText($css) -replace "\r?\n", "`r`n"
+          [IO.File]::WriteAllText($css, $content)
+          npm run build:site
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run check:site
