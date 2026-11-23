@@ -202,7 +202,7 @@ The website ([yanfield.com](https://yanfield.com)) is a static site in `site/`: 
 
 ## Roadmap
 
-- **v0.1.x (current)**: writing desk, notes system, AI review and cost visibility;
+- **v0.2.0 (current)**: writing desk, notes system, chapter version history, AI review, and cost visibility;
 - **Next**: EPUB export and more detailed writing statistics;
 - **Later**: knowledge-graph view, model comparison, collaborative review.
 
